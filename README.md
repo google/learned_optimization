@@ -4,7 +4,7 @@ learned\_optimization is a research codebase for training learned
 optimizers. It implements a number of hand designed and learned optimizers, tasks to test them on, and a number of outer-training algorithms such as ES, PES.
 
 ## Quick Start Colab Notebooks
-The fastest way to get started is to fork a [colab notebook](https://github.com/google/learned_optimization) and leverage a free accelerator there.
+The fastest way to get started is to fork a [colab notebook](https://github.com/google/learned_optimization/notebooks) and leverage a free accelerator there.
 
 ## Installation
 
