@@ -5,7 +5,10 @@ optimizers. It implements hand designed and learned optimizers, tasks to meta-tr
 
 ## Quick Start Colab Notebooks
 
-The fastest way to get started is to fork a [colab notebook](https://github.com/google/learned_optimization/notebooks) and leverage a free accelerator there.
+Introduction notebook: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/notebooks/Part1_Introduction.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Creating custom tasks: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/notebooks/Part2_CustomTasks.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+The fastest way to get started is to copy the Introduction notebook, and run it on a free accelerator in colab.
 
 ## Installation
 
