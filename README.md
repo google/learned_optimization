@@ -1,9 +1,10 @@
-# learned\_optimization: Training and evaluating learned optimizers in Jax
+# learned\_optimization: Training and evaluating learned optimizers in JAX
 
 learned\_optimization is a research codebase for training learned
-optimizers. It implements a number of hand designed and learned optimizers, tasks to test them on, and a number of outer-training algorithms such as ES, PES.
+optimizers. It implements hand designed and learned optimizers, tasks to meta-train and meta-test them on, and outer-training algorithms such as ES and PES.
 
 ## Quick Start Colab Notebooks
+
 The fastest way to get started is to fork a [colab notebook](https://github.com/google/learned_optimization/notebooks) and leverage a free accelerator there.
 
 ## Installation
