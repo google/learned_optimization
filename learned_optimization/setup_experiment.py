@@ -24,6 +24,8 @@ from learned_optimization import filesystem
 flags.DEFINE_multi_string("gin_bindings", None,
                           "Newline separated list of Gin parameter bindings.")
 
+flags.DEFINE_multi_string("gin_import", None, "List of modules to import")
+
 flags.DEFINE_multi_string("config_file", None,
                           "List of paths to the config files for Gin.")
 
@@ -40,6 +42,10 @@ def parse_and_set_gin_config(finalize: bool, skip_unknown: bool):
   # We want to be able to parse strings and configurables from cmd line args
   # To do this, we assume configurables are starting with @ and %, the rest are
   # strings.
+  if FLAGS.gin_import:
+    for imp in FLAGS.gin_import:
+      logging.info("Gin is importing %s", imp)
+      __import__(imp)
 
   if FLAGS.gin_bindings:
     for i, g in enumerate(FLAGS.gin_bindings):

@@ -92,6 +92,7 @@ def single_task_to_family(task: Task,
                           name: Optional[str] = None,
                           eval_task: Optional[Task] = None) -> TaskFamily:
   """Makes a TaskFamily which always returns the provided class."""
+
   if eval_task is None:
     eval_task = task
 
@@ -113,6 +114,16 @@ def single_task_to_family(task: Task,
       return eval_task
 
   return _TaskFamily()
+
+
+@gin.configurable
+def sample_single_task_family(key: PRNGKey,
+                              task_family: TaskFamily) -> TaskFamily:
+  del key
+  if not isinstance(task_family, TaskFamily):
+    raise ValueError("task_family must be an instance of TaskFamily!"
+                     f" Not {type(task_family)}")
+  return task_family
 
 
 def softmax_cross_entropy(

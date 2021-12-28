@@ -58,7 +58,7 @@ class LearnableSGD(LearnedOptimizer):
     self.initial_lr = initial_lr
 
   def init(self, rng: PRNGKey) -> MetaParams:
-    return hk.data_structures.to_immutable_dict(
+    return hk.data_structures.to_haiku_dict(
         {"log_lr": jnp.log(jnp.asarray(self.initial_lr))})
 
   def opt_fn(self, theta, is_training=False) -> opt_base.Optimizer:
@@ -79,7 +79,7 @@ class LearnableSGDM(LearnedOptimizer):
     self.initial_momentum = initial_momentum
 
   def init(self, rng: PRNGKey) -> MetaParams:
-    return hk.data_structures.to_immutable_dict({
+    return hk.data_structures.to_haiku_dict({
         "log_lr": jnp.log(jnp.asarray(self.initial_lr)),
         "one_minus_momentum": one_minus_log.forward(self.initial_momentum)
     })
@@ -115,7 +115,7 @@ class LearnableAdam(LearnedOptimizer):
     self.use_summary = use_summary
 
   def init(self, rng: PRNGKey) -> MetaParams:
-    return hk.data_structures.to_immutable_dict({
+    return hk.data_structures.to_haiku_dict({
         "log_lr": jnp.log(jnp.asarray(self.initial_lr)),
         "one_minus_beta1": one_minus_log.forward(self.initial_beta1),
         "one_minus_beta2": one_minus_log.forward(self.initial_beta2),

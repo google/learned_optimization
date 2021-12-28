@@ -27,16 +27,21 @@ import jax
 import jax.numpy as jnp
 import numpy as onp
 
+import tensorflow.compat.v2 as tf
+
 # Oryx can be a bit tricky to install. Turning off summaries
 try:
   import oryx  # pylint: disable=g-import-not-at-top
-  oryx.core.sow
+  _ = oryx.core.sow  # Ensure that loading of sow works.
   ORYX_LOGGING = True
 except (ImportError, AttributeError):
   logging.error("Oryx not found! This library will still work but no summary"
                 "will be logged.")
   ORYX_LOGGING = False
 
+# Right now we make use of flax's metrics which uses tensorflow for summary
+# writing. This requires TF2.0 eager style execution.
+tf.enable_v2_behavior()
 
 F = TypeVar("F", bound=Callable)
 G = TypeVar("G", bound=Callable)
@@ -216,6 +221,7 @@ def with_summary_output_reduced(fn: F, static_argnums=()) -> G:
     if ORYX_LOGGING:
       out_fn = oryx.core.harvest(jax_args_fn, tag=_SOW_TAG)
     else:
+
       def out_fn(unused_in, *args):
         outs = jax_args_fn(*args)
         return outs, {}
@@ -383,5 +389,4 @@ class MultiWriter(SummaryWriterBase):
 TensorboardWriter = tensorboard.SummaryWriter
 # TODO(lmetz) implement / bring in summary writer that doesn't use TF.
 JaxboardWriter = tensorboard.SummaryWriter
-
 

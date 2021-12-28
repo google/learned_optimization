@@ -346,7 +346,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
     fac_vec_v = jnp.ones([len(self._initial_adafactor_decays)])
     mod_theta = self._mod_init(key, global_features, p, g, m, rms, fac_g,
                                fac_vec_col, fac_vec_row, fac_vec_v)
-    return hk.data_structures.to_immutable_dict({
+    return hk.data_structures.to_haiku_dict({
         "momentum_decays": jnp.zeros([len(self._initial_momentum_decays)]),
         "rms_decays": jnp.zeros([len(self._initial_rms_decays)]),
         "adafactor_decays": jnp.zeros([len(self._initial_adafactor_decays)]),

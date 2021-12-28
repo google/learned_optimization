@@ -24,7 +24,7 @@ from absl import logging
 flags.DEFINE_bool("profile_log_times", False, "Log out timing information.")
 
 FLAGS = flags.FLAGS
-FLAGS(sys.argv, known_only=True)  # Ensure flags are kj
+FLAGS(sys.argv, known_only=True)  # Ensure flags are parsed at this time.
 
 
 class Profile:
@@ -44,7 +44,7 @@ class Profile:
 
   def __exit__(self, exc_type, exc_value, traceback):
     if FLAGS.profile_log_times:
-      logging.info(f"{self.name} took {time.time()-self._start_time} seconds")  # pylint: disable=logging-format-interpolation
+      logging.info(f"{self.name} took {time.time()-self._start_time} seconds")  # pylint: disable=logging-fstring-interpolation
 
 
 def wrap():

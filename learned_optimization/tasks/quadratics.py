@@ -94,7 +94,7 @@ class SumQuadraticTask(base.Task):
 
   def init(self, key):
     key1, key2 = jax.random.split(key)
-    param = hk.data_structures.to_immutable_dict({
+    param = hk.data_structures.to_haiku_dict({
         "a": jax.random.normal(key1, shape=(10,)),
         "b": jax.random.normal(key2, shape=(10,))
     })

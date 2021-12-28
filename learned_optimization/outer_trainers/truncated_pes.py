@@ -312,14 +312,15 @@ class TruncatedPES(gradient_learner.GradientEstimator):
 
   @profile.wrap()
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
-                        outer_state: Any, key: PRNGKey) -> PESWorkerState:
+                        key: PRNGKey) -> PESWorkerState:
     key1, key2 = jax.random.split(key)
     theta = worker_weights.theta
     # Note this doesn't use sampled theta for the first init.
     # I believe this is fine most of the time.
     # TODO(lmetz) consider init-ing at an is_done state instead.
     pos_unroll_state = init_single_state(self.task_family, self.learned_opt,
-                                         self.trunc_sched, theta, outer_state,
+                                         self.trunc_sched, theta,
+                                         worker_weights.outer_state,
                                          jax.random.split(key1, self.num_tasks))
 
     neg_unroll_state = pos_unroll_state
@@ -350,7 +351,6 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       worker_weights: gradient_learner.WorkerWeights,
       key: PRNGKey,
       state: PESWorkerState,
-      outer_state: Any,
       with_summary: bool = False
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
 
@@ -392,14 +392,16 @@ class TruncatedPES(gradient_learner.GradientEstimator):
           self.train_and_meta,
       ]
       (p_state, p_ys), m = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
-          *(static_args + [vec_p_theta, key, p_state, datas, outer_state]),
+          *(static_args +
+            [vec_p_theta, key, p_state, datas, worker_weights.outer_state]),
           with_summary=with_summary,
           sample_rng_key=next(rng))
       metrics.append(m)
 
       p_yses.append(p_ys)
       (n_state, n_ys), _ = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
-          *(static_args + [vec_n_theta, key, n_state, datas, outer_state]),
+          *(static_args +
+            [vec_n_theta, key, n_state, datas, worker_weights.outer_state]),
           with_summary=False)
       n_yses.append(n_ys)
 

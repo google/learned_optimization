@@ -189,7 +189,7 @@ def image_classification_datasets(
           normalize_std, shape=[1, 1, 1, 3], dtype=image.dtype)
 
     batch["label"] = tf.cast(batch["label"], tf.int32)
-    return hk.data_structures.to_immutable_dict({
+    return hk.data_structures.to_haiku_dict({
         "image": batch["image"],
         "label": batch["label"]
     })

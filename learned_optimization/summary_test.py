@@ -40,6 +40,7 @@ def fn2(static, a):
   summary.summary(a, name=static)
   return a * 2
 
+
 if summary.ORYX_LOGGING:
 
   class SummaryTest(absltest.TestCase):

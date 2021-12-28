@@ -30,11 +30,10 @@ class FakeGradientEstimator(gradient_learner.GradientEstimator):
     self.task_family = quadratics.FixedDimQuadraticFamily(10)
     self.grad_val = grad_val
 
-  def init_worker_state(self, worker_weights, outer_state, key):
+  def init_worker_state(self, worker_weights, key):
     return 0
 
-  def compute_gradient_estimate(self, worker_weights, key, state, outer_state,
-                                with_summary):
+  def compute_gradient_estimate(self, worker_weights, key, state, with_summary):
     out = gradient_learner.GradientEstimatorOut(
         1.0,
         grad=jax.tree_map(lambda x: x * 0 + self.grad_val,
@@ -74,19 +73,19 @@ class GradientLearnerTest(absltest.TestCase):
   def test_gradient_worker_compute(self):
     estimators = [FakeGradientEstimator(0), FakeGradientEstimator(1)]
     key = jax.random.PRNGKey(0)
-    theta = hk.data_structures.to_immutable_dict({"theta": 12.})
-    worker_weights = gradient_learner.WorkerWeights(theta, None)
+    theta = hk.data_structures.to_haiku_dict({"theta": 12.})
+    worker_weights = gradient_learner.WorkerWeights(
+        theta, None, gradient_learner.OuterState(1))
     unroll_states = [
-        t.init_worker_state(worker_weights, None, key) for t in estimators
+        t.init_worker_state(worker_weights, key) for t in estimators
     ]
     gradient_out = gradient_learner.gradient_worker_compute(
-        worker_weights, 1, estimators, unroll_states, key, with_metrics=True)
+        worker_weights, estimators, unroll_states, key, with_metrics=True)
     self.assertEqual(gradient_out.to_put.theta_grads["theta"], 0.5)
     self.assertEqual(gradient_out.unroll_states[0], 1)
 
     gradient_out = gradient_learner.gradient_worker_compute(
         worker_weights,
-        1,
         estimators,
         gradient_out.unroll_states,
         key,

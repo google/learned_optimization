@@ -16,7 +16,7 @@
 """Train a learned optimizer with gradients."""
 import abc
 import functools
-from typing import Any, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from absl import logging
 import flax
@@ -43,9 +43,15 @@ class GradientLearnerState:
 
 
 @flax.struct.dataclass
+class OuterState:
+  outer_iteration: jnp.ndarray
+
+
+@flax.struct.dataclass
 class WorkerWeights:
   theta: Any
   theta_model_state: Any
+  outer_state: OuterState
 
 
 @flax.struct.dataclass
@@ -84,11 +90,6 @@ class GradientEstimatorOut:
   unroll_info: UnrollInfo
 
 
-@flax.struct.dataclass
-class OuterState:
-  outer_iteration: jnp.ndarray
-
-
 @jax.jit
 def _tree_mean(stack):
   return jax.tree_map(lambda x: jnp.mean(x, axis=0), stack)
@@ -124,7 +125,9 @@ class GradientLearner:
 
   def get_state_for_worker(self, state: GradientLearnerState) -> WorkerWeights:
     return WorkerWeights(
-        self.get_lopt_params(state), self.get_lopt_model_state(state))
+        theta=self.get_lopt_params(state),
+        theta_model_state=self.get_lopt_model_state(state),
+        outer_state=OuterState(state.theta_opt_state.iteration))
 
   def init(self, key: PRNGKey) -> GradientLearnerState:
     """Initial state of the GradientLearner.
@@ -233,14 +236,13 @@ class GradientEstimator(abc.ABC):
   """Base class for classes which estimate grads (via ES, PES, or backprop)."""
   task_family: tasks_base.TaskFamily
 
-  def init_worker_state(self, worker_weights: WorkerWeights, outer_state: Any,
+  def init_worker_state(self, worker_weights: WorkerWeights,
                         key: PRNGKey) -> GradientEstimatorState:
     raise NotImplementedError()
 
   def compute_gradient_estimate(
       self, worker_weights: WorkerWeights, key: PRNGKey,
-      state: GradientEstimatorState, outer_state: Any,
-      with_summary: Optional[bool]
+      state: GradientEstimatorState, with_summary: Optional[bool]
   ) -> Tuple[GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
     raise NotImplementedError()
 
@@ -254,8 +256,14 @@ def _nan_to_num(vals, replace, use_jnp=False):
     return jax.tree_map(onp.nan_to_num, vals)
 
 
-@functools.partial(jax.jit, static_argnums=(0, 1))
 def _tree_zeros_on_device(shapes, device):
+  leaves, treedef = jax.tree_flatten(shapes)
+  return jax.tree_unflatten(treedef,
+                            _tree_zeros_on_device_inner(tuple(leaves), device))
+
+
+@functools.partial(jax.jit, static_argnums=(0, 1))
+def _tree_zeros_on_device_inner(shapes, device):
   zero_val = lambda x: jax.device_put(jnp.asarray(0, dtype=x.dtype), device)
   return jax.tree_map(lambda x: jnp.full(x.shape, zero_val(x)), shapes)
 
@@ -264,7 +272,6 @@ def _tree_zeros_on_device(shapes, device):
 @profile.wrap()
 def gradient_worker_compute(
     worker_weights: WorkerWeights,
-    step: Union[jnp.ndarray, int],
     gradient_estimators: Sequence[GradientEstimator],
     unroll_states: Sequence[GradientEstimatorState],
     key: PRNGKey,
@@ -280,7 +287,6 @@ def gradient_worker_compute(
   Args:
     worker_weights: Weights created by the GradientLearner and represent the
       current parameters and model state of the learned optimizer.
-    step: meta-training iteration
     gradient_estimators: The gradient estimators used to update the unroll state
     unroll_states: state of the gradient estimator (e.g. inner problem weights)
     key: jax rng
@@ -298,12 +304,9 @@ def gradient_worker_compute(
   worker_weights = jax.device_put(worker_weights, device)
   unroll_states = jax.device_put(unroll_states, device)
   key = jax.device_put(key, device)
-  step = jax.device_put(step, device)
 
   theta = worker_weights.theta
   theta_model_state = worker_weights.theta_model_state
-
-  outer_state = OuterState(outer_iteration=step)
 
   theta_shape = jax.tree_map(lambda x: jax.ShapedArray(x.shape, x.dtype), theta)
   grads_accum = _tree_zeros_on_device(theta_shape, device)
@@ -322,11 +325,7 @@ def gradient_worker_compute(
 
       with profile.Profile(f"unroll__metrics{with_metrics}"):
         estimator_out, metrics = estimator.compute_gradient_estimate(
-            worker_weights,
-            rng,
-            unroll_state,
-            outer_state,
-            with_summary=with_metrics)
+            worker_weights, rng, unroll_state, with_summary=with_metrics)
 
       unroll_states_out.append(estimator_out.unroll_state)
       losses.append(estimator_out.mean_loss)
@@ -347,7 +346,7 @@ def gradient_worker_compute(
             "loss": estimator_out.unroll_info.loss[idx, :],
             "task_param": jax.tree_map(fn, onp_task_params),
             "iteration": estimator_out.unroll_info.iteration[idx],
-            "outer_iteration": outer_state.outer_iteration,
+            "outer_iteration": worker_weights.outer_state.outer_iteration,
         })
       else:
         logging.warn("No out specified by learner. "
@@ -457,7 +456,7 @@ class SingleMachineGradientLearner:
     worker_weights = self.gradient_learner.get_state_for_worker(theta_state)
     keys = jax.random.split(key, len(self.gradient_estimators))
     unroll_states = [
-        grad_est.init_worker_state(worker_weights, None, key)
+        grad_est.init_worker_state(worker_weights, key)
         for key, grad_est in zip(keys, self.gradient_estimators)
     ]
 
@@ -488,7 +487,6 @@ class SingleMachineGradientLearner:
         state.gradient_learner_state)
     worker_compute_out = gradient_worker_compute(
         worker_weights,
-        None,
         self.gradient_estimators,
         state.gradient_estimator_states,
         key=key1,

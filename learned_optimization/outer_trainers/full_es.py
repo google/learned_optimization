@@ -427,7 +427,7 @@ class FullES(gradient_learner.GradientEstimator):
                        " multiples of each other.")
 
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
-                        outer_state: Any, key: PRNGKey) -> UnrollState:
+                        key: PRNGKey) -> UnrollState:
     return UnrollState()
 
   def compute_gradient_estimate(
@@ -435,7 +435,6 @@ class FullES(gradient_learner.GradientEstimator):
       worker_weights,
       key,
       state,
-      outer_state,
       with_summary=False,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
     rng = hk.PRNGSequence(key)

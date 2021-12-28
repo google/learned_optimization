@@ -13,18 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Utilities to test trainers."""
-import jax
-from learned_optimization.outer_trainers import gradient_learner
+"""Tests for simple_lopt_train."""
+
+import tempfile
+
+from absl.testing import absltest
+from learned_optimization.examples import simple_lopt_train
+from learned_optimization.tasks import quadratics
 
 
-def trainer_smoketest(trainer):
-  key = jax.random.PRNGKey(0)
-  theta = trainer.learned_opt.init(key)
-  worker_weights = gradient_learner.WorkerWeights(
-      theta, None, gradient_learner.OuterState(1))
-  state = trainer.init_worker_state(worker_weights, key=key)
-  out, metrics = trainer.compute_gradient_estimate(
-      worker_weights, key, state, with_summary=True)
-  del out
-  del metrics
+class SimpleLoptTrainTest(absltest.TestCase):
+
+  def test_train(self):
+    with tempfile.TemporaryDirectory() as path:
+      simple_lopt_train.train(path, 10, task=quadratics.QuadraticTask())
+
+
+if __name__ == '__main__':
+  absltest.main()

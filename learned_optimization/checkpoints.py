@@ -152,6 +152,7 @@ def periodically_save_checkpoint(
       paths[prefix] = path
       _last_checkpoint_time[prefix] = time.time()
 
+    paths = hk.data_structures.to_immutable_dict(paths)
     return paths
   else:
     return None

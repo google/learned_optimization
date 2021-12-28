@@ -25,6 +25,7 @@ from absl.testing import absltest
 import courier
 from learned_optimization import summary
 from learned_optimization.continuous_eval import run_eval_chief
+from learned_optimization.continuous_eval import task_group_server
 import numpy as onp
 
 
@@ -77,36 +78,51 @@ class RunEvalChiefTest(absltest.TestCase):
                        os.path.join(monitor_dir, "default_params_2"))
 
   def get_fake_results(self, i=432):
-    task_group = "0"
 
     value1 = {
-        "train/loss": onp.asarray([0.0, 0.0]),
-        "train/norm_loss": onp.asarray([0.0, 0.0]),
-        "outer_valid/loss": onp.asarray([0.0, 0.0]),
-        "outer_valid/norm_loss": onp.asarray([0.0, 0.0]),
+        "eval/train/loss": onp.asarray([0.0, 0.0]),
+        "eval/train/norm_loss": onp.asarray([0.0, 0.0]),
+        "eval/outer_valid/loss": onp.asarray([0.0, 0.0]),
+        "eval/outer_valid/norm_loss": onp.asarray([0.0, 0.0]),
         "total_time": 1.0,
         "gen_id": "my_genid",
         "step": i
     }
 
     value2 = {
-        "train/loss": onp.asarray([0.0, 0.0, 1.0]),
-        "train/norm_loss": onp.asarray([0.0, 0.0, 1.0]),
-        "outer_valid/loss": onp.asarray([0.0, 0.0, 1.0]),
-        "outer_valid/norm_loss": onp.asarray([0.0, 0.0, 1.0]),
+        "eval/train/loss": onp.asarray([0.0, 0.0, 1.0]),
+        "eval/train/norm_loss": onp.asarray([0.0, 0.0, 1.0]),
+        "eval/outer_valid/loss": onp.asarray([0.0, 0.0, 1.0]),
+        "eval/outer_valid/norm_loss": onp.asarray([0.0, 0.0, 1.0]),
         "total_time": 1.0,
         "gen_id": "my_genid",
         "step": i
     }
 
     values = [value1, value2]
-    task1 = ["eval_task_family.task_fn=@QuadraticTask"], "task1"
-    task2 = ["eval_task_family.task_fn=@QuadraticTask"], "task2"
-    tasks = [task1, task2]
-    task_group = (0, {
+
+    paths = {
         "params_": "path/blah_params_123",
         "checkpoint_": "path/blah_checkpoint_123",
-    })
+    }
+    task_group = (0, paths)
+
+    task1 = task_group_server.EvalTask(
+        task_content=(
+            ["eval_task_family.task_fn=@QuadraticTask"],
+            "task1",
+        ),
+        task_group=task_group,
+        task_index=0)
+    task2 = task_group_server.EvalTask(
+        task_content=(
+            ["eval_task_family.task_fn=@QuadraticTask"],
+            "task2",
+        ),
+        task_group=task_group,
+        task_index=1)
+
+    tasks = [task1, task2]
     result = task_group, values, tasks
     return result
 

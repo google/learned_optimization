@@ -54,6 +54,7 @@ def uniquify_server_name(server_name: str, experiment_name: str) -> str:
   hmod = hashlib.sha256()
   hmod.update(experiment_name.encode("utf-8"))
   hval = hmod.hexdigest()[0:20]
+  logging.info(f"Hashing experiment name [{experiment_name}] => {str(hval)}")  #. pylint: disable=g-fstring-interpolation
   return str(hval) + "__" + server_name
 
 

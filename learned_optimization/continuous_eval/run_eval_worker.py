@@ -185,7 +185,8 @@ def connect_to_server_and_do_tasks(train_log_dir: str):
   """
   chief_name, unused_num_workers, lopt = run_eval_chief.eval_chief_config()
 
-  server_name = distributed.uniquify_server_name(train_log_dir, chief_name)
+  server_name = distributed.uniquify_server_name(
+      chief_name, os.path.join(train_log_dir, chief_name))
 
   logging.info("Connecting to client  [[%s]]", server_name)
   client = courier.Client(str(server_name))

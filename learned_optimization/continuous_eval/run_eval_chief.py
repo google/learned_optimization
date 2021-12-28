@@ -27,6 +27,7 @@ from absl import logging
 from flax.metrics import tensorboard
 from flax.training import checkpoints
 import gin
+import haiku as hk
 import jax.numpy as jnp
 from learned_optimization import filesystem
 from learned_optimization import profile
@@ -130,7 +131,7 @@ def monitor_checkpoint_dir(
         fs.append(executor.submit(_retry_copy, got_path, copy_path))
       # block until all copy are done.
       _ = [f.result() for f in fs]
-    yield (last_idx, prefix_to_copy_path)
+    yield (last_idx, hk.data_structures.to_immutable_dict(prefix_to_copy_path))
 
 
 @profile.wrap()
@@ -163,9 +164,8 @@ def convert_result_to_metric_dict(task_group: Tuple[int, Mapping[str, str]],
   # For the evaluation jobs we have here, tasks looks like:
   # (path, (["bindings=name", ...], name_of_task))
 
-  unnorm_v = [r["train/loss"] for r in values]
-  norm_v = [r["train/norm_loss"] for r in values]
-
+  unnorm_v = [r["eval/train/loss"] for r in values]
+  norm_v = [r["eval/train/norm_loss"] for r in values]
   times = [r["total_time"] for r in values]
 
   to_write = {}
@@ -184,7 +184,7 @@ def convert_result_to_metric_dict(task_group: Tuple[int, Mapping[str, str]],
   to_write["last_inner_norm_meta_loss"] = float(inner_norm_meta_loss)
 
   if "outer_valid" in values[0]:
-    valid_norm_v = [r["outer_valid/norm_loss"] for r in values]
+    valid_norm_v = [r["eval/outer_valid/norm_loss"] for r in values]
 
     valid_meta_loss = onp.mean([onp.nanmean(x) for x in valid_norm_v])
     to_write["inner_norm_valid_meta_loss"] = float(valid_meta_loss)
@@ -212,8 +212,7 @@ def convert_result_to_metric_dict(task_group: Tuple[int, Mapping[str, str]],
   all_mean_last = []
 
   for t, v, inner_norm_v, task_time in zip(tasks, unnorm_v, norm_v, times):
-    cfg, name = t
-
+    cfg, name = t.task_content
     to_write[f"{name}/time"] = task_time
 
     to_write[f"{name}/nonorm_avg_meta_loss"] = onp.mean(v)
@@ -316,6 +315,7 @@ def write_results_thread_main(
       logging.info(str(tasks))
 
       metrics = convert_result_to_metric_dict(task_group, values, tasks)
+      logging.info("Successfully converted metrics %s", str(metrics))
 
       steps = [r["step"] for r in values]
       step = int(steps[0])
