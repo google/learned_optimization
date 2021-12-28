@@ -78,7 +78,7 @@ The decision to branch at a checkpoint is governed by a `Mutate` class which has
 This trains each worker of the population for some amount of time (either measured in steps, or wallclock). Once this time has elapsed, and an evaluation is has been sent back for each worker,
 all workers are compared. The best performing worker is selected and the parameters and hyper-parameters of this worker are copied to the other workers, and the hyper-parameters are modified.
 
-This is a simplified setup to that explored in the (population based training paper)[https://arxiv.org/abs/1711.09846].
+This is a simplified setup to that explored in the [population based training paper](https://arxiv.org/abs/1711.09846).
 
 ### Fixed schedule
 This trains a single worker and modifies hyper parameters in a fixed schedule specified at construction.
