@@ -1,14 +1,16 @@
-# learned\_optimization: Training and evaluating learned optimizers in Jax
+# learned\_optimization: Training and evaluating learned optimizers in JAX
 
-learned\_optimazation is a research codebase for training learned
-optimizers. It implements a number of hand designed and learned optimizers, tasks to test them on, and a number of outer-training algorithms such as ES, PES.
+learned\_optimization is a research codebase for training learned
+optimizers. It implements hand designed and learned optimizers, tasks to meta-train and meta-test them on, and outer-training algorithms such as ES and PES.
 
 ## Quick Start Colab Notebooks
-The fastest way to get started is to fork a colab notebook and leverage a free accelerator there.
 
-TODO notebook links
+- Introduction notebook: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/notebooks/Part1_Introduction.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+- Creating custom tasks: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/notebooks/Part2_CustomTasks.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-## Installation
+The fastest way to get started is to copy the Introduction notebook, and experiment using a free accelerator in colab (go to `Runtime` -> `Change runtime type` in colab to select a TPU or GPU backend).
+
+## Local Installation
 
 We strongly recommend using virtualenv to work with this package.
 
