@@ -16,7 +16,7 @@
 """Worker for continuous evaluation."""
 import os
 import time
-from typing import Mapping, Optional, TypeVar, Union
+from typing import Mapping, Optional, TypeVar, Union, Any, Callable
 
 from absl import app
 from absl import flags
@@ -24,6 +24,7 @@ from absl import logging
 import courier
 import gin
 import jax
+import jax.numpy as jnp
 from learned_optimization import checkpoints
 from learned_optimization import distributed
 from learned_optimization import eval_training
@@ -38,6 +39,7 @@ from learned_optimization.tasks import base as tasks_base
 import numpy as onp
 
 FLAGS = flags.FLAGS
+PRNGKey = jnp.ndarray
 
 _cache = []
 
@@ -74,24 +76,61 @@ _task_family_cache = {}
 @gin.configurable
 def get_task_family(
     task: Optional[tasks_base.Task] = None,
-    task_family: Optional[tasks_base.TaskFamily] = None
-) -> tasks_base.TaskFamily:
+    task_family: Optional[tasks_base.TaskFamily] = None,
+    task_family_seed: Optional[int] = None,
+    sample_task_family_fn: Optional[Callable[[PRNGKey],
+                                             tasks_base.TaskFamily]] = None,
+    sample_task_family_fn_seed: Optional[int] = None) -> tasks_base.TaskFamily:
   """Load the task family.
 
   This function is to be overloaded by gin. Only pass one of either task
-  or task_family.
+  or task_family, or sample_task_family_fn.
 
   Args:
     task: Task to use
     task_family: Task family to use
+    task_family_seed: seed to use when sampling from a task_family. This is
+      useful to reduce eval variance if the task family has a wide variety of
+      tasks.
+    sample_task_family_fn: A callable that samples a task_family
+    sample_task_family_fn_seed: The seed used when drawing the sample from
+      sample_task_family_fn.
 
   Returns:
     TaskFamily instance containing either the task, or the task_family.
   """
-  if sum([x is None for x in [task, task_family]]) != 1:
-    raise ValueError("Must set only a single kind of task config in gin.")
+  if sum([x is not None for x in [task, task_family, sample_task_family_fn]
+         ]) != 1:
+    raise ValueError(
+        "Must set only a single kind of task config in gin.\n"
+        f"Passed in: task: {task}\n"
+        f"Passed in: task_family: {task_family}\n"
+        f"Passed in: sample_task_family_fn: {sample_task_family_fn}\n")
+
+  if sample_task_family_fn:
+    if sample_task_family_fn_seed is None:
+      sample_task_family_fn_seed = onp.random.randint(0, 100000)
+    task_family = sample_task_family_fn(
+        jax.random.PRNGKey(sample_task_family_fn_seed))
+
   if task_family:
-    return task_family
+    if task_family_seed is not None:
+
+      class _TaskFamily(tasks_base.TaskFamily):
+
+        def __init__(self):
+          self.datasets = task_family.datasets
+
+        def sample(self, key: PRNGKey) -> Any:
+          return task_family.sample(jax.random.PRNGKey(task_family_seed))
+
+        def task_fn(self, cfg: Any) -> Any:
+          return task_family.task_fn(cfg)
+
+      return _TaskFamily()
+
+    else:
+      return task_family
   if task:
     return tasks_base.single_task_to_family(task)
   raise NotImplementedError()
