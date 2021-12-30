@@ -106,7 +106,7 @@ def monitor_checkpoint_dir(
   while True:
     with profile.Profile("waiting"):
       last_idx = _last_checkpoint_idx(monitor_dir, prefix_to_monitor)
-      logging.info(f"Last checkpoint found: {last_idx}. But on current {step}")  # pylint: disable=logging-format-interpolation
+      logging.info(f"Last checkpoint found: {last_idx}. But on current {step}")  # pylint: disable=logging-fstring-interpolation
       if last_idx is None or last_idx <= step:
         time.sleep(sleep_time)
         continue
@@ -421,13 +421,13 @@ def run_evaluation_chief(train_log_dir: str,
 
     if not skip:
       with profile.Profile("add_task_group"):
-        logging.info(  # pylint: disable=logging-format-interpolation
+        logging.info(  # pylint: disable=logging-fstring-interpolation
             f"Adding a {len(evaluation_set)} evaluations for checkpoint paths {prefix_mapping}"
         )
         chief.add_task_group((task_index, prefix_mapping), evaluation_set)
     else:
       logging.info("Skipping checkpoint %s", str(prefix_mapping))
-      for path in prefix_mapping:
+      for path in prefix_mapping.values():
         filesystem.remove(path)
 
 
