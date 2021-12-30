@@ -5,8 +5,8 @@ optimizers. It implements hand designed and learned optimizers, tasks to meta-tr
 
 ## Quick Start Colab Notebooks
 
-- Introduction notebook: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/notebooks/Part1_Introduction.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
-- Creating custom tasks: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/notebooks/Part2_CustomTasks.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+- Introduction notebook: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/learned_optimization/notebooks/Part1_Introduction.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+- Creating custom tasks: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/learned_optimization/notebooks/Part2_CustomTasks.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 The fastest way to get started is to copy the Introduction notebook, and experiment using a free accelerator in colab (go to `Runtime` -> `Change runtime type` in colab to select a TPU or GPU backend).
 
