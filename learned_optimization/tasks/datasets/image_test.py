@@ -39,6 +39,11 @@ class ImageTest(absltest.TestCase):
     data = next(datasets.train)
     self.assertEqual(data["image"].shape, (128, 28, 28, 3))
 
+  def test_imagenet16(self):
+    datasets = image.imagenet16_datasets(128)
+    data = next(datasets.train)
+    self.assertEqual(data["image"].shape, (128, 16, 16, 3))
+
 
 if __name__ == "__main__":
   absltest.main()

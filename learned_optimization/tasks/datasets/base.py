@@ -17,18 +17,26 @@
 
 import dataclasses
 import functools
+import os
 import threading
-from typing import Any, Callable, Iterator, Tuple, Optional
+from typing import Any, Callable, Iterator, Mapping, Optional, Sequence, Tuple
 
 from absl import logging
 from flax.training import prefetch_iterator
 import haiku as hk
 import jax
+from learned_optimization import filesystem
 import numpy as onp
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
 Batch = Any
+
+
+def get_tfrecord_data_dir():
+  data_dir = os.environ.get("TFDS_DATA_DIR", "~/tensorflow_datasets")
+  logging.info("Using tfrecord data dir of: %s", data_dir)
+  return os.path.expanduser(data_dir)
 
 
 @dataclasses.dataclass
@@ -131,15 +139,48 @@ def datasets_map(fn: Callable[[Batch], Batch], datasets: Datasets) -> Datasets:
       test=map(fn, datasets.test))
 
 
-def image_classification_datasets(
+def _image_map_fn(cfg: Mapping[str, Any], batch: Batch) -> Batch:
+  """Apply transformations + data aug to batch of data."""
+  # batch is the entire tensor, with shape:
+  # [batchsize, img width, img height, channels]
+  batch = {k: v for k, v in batch.items()}
+  if tuple(batch["image"].shape[1:3]) != cfg["image_size"]:
+    batch["image"] = tf.image.resize(batch["image"], cfg["image_size"])
+
+  if cfg["stack_channels"] != 1:
+    assert batch["image"].shape[3] == 1, batch["image"].shape
+    batch["image"] = tf.tile(batch["image"], (1, 1, 1, cfg["stack_channels"]))
+
+  if cfg["aug_flip_left_right"]:
+    batch["image"] = tf.image.random_flip_left_right(batch["image"])
+
+  if cfg["aug_flip_up_down"]:
+    batch["image"] = tf.image.random_flip_up_down(batch["image"])
+
+  if cfg["normalize_mean"] is None:
+    batch["image"] = tf.cast(batch["image"], tf.float32) / 255.
+  else:
+    assert cfg["normalize_std"] is not None
+    image = tf.cast(batch["image"], tf.float32)
+    image -= tf.constant(
+        cfg["normalize_mean"], shape=[1, 1, 1, 3], dtype=image.dtype)
+    batch["image"] = image / tf.constant(
+        cfg["normalize_std"], shape=[1, 1, 1, 3], dtype=image.dtype)
+
+  batch["label"] = tf.cast(batch["label"], tf.int32)
+  return hk.data_structures.to_immutable_dict({
+      "image": batch["image"],
+      "label": batch["label"]
+  })
+
+
+def preload_tfds_image_classification_datasets(
     datasetname: str,
     splits: Tuple[str, str, str, str],
     batch_size: int,
     image_size: Tuple[int, int],
     stack_channels: int = 1,
     prefetch_batches: int = 300,
-    aug_flip_left_right: bool = False,
-    aug_flip_up_down: bool = False,
     normalize_mean: Optional[Tuple[int, int, int]] = None,
     normalize_std: Optional[Tuple[int, int, int]] = None) -> Datasets:
   """Load an image dataset with tfds.
@@ -152,52 +193,27 @@ def image_classification_datasets(
     image_size: target size to resize images to.
     stack_channels: stack the channels in case of 1d outputs (e.g. mnist)
     prefetch_batches: number of batches to prefetch
-    aug_flip_left_right: randomly flip left/right
-    aug_flip_up_down: randomly flip up/down
     normalize_mean: mean RGB value to subtract off of images to normalize imgs
     normalize_std: std RGB of dataset to normalize imgs
 
   Returns:
     A Datasets object containing data iterators.
   """
+  cfg = {
+      "batch_size": batch_size,
+      "image_size": image_size,
+      "stack_channels": stack_channels,
+      "prefetch_batches": prefetch_batches,
+      "aug_flip_left_right": False,
+      "aug_flip_up_down": False,
+      "normalize_mean": normalize_mean,
+      "normalize_std": normalize_std
+  }
 
-  def map_fn(batch):
-    # batch is the entire tensor, with shape:
-    # [batchsize, img width, img height, channels]
-    batch = {k: v for k, v in batch.items()}
-    if tuple(batch["image"].shape[1:3]) != image_size:
-      batch["image"] = tf.image.resize(batch["image"], image_size)
-
-    if stack_channels != 1:
-      assert batch["image"].shape[3] == 1, batch["image"].shape
-      batch["image"] = tf.tile(batch["image"], (1, 1, 1, stack_channels))
-
-    if aug_flip_left_right:
-      batch["image"] = tf.image.random_flip_left_right(batch["image"])
-
-    if aug_flip_up_down:
-      batch["image"] = tf.image.random_flip_up_down(batch["image"])
-
-    if normalize_mean is None:
-      batch["image"] = tf.cast(batch["image"], tf.float32) / 255.
-    else:
-      assert normalize_std is not None
-      image = tf.cast(batch["image"], tf.float32)
-      image -= tf.constant(
-          normalize_mean, shape=[1, 1, 1, 3], dtype=image.dtype)
-      batch["image"] = image / tf.constant(
-          normalize_std, shape=[1, 1, 1, 3], dtype=image.dtype)
-
-    batch["label"] = tf.cast(batch["label"], tf.int32)
-    return hk.data_structures.to_haiku_dict({
-        "image": batch["image"],
-        "label": batch["label"]
-    })
-
-  def make_python_iter(split):
+  def make_python_iter(split: str) -> Iterator[Batch]:
     # load the entire dataset into memory
     dataset = tfds.load(datasetname, split=split, batch_size=-1)
-    data = tfds.as_numpy(map_fn(dataset))
+    data = tfds.as_numpy(_image_map_fn(cfg, dataset))
 
     # use a python iterator as this is faster than TFDS.
     def generator_fn():
@@ -219,5 +235,95 @@ def image_classification_datasets(
       return prefetch_iterator.PrefetchIterator(iter_fn(), prefetch_batches)
 
     return ThreadSafeIterator(LazyIterator(generator_fn))
+
+  return Datasets(*[make_python_iter(split) for split in splits])
+
+
+def _tfrecord_filenames_from_dataset_name(datasetname: str,
+                                          split: str) -> Sequence[str]:
+  """List of tfrecord files for a given dataset and split."""
+  data_dir = get_tfrecord_data_dir()
+  pattern = f"{data_dir}/{datasetname}/{split}.tfrecords*"
+  logging.info("Loading files for dataset on pattern: %s", pattern)
+
+  filenames = filesystem.glob(pattern)
+
+  if not filenames:
+    raise ValueError(f"Dataset {datasetname} with split {split} doesn't"
+                     " appear to be preprocessed? Please run dataset creation.")
+  return filenames
+
+
+def tfrecord_image_classification_datasets(
+    datasetname: str,
+    splits: Tuple[str, str, str, str],
+    batch_size: int,
+    image_size: Tuple[int, int],
+    decode_image_shape: Sequence[int],
+    stack_channels: int = 1,
+    prefetch_batches: int = 300,
+    aug_flip_left_right: bool = False,
+    aug_flip_up_down: bool = False,
+    normalize_mean: Optional[Tuple[int, int, int]] = None,
+    normalize_std: Optional[Tuple[int, int, int]] = None) -> Datasets:
+  """Load an image dataset from tfrecords.
+
+  Args:
+    datasetname: name of the dataset to be loaded with tfds.
+    splits: tfds style splits for different subsets of data. (train,
+      inner-valid, outer-valid, and test set)
+    batch_size: batch size of iterators
+    image_size: target size to resize images to.
+    decode_image_shape: shape of image to reshape parsed raw bytes.
+    stack_channels: stack the channels in case of 1d outputs (e.g. mnist)
+    prefetch_batches: number of batches to prefetch
+    aug_flip_left_right: randomly flip left/right
+    aug_flip_up_down: randomly flip up/down
+    normalize_mean: mean RGB value to subtract off of images to normalize imgs
+    normalize_std: std RGB of dataset to normalize imgs
+
+  Returns:
+    A Datasets object containing data iterators.
+  """
+
+  cfg = {
+      "batch_size": batch_size,
+      "image_size": image_size,
+      "stack_channels": stack_channels,
+      "prefetch_batches": prefetch_batches,
+      "aug_flip_left_right": aug_flip_left_right,
+      "aug_flip_up_down": aug_flip_up_down,
+      "normalize_mean": normalize_mean,
+      "normalize_std": normalize_std
+  }
+
+  def make_python_iter(split: str) -> Iterator[Batch]:
+    filenames = _tfrecord_filenames_from_dataset_name(datasetname, split)
+
+    filenames = [tf.convert_to_tensor(filename) for filename in filenames]
+    filenames = tf.data.Dataset.from_tensor_slices(filenames).repeat(
+        -1).shuffle(len(filenames) * 2)
+    ds = tf.data.TFRecordDataset(
+        filenames, compression_type="GZIP", num_parallel_reads=4)
+
+    features = {
+        "image": tf.io.FixedLenFeature([], dtype=tf.string),
+        "label": tf.io.FixedLenFeature([], dtype=tf.string)
+    }
+
+    def parse(r):
+      feats = tf.io.parse_example(r, features)
+      feats["image"] = tf.io.decode_raw(feats["image"], tf.uint8)
+      feats["image"] = tf.reshape(feats["image"], decode_image_shape)
+
+      feats["label"] = tf.io.decode_raw(feats["label"], tf.int32)
+      feats["label"] = tf.reshape(feats["label"], [])
+      return feats
+
+    ds = ds.map(parse).map(functools.partial(_image_map_fn, cfg))
+    ds = ds.shuffle(10000)
+    ds = ds.batch(batch_size, drop_remainder=True)
+    ds = ds.prefetch(128)
+    return ThreadSafeIterator(LazyIterator(ds.as_numpy_iterator))
 
   return Datasets(*[make_python_iter(split) for split in splits])
