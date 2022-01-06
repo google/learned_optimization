@@ -260,3 +260,20 @@ class RMSProp(OptaxOptimizer):
   def name(self):
     return (f"RMSProp_lr{self.learning_rate}_d{self.decay}_eps{self.epsilon}"
             f"_m{self.momentum}_nesterov{self.nesterov}")
+
+
+@gin.configurable
+class GradientClipOptimizer(Optimizer):
+  """Clip gradients by value before passing into an optimizer."""
+
+  def __init__(self, opt: Optimizer, grad_clip: float = 3.0):
+    self.opt = opt
+    self.grad_clip = grad_clip
+
+  def init(self, *args, **kwargs):
+    return self.opt.init(*args, **kwargs)
+
+  def update(self, opt_state, grad, *args, **kwargs):
+    grad = jax.tree_map(lambda x: jnp.clip(x, -self.grad_clip, self.grad_clip),
+                        grad)
+    return self.opt.update(opt_state, grad, *args, **kwargs)

@@ -406,17 +406,17 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
 
       def update(self,
                  opt_state: AdafacMLPLOptState,
-                 grads: opt_base.Gradient,
+                 grad: opt_base.Gradient,
                  loss: jnp.ndarray,
                  model_state: Optional[opt_base.ModelState] = None,
                  is_valid: bool = False,
                  key: Optional[PRNGKey] = None) -> AdafacMLPLOptState:
 
         mom_roll, rms_roll, fac_vec_roll = self._get_rolling()
-        next_mom_rolling = mom_roll.update(opt_state.mom_rolling, grads)
-        next_rms_rolling = rms_roll.update(opt_state.rms_rolling, grads)
+        next_mom_rolling = mom_roll.update(opt_state.mom_rolling, grad)
+        next_rms_rolling = rms_roll.update(opt_state.rms_rolling, grad)
         next_fac_rolling_features, fac_g = fac_vec_roll.update(
-            opt_state.fac_rolling_features, grads)
+            opt_state.fac_rolling_features, grad)
 
         # compute some global features
         training_step_feature = tanh_embedding(opt_state.iteration)
@@ -429,7 +429,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
 
         fun = functools.partial(mod_apply, self.theta["nn"], global_features)
 
-        next_params = jax.tree_multimap(fun, opt_state.params, grads,
+        next_params = jax.tree_multimap(fun, opt_state.params, grad,
                                         next_mom_rolling.m,
                                         next_rms_rolling.rms, fac_g,
                                         next_fac_rolling_features.v_col,
