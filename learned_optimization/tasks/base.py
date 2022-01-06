@@ -34,7 +34,6 @@ T = TypeVar("T")
 class Task:
   """Base class for task interface."""
   datasets: Optional[datasets_base.Datasets] = None
-  name: Optional[str]
 
   def loss(self, params: Params, state: ModelState, key: PRNGKey,
            data: Batch) -> Tuple[jnp.ndarray, ModelState]:
@@ -50,6 +49,10 @@ class Task:
 
   def normalizer(self, loss: jnp.ndarray) -> jnp.ndarray:
     return loss
+
+  @property
+  def name(self):
+    return self.__class__.__name__
 
 
 class TaskFamily:

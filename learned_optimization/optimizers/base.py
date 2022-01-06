@@ -64,7 +64,17 @@ class Optimizer(abc.ABC):
       is_valid: jnp.asarray = False,
       key: PRNGKey = None,
   ) -> OptState:
-    raise NotImplementedError
+    raise NotImplementedError()
+
+  @property
+  def name(self) -> str:
+    """Name of optimizer.
+
+    This property is used when serializing results / baselines. This should
+    lead with the class name, and follow with all parameters used to create
+    the object. For example: "<ClassName>_<param1><value>_<param2><value>"
+    """
+    raise NotImplementedError()
 
 
 # Internal-ish states
@@ -113,8 +123,13 @@ class SGD(OptaxOptimizer):
   """Stochastic gradient descent."""
 
   def __init__(self, learning_rate=0.01):
+    self.learning_rate = learning_rate
     opt = optax.sgd(learning_rate)
     super().__init__(opt)
+
+  @property
+  def name(self):
+    return f"SGD_lr{self.learning_rate}"
 
 
 @gin.configurable
@@ -122,8 +137,14 @@ class SGDM(OptaxOptimizer):
   """Stochastic gradient descent with momentum."""
 
   def __init__(self, learning_rate=0.01, momentum=0.9):
+    self.learning_rate = learning_rate
+    self.momentum = momentum
     opt = optax.sgd(learning_rate, momentum)
     super().__init__(opt)
+
+  @property
+  def name(self):
+    return f"SGDM_lr{self.learning_rate}_m{self.momentum}"
 
 
 @gin.configurable
@@ -136,6 +157,12 @@ class Adam(OptaxOptimizer):
                beta2=0.999,
                epsilon=1e-8,
                epsilon_root=1e-8):
+    self.learning_rate = learning_rate
+    self.beta1 = beta1
+    self.beta2 = beta2
+    self.epsilon = epsilon
+    self.epsilon_root = epsilon_root
+
     opt = optax.adam(
         learning_rate=learning_rate,
         b1=beta1,
@@ -143,6 +170,11 @@ class Adam(OptaxOptimizer):
         eps=epsilon,
         eps_root=epsilon_root)
     super().__init__(opt)
+
+  @property
+  def name(self):
+    return (f"Adam_lr{self.learning_rate}_b1{self.beta1}_b2{self.beta2}"
+            f"_eps{self.epsilon}_epsroot{self.epsilon_root}")
 
 
 def piecewise_linear(times: Sequence[float],
@@ -210,6 +242,11 @@ class RMSProp(OptaxOptimizer):
       momentum=0.0,
       nesterov=False,
   ):
+    self.learning_rate = learning_rate
+    self.decay = decay
+    self.epsilon = epsilon
+    self.momentum = momentum
+    self.nesterov = nesterov
     opt = optax.rmsprop(
         learning_rate=learning_rate,
         decay=decay,
@@ -218,3 +255,8 @@ class RMSProp(OptaxOptimizer):
         momentum=momentum,
     )
     super().__init__(opt)
+
+  @property
+  def name(self):
+    return (f"RMSProp_lr{self.learning_rate}_d{self.decay}_eps{self.epsilon}"
+            f"_m{self.momentum}_nesterov{self.nesterov}")
