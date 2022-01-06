@@ -28,7 +28,6 @@ import jax.numpy as jnp
 from learned_optimization import filesystem
 from learned_optimization import profile
 from learned_optimization import setup_experiment
-from learned_optimization.tasks import base as tasks_base
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.time_filter import timings
 import numpy as onp
@@ -39,7 +38,7 @@ PRNGKey = jnp.ndarray
 @profile.wrap()
 def eval_and_save_one_timing(
     sample_task_family_cfg_fn: Callable[[PRNGKey],
-                                        tasks_base.TaskFamily], save_dir: str):
+                                        cfgobject.CFGObject], save_dir: str):
   """Get runtime and save results from one random seed."""
   seed = onp.random.randint(0, 1000000000)
 
@@ -64,7 +63,7 @@ def eval_and_save_one_timing(
 @gin.configurable
 def run_many_eval_and_save(
     sample_task_family_cfg_fn: Callable[[PRNGKey],
-                                        tasks_base.TaskFamily] = gin.REQUIRED,
+                                        cfgobject.CFGObject] = gin.REQUIRED,
     save_dir: str = gin.REQUIRED,
     num_to_run: int = gin.REQUIRED):
   """Compute and save `num_to_run` runtime statistics."""
@@ -85,7 +84,7 @@ def run_many_eval_and_save(
 def main(argv):
   if len(argv) > 1:
     raise app.UsageError("Too many command-line arguments.")
-  setup_experiment.setup_experiment("main", make_dir=False)
+  setup_experiment.setup_experiment(make_dir=False)
   run_many_eval_and_save()
 
 
