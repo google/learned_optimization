@@ -250,7 +250,11 @@ def preload_tfds_image_classification_datasets(
 
     return ThreadSafeIterator(LazyIterator(generator_fn))
 
-  return Datasets(*[make_python_iter(split) for split in splits])
+  builder = tfds.builder(datasetname)
+  num_classes = builder.info.features["label"].num_classes
+  return Datasets(
+      *[make_python_iter(split) for split in splits],
+      extra_info={"num_classes": num_classes})
 
 
 def _tfrecord_filenames_from_dataset_name(datasetname: str,
@@ -300,6 +304,10 @@ def tfrecord_image_classification_datasets(
     A Datasets object containing data iterators.
   """
 
+  num_classes_map = {"imagenet2012_16": 1000}
+  if datasetname not in num_classes_map:
+    raise ValueError(f"Trying to access an unsupported dataset: {datasetname}?")
+
   cfg = {
       "batch_size": batch_size,
       "image_size": image_size,
@@ -340,4 +348,6 @@ def tfrecord_image_classification_datasets(
     ds = ds.prefetch(128)
     return ThreadSafeIterator(LazyIterator(ds.as_numpy_iterator))
 
-  return Datasets(*[make_python_iter(split) for split in splits])
+  return Datasets(
+      *[make_python_iter(split) for split in splits],
+      extra_info={"num_classes": num_classes_map[datasetname]})
