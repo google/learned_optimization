@@ -16,11 +16,13 @@
 """Data iterators for image datasets."""
 
 from typing import Tuple
+import gin
 
 from learned_optimization.tasks.datasets import base
 
 
 @base.dataset_lru_cache
+@gin.configurable
 def mnist_datasets(batch_size: int,
                    image_size: Tuple[int, int] = (28, 28),
                    stack_channels: int = 1) -> base.Datasets:
@@ -34,6 +36,7 @@ def mnist_datasets(batch_size: int,
 
 
 @base.dataset_lru_cache
+@gin.configurable
 def fashion_mnist_datasets(batch_size: int,
                            image_size: Tuple[int, int] = (28, 28),
                            stack_channels: int = 1) -> base.Datasets:
@@ -47,6 +50,7 @@ def fashion_mnist_datasets(batch_size: int,
 
 
 @base.dataset_lru_cache
+@gin.configurable
 def cifar10_datasets(
     batch_size: int,
     image_size: Tuple[int, int] = (32, 32),
@@ -57,6 +61,7 @@ def cifar10_datasets(
 
 
 @base.dataset_lru_cache
+@gin.configurable
 def cifar100_datasets(
     batch_size: int,
     image_size: Tuple[int, int] = (32, 32),
@@ -67,6 +72,7 @@ def cifar100_datasets(
 
 
 @base.dataset_lru_cache
+@gin.configurable
 def imagenet16_datasets(
     batch_size: int,
     image_size: Tuple[int, int] = (16, 16),

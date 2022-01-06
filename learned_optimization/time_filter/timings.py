@@ -231,6 +231,7 @@ def task_family_runtime_stats(
     data=True,
     scan_unroll=1,
     num_time_estimates: int = 30,
+    num_tasks_list=None,
     clear_buffers: bool = True) -> Mapping[str, Tuple[float, float]]:
   """Compute runtime perf statistics for a given task family.
 
@@ -254,6 +255,7 @@ def task_family_runtime_stats(
     scan_unroll: Passed into jax.lax.scan's `unroll` argument controlling how
       many steps to inline.
     num_time_estimates: Number of timeings / estimates to take for each timing.
+    num_tasks_list: list of number of tasks to try.
     clear_buffers: Force clear all memory on accelerator device between tests.
 
   Returns:
@@ -271,7 +273,10 @@ def task_family_runtime_stats(
   else:
     ret["data"] = None
 
-  for num_task in [1, 2, 4, 8, 16, 32]:
+  if num_tasks_list is None:
+    num_tasks_list = [1, 2, 4, 8, 16, 32]
+
+  for num_task in num_tasks_list:
     if clear_buffers:
       _jax_clear_device_buffers()
 
