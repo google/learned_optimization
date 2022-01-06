@@ -59,7 +59,7 @@ def get_batches(task_family: tasks_base.TaskFamily,
   elif len(batch_shape) == 3:
     datas_list = [
         get_batches(task_family, [batch_shape[1], batch_shape[2]],
-                    train_and_meta, numpy, split)
+                    train_and_meta, numpy, split) for _ in range(batch_shape[0])
     ]
     if numpy:
       return tree_utils.tree_zip_onp(datas_list)

@@ -19,12 +19,12 @@ import functools
 from typing import Any, Mapping, Sequence, Tuple
 
 import flax
+from flax import jax_utils
 import gin
 import haiku as hk
 import jax
 from jax import lax
 import jax.numpy as jnp
-
 from learned_optimization import profile
 from learned_optimization import summary
 from learned_optimization import training
@@ -338,7 +338,8 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       pos_unroll_state = pos_unroll_state.replace(inner_step=inner_step)
       neg_unroll_state = neg_unroll_state.replace(inner_step=inner_step)
 
-    accumulator = jax.tree_multimap(jnp.zeros_like, theta)
+    accumulator = jax.tree_multimap(
+        lambda x: jnp.zeros([self.num_tasks] + list(x.shape)), theta)
 
     return PESWorkerState(
         pos_state=pos_unroll_state,
@@ -407,6 +408,207 @@ class TruncatedPES(gradient_learner.GradientEstimator):
 
     loss, es_grad, new_accumulator, p_ys, delta_loss = compute_pes_grad(
         p_yses, n_yses, accumulator, vec_pos, self.std)
+
+    unroll_info = gradient_learner.UnrollInfo(
+        loss=p_ys.loss,
+        iteration=p_ys.iteration,
+        task_param=p_ys.task_param,
+        is_done=p_ys.is_done)
+
+    output = gradient_learner.GradientEstimatorOut(
+        mean_loss=loss,
+        grad=es_grad,
+        unroll_state=PESWorkerState(p_state, n_state, new_accumulator),
+        unroll_info=unroll_info)
+
+    metrics = summary.aggregate_metric_list(metrics)
+    if with_summary:
+      metrics["sample||delta_loss_sample"] = summary.sample_value(
+          key, jnp.abs(delta_loss))
+      metrics["mean||delta_loss_mean"] = jnp.abs(delta_loss)
+      metrics["sample||inner_step"] = p_state.inner_step[0]
+      metrics["sample||end_inner_step"] = p_state.inner_step[0]
+
+    return output, metrics
+
+
+# Helper functions for PMAP-ed PES
+@functools.partial(jax.jit, static_argnums=(1, 2))
+def _vectorized_key(key, dim1, dim2):
+
+  def sp(key):
+    return jax.random.split(key, dim2)
+
+  return jax.vmap(sp)(jax.random.split(key, dim1))
+
+
+@functools.partial(jax.pmap, axis_name="dev")
+def _pmap_reduce(vals):
+  return jax.lax.pmean(vals, axis_name="dev")
+
+
+@gin.configurable
+class TruncatedPESPMAP(TruncatedPES):
+  """GradientEstimator for computing PES gradient estimates leveraging pmap.
+
+  See TruncatedPES documentation for information on PES. This estimator
+  additionally makes use of multiple TPU devices via jax's pmap.
+  """
+
+  def __init__(self,
+               *args,
+               num_devices=8,
+               replicate_data_across_devices=False,
+               **kwargs):
+    super().__init__(*args, **kwargs)
+    self.num_devices = num_devices
+    self.replicate_data_across_devices = replicate_data_across_devices
+    if len(jax.local_devices()) != self.num_devices:
+      raise ValueError("Mismatch in device count!"
+                       f" Found: {jax.local_devices()}."
+                       f" Expected {num_devices} devices.")
+
+    init_single_partial = functools.partial(init_single_state, self.task_family,
+                                            self.learned_opt, self.trunc_sched)
+    self.pmap_init_single_state = jax.pmap(
+        init_single_partial, in_axes=(None, None, 0))
+
+    self.pmap_compute_pes_grad = jax.pmap(
+        functools.partial(compute_pes_grad, std=self.std))
+
+    self.pmap_vector_sample_perturbations = jax.pmap(
+        functools.partial(
+            common.vector_sample_perturbations,
+            std=self.std,
+            num_tasks=self.num_tasks),
+        in_axes=(None, 0),
+    )
+
+  @functools.partial(
+      jax.pmap,
+      in_axes=(None, 0, 0, 0, 0, None, None),
+      static_broadcasted_argnums=(
+          0,
+          6,
+      ))
+  def pmap_unroll_next_state(self, vec_theta, key, state, datas, outer_state,
+                             with_summary):
+    static_args = [
+        self.task_family,
+        self.learned_opt,
+        self.trunc_sched,
+        self.num_tasks,
+        self.steps_per_jit,
+        self.train_and_meta,
+    ]
+    key1, key2 = jax.random.split(key)
+    (p_state, p_ys), m = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+        *(static_args + [vec_theta, key1, state, datas, outer_state]),
+        with_summary=with_summary,
+        sample_rng_key=key2)
+    return (p_state, p_ys), m
+
+  @profile.wrap()
+  def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
+                        key: PRNGKey) -> PESWorkerState:
+    key1, key2 = jax.random.split(key)
+    theta = worker_weights.theta
+
+    keys = _vectorized_key(key1, self.num_devices, self.num_tasks)
+    # Note this doesn't use sampled theta for the first init.
+    # I believe this is fine most of the time.
+    # TODO(lmetz) consider init-ing at an is_done state instead.
+    pos_unroll_state = self.pmap_init_single_state(theta,
+                                                   worker_weights.outer_state,
+                                                   keys)
+    neg_unroll_state = pos_unroll_state
+
+    # When initializing, we want to keep the trajectories not all in sync.
+    # To do this, we can initialize with a random offset on the inner-step.
+    if self.random_initial_iteration_offset:
+      inner_step = jax.random.randint(
+          key2,
+          pos_unroll_state.inner_step.shape,
+          0,
+          self.random_initial_iteration_offset,
+          dtype=pos_unroll_state.inner_step.dtype)
+      pos_unroll_state = pos_unroll_state.replace(inner_step=inner_step)
+      neg_unroll_state = neg_unroll_state.replace(inner_step=inner_step)
+
+    # TODO(lmetz) check the shape of the the accumulator
+    accumulator = jax.tree_multimap(
+        lambda x: jnp.zeros([self.num_tasks] + list(x.shape)), theta)
+    accumulator = jax_utils.replicate(accumulator)
+
+    return PESWorkerState(
+        pos_state=pos_unroll_state,
+        neg_state=neg_unroll_state,
+        accumulator=accumulator)
+
+  @profile.wrap()
+  def compute_gradient_estimate(
+      self,
+      worker_weights: gradient_learner.WorkerWeights,
+      key: PRNGKey,
+      state: PESWorkerState,
+      with_summary: bool = False
+  ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
+
+    p_state = state.pos_state
+    n_state = state.neg_state
+    accumulator = state.accumulator
+    vec_key = jax.random.split(key, self.num_devices)
+
+    theta = worker_weights.theta
+
+    vec_pos, vec_p_theta, vec_n_theta = self.pmap_vector_sample_perturbations(
+        theta, vec_key)
+
+    p_yses = []
+    n_yses = []
+    metrics = []
+
+    def get_batch():
+      """Get batch with leading dims [num_devices, steps_per_jit, num_tasks]."""
+
+      if self.replicate_data_across_devices:
+        # Use the same data across each device
+        b = training.get_batches(
+            self.task_family, (self.steps_per_jit, self.num_tasks),
+            self.train_and_meta,
+            numpy=False)
+        return jax_utils.replicate(b)
+      else:
+        # Use different data across the devices
+        return training.get_batches(
+            self.task_family,
+            (self.num_devices, self.steps_per_jit, self.num_tasks),
+            self.train_and_meta,
+            numpy=False)
+
+    for _ in range(self.trunc_length // self.steps_per_jit):
+      datas = get_batch()
+
+      # force all to be non weak type. This is for cache hit reasons.
+      # TODO(lmetz) consider instead just setting the weak type flag?
+      p_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), p_state)
+      n_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), n_state)
+
+      (p_state, p_ys), m = self.pmap_unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+          vec_p_theta, vec_key, p_state, datas, worker_weights.outer_state,
+          with_summary)
+      metrics.append(m)
+
+      p_yses.append(p_ys)
+      (n_state, n_ys), _ = self.pmap_unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+          vec_n_theta, vec_key, n_state, datas, worker_weights.outer_state,
+          False)
+      n_yses.append(n_ys)
+
+    loss, es_grad, new_accumulator, p_ys, delta_loss = self.pmap_compute_pes_grad(
+        p_yses, n_yses, accumulator, vec_pos)
+
+    es_grad, loss = jax_utils.unreplicate(_pmap_reduce((es_grad, loss)))
 
     unroll_info = gradient_learner.UnrollInfo(
         loss=p_ys.loss,

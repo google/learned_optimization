@@ -18,6 +18,7 @@
 from absl.testing import absltest
 import haiku as hk
 import jax
+import jax.numpy as jnp
 from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.optimizers import base as opt_base
 from learned_optimization.outer_trainers import gradient_learner
@@ -73,7 +74,7 @@ class GradientLearnerTest(absltest.TestCase):
   def test_gradient_worker_compute(self):
     estimators = [FakeGradientEstimator(0), FakeGradientEstimator(1)]
     key = jax.random.PRNGKey(0)
-    theta = hk.data_structures.to_haiku_dict({"theta": 12.})
+    theta = hk.data_structures.to_haiku_dict({"theta": jnp.asarray(12.)})
     worker_weights = gradient_learner.WorkerWeights(
         theta, None, gradient_learner.OuterState(1))
     unroll_states = [

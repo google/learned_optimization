@@ -145,7 +145,7 @@ class GradientLearner:
     model_state = None
 
     if self._init_theta_from_path:
-      logging.info(  # pylint: disable=logging-format-interpolation
+      logging.info(  # pylint: disable=logging-fstring-interpolation
           f"Got a init from params path {self._init_theta_from_path}."
           " Using this instead of random randomly initializing.")
 
@@ -168,7 +168,7 @@ class GradientLearner:
         theta_init, model_state, num_steps=self._num_steps)
 
     if self._init_outer_state_from_path:
-      logging.info(  # pylint: disable=logging-format-interpolation
+      logging.info(  # pylint: disable=logging-fstring-interpolation
           f"Got a init from outer state path {self._init_outer_state_from_path}."
           " Using this instead of randomly initializing.")
       theta_opt_state = training.load_state(self._init_outer_state_from_path,
@@ -301,10 +301,6 @@ def gradient_worker_compute(
   if device is None:
     device = jax.local_devices(0)[0]
 
-  worker_weights = jax.device_put(worker_weights, device)
-  unroll_states = jax.device_put(unroll_states, device)
-  key = jax.device_put(key, device)
-
   theta = worker_weights.theta
   theta_model_state = worker_weights.theta_model_state
 
@@ -353,6 +349,8 @@ def gradient_worker_compute(
                      "Not logging any events data.")
 
       if with_metrics:
+        metrics = {k: v for k, v in metrics.items()}
+
         # Metrics don't take into account which task they are comming from.
         # Let's add additional metrics with the task name pulled out.
         with profile.Profile("metric_computation"):
