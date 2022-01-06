@@ -42,10 +42,20 @@ def get_tfrecord_data_dir():
 @dataclasses.dataclass
 class Datasets:
   """Container consisting of 4 iterators of data."""
-  train: Iterator[Batch]
-  inner_valid: Iterator[Batch]
-  outer_valid: Iterator[Batch]
-  test: Iterator[Batch]
+
+  def __init__(self,
+               train: Iterator[Batch],
+               inner_valid: Iterator[Batch],
+               outer_valid: Iterator[Batch],
+               test: Iterator[Batch],
+               extra_info: Optional[Mapping[str, Any]] = None):
+    if not extra_info:
+      extra_info = {}
+    self.train = train
+    self.inner_valid = inner_valid
+    self.outer_valid = outer_valid
+    self.test = test
+    self.extra_info = extra_info
 
   def split(self, name: str) -> Iterator[Batch]:
     """Return an iterator corresponding to the given data split."""
@@ -95,8 +105,8 @@ class LazyIterator:
 class LazyDataset(Datasets):
   """Dataset which lazily executes the dataset_fn when data is needed."""
 
-  def __init__(self, dataset_fn: Callable[[], Datasets]):
-    self._fn = dataset_fn
+  def __init__(self, dataset_fn: Callable[[], Datasets]):  # pylint: disable=super-init-not-called
+    self._fn = functools.lru_cache(None)(dataset_fn)
 
   @property
   def train(self):
@@ -113,6 +123,10 @@ class LazyDataset(Datasets):
   @property
   def test(self):
     return self._fn().test
+
+  @property
+  def extra_info(self):
+    return self._fn().extra_info
 
 
 _CACHED_DATASETS = []

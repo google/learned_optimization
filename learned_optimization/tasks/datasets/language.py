@@ -85,7 +85,11 @@ def _make_datasets(tfds_datasetname: str, vocab: seqio.vocabularies.Vocabulary,
 
   train, inner_valid, outer_valid, test = [make(split) for split in splits]
   return base.Datasets(
-      train=train, inner_valid=inner_valid, outer_valid=outer_valid, test=test)
+      train=train,
+      inner_valid=inner_valid,
+      outer_valid=outer_valid,
+      test=test,
+      extra_info={'vocab_size': vocab.vocab_size})
 
 
 @base.dataset_lru_cache
