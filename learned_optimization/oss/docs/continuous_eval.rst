@@ -1,4 +1,5 @@
-# Continuous Eval
+Continuous Eval
+================
 
 Meta-learning training can be an incredibly noisy process as one often meta-learns over randomly sampled tasks and these sampled tasks could have very different meta-objectives.
 To get higher quality evaluation, as well as to evaluate performance on different
@@ -18,15 +19,20 @@ off based on that.
 
 We summarize the architecture in the figure below.
 
-<!--- path to figure: https://docs.google.com/presentation/d/16zWe2ryUUcbWSBRhfYx7D5BwG9z1Mt-4BpWCOKmnais/edit?resourcekey=0-_if_-4xNYC5bgD1ZyN2Pmg#slide=id.p --->
+
+.. path to edit figure: https://docs.google.com/presentation/d/16zWe2ryUUcbWSBRhfYx7D5BwG9z1Mt-4BpWCOKmnais/edit?resourcekey=0-_if_-4xNYC5bgD1ZyN2Pmg#slide=id.p --->
 
 
-![Continuous eval system diagram](../docs/continuous_eval_system_diagram.png)
+.. image:: _static/continuous_eval_system_diagram.png
+  :width: 800
+  :alt: Continuous eval system diagram
 
 
 There are 2 types of job: the eval chief and the eval worker.
 
-### Evaluation Chief
+Evaluation Chief
+----------------
+
 The evaluation chief is configured with a set of evaluations with which to run
 a given checkpoint on. The chief then starts up a couple of threads.
 First, there is a thread to monitor a given directory for a new checkpoint.
@@ -38,14 +44,18 @@ writes the results out to tensorboard, and optionally the population controller
 if one is using population based training
 
 
-### Evaluation configuration
+Evaluation configuration
+------------------------
+
 While it's possible to use similar infrastructure to pass around any kind of
-configuration for an evaluation task, we opt to use [gin](https://github.com/google/gin-config) -- in in particular
+configuration for an evaluation task, we opt to use `gin <https://github.com/google/gin-config>`_ -- in in particular
 a set of gin bindings which specify the new task.
 We find this very convenient, but it comes at the cost of complexity and global
 state.
 
-### Evaluation Worker
+Evaluation Worker
+------------------------
+
 For a given evaluation chief, we run multiple evaluation workers. Each worker
 is responsible for grabbing an evaluation to work on from the eval chief.
 We first parse the evaluation configuration, load any weights (e.g. weights of

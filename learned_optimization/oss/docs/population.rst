@@ -1,4 +1,5 @@
-# Population: Online hparam adjustment for multiple workers
+Population: Online hparam adjustment for multiple workers
+==========================================================
 
 A micro library for population based training and online hparam adjustment.
 
@@ -9,53 +10,57 @@ to more complex schedules involving curriculum over say data augmentation.
 Fixed schedules are difficult to tune, however, and as such this library also supports interactive
 hyperparameter updating based on a generalization of population based training.
 
-## Quick Start Example
+Quick Start Example
+-------------------
+
 This example shows how to leverage population based training training with 2 populations. For a full example see below.
-```python
-from learned_optimization.population import population as pop_mod
-from learned_optimization.population.mutators import winner_take_all_genetic
 
-# First we define how we want the population to be mutated.
-# Let's just randomly perturb it.
-def mutate_fn(hparams):
-  return {"log_lr": hparams["log_lr"] + np.random.normal()*0.1}
+.. code-block::
 
-# Select a mutator. This mutator does a population wide selection every 100 steps.
-mutator = winner_take_all_genetic.WinnerTakeAllGenetic(mutate_fn, steps_per_exploit=100)
+  from learned_optimization.population import population as pop_mod
+  from learned_optimization.population.mutators import winner_take_all_genetic
 
-# Construct the PopulationController which manages the population
-population = pop_mod.PopulationController([{"log_lr": np.log(1e-4)} for i in range(2)], mutator)
+  # First we define how we want the population to be mutated.
+  # Let's just randomly perturb it.
+  def mutate_fn(hparams):
+    return {"log_lr": hparams["log_lr"] + np.random.normal()*0.1}
 
-# Now, on each worker, we train a model.
-gen_id = ""  # The generation we are currently training. No generation at init.
-hparams = None # The initial hparams -- these will be determined by the population
-params = None # No initial parameter values.
-step = 0
+  # Select a mutator. This mutator does a population wide selection every 100 steps.
+  mutator = winner_take_all_genetic.WinnerTakeAllGenetic(mutate_fn, steps_per_exploit=100)
 
-while True:
-  # Get the current set of parameters and hparams to work on.
-  # Worker id here contains the integer worker index to differentiate the 2 workers.
-  new_data = population.maybe_get_worker_data(worker_id, gen_id, step, params, meta_params)
-  # If this is non-None then we obtained some new hparams and params to work with.
-  if new_data:
-    params = new_data.params
-    hparams = new_data.meta_params
-    gen_id = new_data.generation_id
-    step = new_data.step
-    if params is None:
-      params = init_params()
+  # Construct the PopulationController which manages the population
+  population = pop_mod.PopulationController([{"log_lr": np.log(1e-4)} for i in range(2)], mutator)
 
-  # Train the model one step
-  params = train_model_one_step(params, hparams)
-  step += 1 # accumulate step counter.
+  # Now, on each worker, we train a model.
+  gen_id = ""  # The generation we are currently training. No generation at init.
+  hparams = None # The initial hparams -- these will be determined by the population
+  params = None # No initial parameter values.
+  step = 0
 
-  # every 10 steps, send back an evaluation.
-  if step % 10 == 0:
-    loss = loss_fn(params)
-    population.set_eval(worker_id, gen_id, step, params, loss)
-```
+  while True:
+    # Get the current set of parameters and hparams to work on.
+    # Worker id here contains the integer worker index to differentiate the 2 workers.
+    new_data = population.maybe_get_worker_data(worker_id, gen_id, step, params, meta_params)
+    # If this is non-None then we obtained some new hparams and params to work with.
+    if new_data:
+      params = new_data.params
+      hparams = new_data.meta_params
+      gen_id = new_data.generation_id
+      step = new_data.step
+      if params is None:
+        params = init_params()
 
-## How it works
+    # Train the model one step
+    params = train_model_one_step(params, hparams)
+    step += 1 # accumulate step counter.
+
+    # every 10 steps, send back an evaluation.
+    if step % 10 == 0:
+      loss = loss_fn(params)
+      population.set_eval(worker_id, gen_id, step, params, loss)
+
+How it works
+-------------
 
 At it's core, these are all meta-learning based methods for updating hyper parameters.
 
@@ -72,29 +77,38 @@ These checkpoints are stored on the `PopulationController` which provides an int
 The decision to branch at a checkpoint is governed by a `Mutate` class which has access to the currently running workers, and the checkpoint cache.
 
 
-## Available Mutators
+Available Mutators
+------------------
 
-### Winner take all genetic algorithms
+Winner take all genetic algorithms
+***********************************
+
 This trains each worker of the population for some amount of time (either measured in steps, or wallclock). Once this time has elapsed, and an evaluation is has been sent back for each worker,
 all workers are compared. The best performing worker is selected and the parameters and hyper-parameters of this worker are copied to the other workers, and the hyper-parameters are modified.
 
-This is a simplified setup to that explored in the [population based training paper](https://arxiv.org/abs/1711.09846).
+This is a simplified setup to that explored in the `population based training paper <https://arxiv.org/abs/1711.09846>`_.
 
-### Fixed schedule
+Fixed schedule
+***********************************
 This trains a single worker and modifies hyper parameters in a fixed schedule specified at construction.
 
-### Single worker Explore
+Single worker Explore
+***********************************
 This trains a single worker in alternating explore phases which tries hyperparameters, and exploit phases which uses the best performing hyper parameters.
 
 
-## Examples
+Examples
+---------
 We provide 3 more complete examples.
 
-### Synthetic
+Synthetic
+*********
 A synthetic problem to quickly demonstrate API
 
-### Simple\_CNN
+Simple\_CNN
+***********
 A small CNN trained in multiple threads on cifar10. The parameters are neural network weights (saved to disk) and the hyper parameters adjusted online consist of a single learning rate.
 
-### Complex\_CNN
+Complex\_CNN
+************
 A more complicated example of a CNN meta-training many more hparams modifying data aug with a performance measurement targeting validation loss.
