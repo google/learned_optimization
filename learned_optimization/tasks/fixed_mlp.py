@@ -89,3 +89,33 @@ class FashionMnistRelu32_8(base.Task):
     maxval = 1.5 * onp.log(10.)
     loss = jnp.clip(loss, 0, maxval)
     return jnp.nan_to_num(loss, nan=maxval, posinf=maxval, neginf=maxval)
+
+
+@gin.configurable
+class Imagenet16Relu256x256x256(base.Task):
+  """A 3 hidden layer MLP trained on 16x16 resized imagenet."""
+
+  def __init__(self):
+    super().__init__()
+
+    def _forward(inp):
+      inp = jnp.reshape(inp, [inp.shape[0], -1])
+      return hk.nets.MLP([256, 256, 256, 1000])(inp)
+
+    self._mod = hk.without_apply_rng(hk.transform(_forward))
+    self.datasets = image.imagenet16_datasets(batch_size=128)
+
+  def init(self, key: PRNGKey) -> Tuple[Any, Any]:
+    return self._mod.init(key, next(self.datasets.train)["image"]), None
+
+  def loss(self, params: Params, state: ModelState, key: PRNGKey,
+           data: Any) -> Tuple[jnp.ndarray, ModelState]:
+    logits = self._mod.apply(params, data["image"])
+    labels = jax.nn.one_hot(data["label"], 1000)
+    vec_loss = base.softmax_cross_entropy(logits=logits, labels=labels)
+    return jnp.mean(vec_loss), state
+
+  def normalizer(self, loss):
+    maxval = 1.5 * onp.log(1000.)
+    loss = jnp.clip(loss, 0, maxval)
+    return jnp.nan_to_num(loss, nan=maxval, posinf=maxval, neginf=maxval)

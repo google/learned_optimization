@@ -25,6 +25,9 @@ class FixedMLPTest(absltest.TestCase):
   def test_FashionMnistRelu128x128(self):
     test_utils.smoketest_task(fixed_mlp.FashionMnistRelu128x128())
 
+  def test_Imagenet16Relu256x256x256(self):
+    test_utils.smoketest_task(fixed_mlp.Imagenet16Relu256x256x256())
+
 
 if __name__ == '__main__':
   absltest.main()
