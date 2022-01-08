@@ -8,3 +8,4 @@ ipython>=7.20.0
 ipykernel>=5.5.0
 nbsphinx>=0.8.7
 sphinx_copybutton>=0.4.0
+myst_nb>=0.13.0
