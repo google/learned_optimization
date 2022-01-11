@@ -127,6 +127,12 @@ class TaskGroupChief(threading.Thread):
     with self._lock:
       eval_tasks = [EvalTask(task_group, i, t) for i, t in enumerate(tasks)]
       self._tasks.extend(eval_tasks)
+
+      try:
+        hash(task_group)
+      except Exception:
+        raise ValueError("Must be able to hash the task_group!")
+
       self._tasks_in_taskgroup[task_group] = [
           TaskAndResult(eval_task=t, result=None) for t in eval_tasks
       ]
@@ -149,6 +155,7 @@ class TaskGroupChief(threading.Thread):
   def _unsafe_save_state(self):
     # write then move for atomic actions.
     with filesystem.file_open(self._state_file + "_tmp", "wb") as f:
+      logging.info(f"Saving state: {self._get_state()}")  # pylint: disable=logging-fstring-interpolation
       content = dill.dumps(self._get_state())
       f.write(content)
     filesystem.rename(self._state_file + "_tmp", self._state_file)

@@ -24,10 +24,10 @@ from typing import Any, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
 from absl import app
 from absl import logging
+import flax
 from flax.metrics import tensorboard
 from flax.training import checkpoints
 import gin
-import haiku as hk
 import jax.numpy as jnp
 from learned_optimization import filesystem
 from learned_optimization import profile
@@ -131,7 +131,7 @@ def monitor_checkpoint_dir(
         fs.append(executor.submit(_retry_copy, got_path, copy_path))
       # block until all copy are done.
       _ = [f.result() for f in fs]
-    yield (last_idx, hk.data_structures.to_immutable_dict(prefix_to_copy_path))
+    yield (last_idx, flax.core.FrozenDict(prefix_to_copy_path))
 
 
 @profile.wrap()
