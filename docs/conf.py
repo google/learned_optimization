@@ -21,6 +21,12 @@
 # full list see the documentation:
 # http://www.sphinx-doc.org/en/master/config
 
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath('..'))
+
+
 # -- Project information -----------------------------------------------------
 
 project = 'learned_optimization'
@@ -138,3 +144,8 @@ execution_excludepatterns = ['*']
 # Tell sphinx-autodoc-typehints to generate stub parameter annotations including
 # types, even if the parameters aren't explicitly documented.
 always_document_param_types = True
+
+# force clear docs every rebuild.
+import shutil
+if os.path.exists('_build/'):
+  shutil.rmtree('_build/')
