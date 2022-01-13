@@ -52,6 +52,13 @@ def _threaded_tqdm_map(threads: int, func: Callable[[Any], Any],
     return [x.result() for x in tqdm.tqdm(future_list)]
 
 
+def number_of_generated_files(sample_fn_name: str, hardware_name: str) -> int:
+  base_dir = _get_timing_dir(sample_fn_name, hardware_name)
+  logging.info(f"Looking for files in {base_dir + '/*'}")  # pylint: disable=logging-fstring-interpolation
+  files = filesystem.glob(base_dir + "/*")
+  return len(files)
+
+
 def load_runtime_files(
     sample_fn_name: str,
     hardware_name: str,
