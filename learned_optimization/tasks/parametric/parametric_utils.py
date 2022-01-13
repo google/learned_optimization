@@ -15,15 +15,20 @@
 
 """Utilities for sampling parametric tasks."""
 import functools
-from typing import Mapping
+from typing import Callable, Mapping
 
+import gin
 import haiku as hk
 import jax
 from jax import lax
 from jax import numpy as jnp
+from learned_optimization.tasks import base as tasks_base
 from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.datasets import image
+from learned_optimization.tasks.parametric import cfgobject
 import numpy as onp
+
+PRNGKey = jnp.ndarray
 
 
 def choice(key, vals):
@@ -42,8 +47,8 @@ class SampleImageDataset:
       "mnist_datasets": (image.mnist_datasets, 10),
       "fashion_mnist_datasets": (image.fashion_mnist_datasets, 10),
       "cifar10_datasets": (image.cifar10_datasets, 10),
-      "cifar100_datasets": (image.cifar100_datasets, 10),
-      "imagenet16_datasets": (image.imagenet16_datasets, 10),
+      "cifar100_datasets": (image.cifar100_datasets, 100),
+      "imagenet16_datasets": (image.imagenet16_datasets, 1000),
   }
 
   @classmethod
@@ -236,3 +241,13 @@ class SampleInitializer:
         return out
 
     return _SwitchedInitializer()
+
+
+@gin.configurable
+def task_from_sample_task_family_fn(sample_task_family_fn: Callable[
+    [PRNGKey], cfgobject.CFGObject], seed: int) -> tasks_base.TaskFamily:
+  key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
+  cfg = sample_task_family_fn(key1)
+  task_family = cfgobject.object_from_config(cfg)
+  inner_cfg = task_family.sample(key2)
+  return task_family.task_fn(inner_cfg)

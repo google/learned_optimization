@@ -94,6 +94,7 @@ class CFGNamed:
   values: Mapping[str, Any] = flax.struct.field(default_factory=dict)
 
 
+@gin.configurable
 def object_from_config(cfg: CFGObject) -> Any:
   if isinstance(cfg, CFGObject):
     r = gin.get_configurable(

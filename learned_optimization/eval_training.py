@@ -86,14 +86,16 @@ def _loss_and_aux(
     data: Data,
     key: PRNGKey,
     pmap_axis_name: Optional[str] = None
-) -> Tuple[jnp.ndarray, Mapping[str, jnp.ndarray]]:
+) -> Tuple[jnp.ndarray, jnp.ndarray, Mapping[str, jnp.ndarray]]:
   """Compute loss and auxilary data from a task."""
   p, s = opt.get_params_state(opt_state)
   l, _, aux = task.loss_and_aux(p, s, key, data)
   if pmap_axis_name:
     l = lax.pmean(l, pmap_axis_name)
     aux = lax.pmean(aux, pmap_axis_name)
-  return l, aux
+
+  norm_fn = getattr(task, "normalizer", lambda x: x)
+  return l, norm_fn(l), aux
 
 
 def _batch_eval(
@@ -104,9 +106,10 @@ def _batch_eval(
     data_iter: Iterator[Any],
     eval_batches: int,
     device: Optional[jax.lib.xla_client.Device] = None
-) -> Tuple[jnp.ndarray, Mapping[str, jnp.ndarray]]:
+) -> Tuple[jnp.ndarray, jnp.ndarray, Mapping[str, jnp.ndarray]]:
   """Compute loss and auxilary data over `eval_batches` of data."""
   eval_losses = []
+  eval_norm_losses = []
   eval_auxs = []
 
   for _ in range(eval_batches):
@@ -117,12 +120,13 @@ def _batch_eval(
       batch = ()
     if device:
       batch = jax.device_put(batch, device=device)
-    ls, aux = _loss_and_aux(task, opt, opt_state, batch, key=key1)
+    ls, norm_ls, aux = _loss_and_aux(task, opt, opt_state, batch, key=key1)
     eval_losses.append(ls)
+    eval_norm_losses.append(norm_ls)
     eval_auxs.append(aux)
 
-  return onp.mean(eval_losses), jax.tree_map(onp.mean,
-                                             tree_utils.tree_zip_onp(eval_auxs))
+  return (onp.mean(eval_losses), onp.mean(eval_norm_losses),
+          jax.tree_map(onp.mean, tree_utils.tree_zip_onp(eval_auxs)))
 
 
 @profile.wrap()
@@ -136,6 +140,7 @@ def single_task_training_curves(
     last_eval_batches: int = 20,
     eval_task: Optional[tasks_base.Task] = None,
     device: Optional[jax.lib.xla_client.Device] = None,
+    summary_writer: Optional[summary.SummaryWriterBase] = None,
 ) -> Mapping[str, jnp.ndarray]:
   """Compute training curves."""
 
@@ -163,7 +168,7 @@ def single_task_training_curves(
         on_last = (i == num_steps)
         for s in splits:
           key, key1 = jax.random.split(key)
-          loss, aux = _batch_eval(
+          loss, loss_normalized, aux = _batch_eval(
               eval_task,
               opt,
               opt_state,
@@ -172,9 +177,13 @@ def single_task_training_curves(
               eval_batches if not on_last else last_eval_batches,
               device=device)
           m[f"eval/{s}/loss"] = loss
+          m[f"eval/{s}/loss_normalized"] = loss_normalized
           for k, v in aux.items():
             m[f"eval/{s}/{k}"] = v
         eval_auxs.append(m)
+        if summary_writer:
+          for k, v in m.items():
+            summary_writer.scalar(k, v, step=i)
         eval_xs.append(i)
 
     with profile.Profile("get_batch"):
