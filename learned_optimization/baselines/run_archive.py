@@ -29,7 +29,7 @@ from absl import logging
 import gin
 import jax
 from learned_optimization import setup_experiment
-from learned_optimization.baselines import hparam_sets
+from learned_optimization.baselines import hparam_sets  # pylint: disable=unused-import
 from learned_optimization.baselines import utils
 import numpy as onp
 
@@ -37,7 +37,8 @@ import numpy as onp
 def maybe_get_hparam_set(task_name,
                          hparam_set_name) -> Optional[Mapping[str, Any]]:
   """Attempt to get the data for a given task_name and hparam set."""
-  unused_cfgs, paths_reps = getattr(hparam_sets, hparam_set_name)(task_name)
+  hparam_set_fn = gin.get_configurable(hparam_set_name)
+  unused_cfgs, paths_reps = hparam_set_fn(task_name)
   paths, unused_reps = zip(*paths_reps)
 
   def load_one(p):
