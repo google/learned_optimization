@@ -51,6 +51,19 @@ class TruncatedPesTest(parameterized.TestCase):
 
     test_utils.trainer_smoketest(trainer)
 
+  def test_truncated_pes_stacked(self):
+    learned_opt = base.LearnableSGD()
+    task_family = quadratics.FixedDimQuadraticFamilyData(10)
+    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    trainer = truncated_pes.TruncatedPES(
+        task_family,
+        learned_opt,
+        trunc_sched,
+        num_tasks=5,
+        steps_per_jit=5,
+        stack_antithetic_samples=True)
+
+    test_utils.trainer_smoketest(trainer)
 
 if __name__ == "__main__":
   absltest.main()
