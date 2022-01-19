@@ -17,10 +17,34 @@
 
 from absl.testing import absltest
 from absl.testing import parameterized
+import jax
+import jax.numpy as jnp
 from learned_optimization.learned_optimizers import base
 from learned_optimization.outer_trainers import full_es
+from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import test_utils
+from learned_optimization.tasks import base as tasks_base
 from learned_optimization.tasks import quadratics
+import numpy as np
+
+
+class TaskFamilyWithAux(tasks_base.TaskFamily):
+
+  def sample(self, key):
+    return None
+
+  def task_fn(self, task_params) -> tasks_base.Task:
+
+    class _Task(tasks_base.Task):
+      datasets = None
+
+      def loss_and_aux(self, params, state, _, data):
+        return 0.0, None, {"aux_name": 1.0}
+
+      def init(self, key):
+        return jnp.asarray(1.), None
+
+    return _Task()
 
 
 class FullEsTest(parameterized.TestCase):
@@ -72,6 +96,29 @@ class FullEsTest(parameterized.TestCase):
         stack_antithetic_samples=True)
 
     test_utils.trainer_smoketest(trainer)
+
+  @parameterized.product(loss_type=("avg", "last_recompute"))
+  def test_full_es_meta_loss_aux(self, loss_type):
+    learned_opt = base.LearnableSGD()
+    task_family = TaskFamilyWithAux()
+    trainer = full_es.FullES(
+        task_family,
+        learned_opt,
+        num_tasks=5,
+        unroll_length=10,
+        steps_per_jit=5,
+        loss_type=loss_type,
+        meta_loss_with_aux_key="aux_name")
+
+    key = jax.random.PRNGKey(0)
+    theta = learned_opt.init(key)
+    worker_weights = gradient_learner.WorkerWeights(
+        theta, None, gradient_learner.OuterState(1))
+    state = trainer.init_worker_state(worker_weights, key=key)
+    out, _ = trainer.compute_gradient_estimate(
+        worker_weights, key, state, with_summary=True)
+
+    np.testing.assert_allclose(out.mean_loss, 1.0)
 
 
 if __name__ == "__main__":

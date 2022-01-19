@@ -90,10 +90,13 @@ def init_state(task_family: tasks_base.TaskFamily,
   return FullWorkerState(inner_opt_state=opt_state, task_param=task_param)
 
 
-@functools.partial(jax.jit, static_argnames=("task_family", "learned_opt"))
-@functools.partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0))
+@functools.partial(
+    jax.jit,
+    static_argnames=("task_family", "learned_opt", "meta_loss_with_aux_key"))
+@functools.partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0))
 def next_state(task_family: tasks_base.TaskFamily,
                learned_opt: lopt_base.LearnedOptimizer,
+               meta_loss_with_aux_key: Optional[str],
                theta: lopt_base.MetaParams, key: PRNGKey,
                state: FullWorkerState,
                data: Any) -> Tuple[FullWorkerState, FullWorkerOut]:
@@ -102,6 +105,9 @@ def next_state(task_family: tasks_base.TaskFamily,
   Args:
     task_family: Task family for the task being trained.
     learned_opt: Learned optimizer instance.
+    meta_loss_with_aux_key: If this is set, instead of returning the loss in
+      FullWorkerOut, the value of the auxilarly metrics specified will be used.
+      This is useful for meta-training against other values (e.g. accuracy).
     theta: Parameters of the learned optimizer
     key: Jax RNG (this is vectorized)
     state: State of the inner problems being trained.
@@ -118,7 +124,13 @@ def next_state(task_family: tasks_base.TaskFamily,
   p, s = opt.get_params_state(state.inner_opt_state)
 
   task = task_family.task_fn(state.task_param)
-  (l, s), g = jax.value_and_grad(task.loss, has_aux=True)(p, s, next(rng), data)
+
+  def loss_fn(p, s, key, data):
+    l, s, aux = task.loss_and_aux(p, s, key, data)
+    return l, (s, aux)
+
+  (l, (s, aux_metrics)), g = jax.value_and_grad(
+      loss_fn, has_aux=True)(p, s, next(rng), data)
 
   summary.summary(l, name="task_loss")
 
@@ -132,8 +144,17 @@ def next_state(task_family: tasks_base.TaskFamily,
       task_param=state.task_param,
   )
 
+  if meta_loss_with_aux_key:
+    if meta_loss_with_aux_key not in aux_metrics:
+      raise ValueError(f"Aux key: {meta_loss_with_aux_key} not found in "
+                       f"task family {task_family}. Found keys are "
+                       f" {aux_metrics.keys()}")
+    meta_loss = aux_metrics[meta_loss_with_aux_key]
+  else:
+    meta_loss = l
+
   out = FullWorkerOut(
-      loss=l,
+      loss=meta_loss,
       is_done=False,
       task_param=state.task_param,
       iteration=state.inner_opt_state.iteration)
@@ -145,9 +166,10 @@ def next_state(task_family: tasks_base.TaskFamily,
     jax.jit,
     static_argnames=("task_family", "learned_opt", "num_tasks",
                      "train_and_meta", "with_summary", "unroll_length",
-                     "stack_antithetic_samples"),
+                     "stack_antithetic_samples", "meta_loss_with_aux_key"),
 )
-@functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 4, 5))
+@functools.partial(
+    summary.add_with_summary, static_argnums=(0, 1, 2, 3, 4, 5, 6))
 def unroll_next_state(
     task_family: tasks_base.TaskFamily,
     learned_opt: lopt_base.LearnedOptimizer,
@@ -155,6 +177,7 @@ def unroll_next_state(
     unroll_length: int,
     train_and_meta: bool,
     stack_antithetic_samples: bool,
+    meta_loss_with_aux_key: Optional[str],
     theta: lopt_base.MetaParams,
     key: PRNGKey,
     state: FullWorkerState,
@@ -172,6 +195,9 @@ def unroll_next_state(
       function evaluation (e.g. for validation based meta-losses).
     stack_antithetic_samples: If using stacked antithetic samples, rng's are
       split to be shared.
+    meta_loss_with_aux_key: Use some value from the given task's aux returns
+      for meta-training. This is useful for, say, meta-training against
+      accuracy rather than the loss.
     theta: Parameters of the learned optimizer
     key: Jax RNG (this is vectorized)
     state: State of the inner problems being trained.
@@ -199,8 +225,9 @@ def unroll_next_state(
       vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
                               vec_keys)
 
-    next_state_, ys = next_state(task_family, learned_opt, theta, vec_keys,
-                                 state, tr_data)
+    next_state_, ys = next_state(task_family, learned_opt,
+                                 meta_loss_with_aux_key, theta, vec_keys, state,
+                                 tr_data)
 
     if train_and_meta:
       vec_keys = jax.random.split(key2, num_tasks)
@@ -208,10 +235,18 @@ def unroll_next_state(
         vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
                                 vec_keys)
 
-      loss = common.vectorized_loss(task_family, learned_opt, theta,
-                                    next_state_.inner_opt_state,
-                                    next_state_.task_param, vec_keys, meta_data)
-      ys = ys.replace(loss=loss)
+      loss, aux_metrics = common.vectorized_loss_and_aux(
+          task_family, learned_opt, theta, next_state_.inner_opt_state,
+          next_state_.task_param, vec_keys, meta_data)
+
+      if meta_loss_with_aux_key:
+        if meta_loss_with_aux_key not in aux_metrics:
+          raise ValueError(f"Aux key: {meta_loss_with_aux_key} not found in "
+                           f"task family {task_family}. Found keys are "
+                           f" {aux_metrics.keys()}")
+        ys = ys.replace(loss=aux_metrics[meta_loss_with_aux_key])
+      else:
+        ys = ys.replace(loss=loss)
 
     @jax.vmap
     def norm(loss, task_param):
@@ -289,6 +324,7 @@ def avg_loss_antithetic_es(
         "std",
         "recompute_samples",
         "clip_loss_diff",
+        "meta_loss_with_aux_key",
     ))
 def last_recompute_antithetic_es(
     task_family: tasks_base.TaskFamily,
@@ -302,7 +338,8 @@ def last_recompute_antithetic_es(
     key: PRNGKey,
     std: float,
     recompute_samples: int,
-    clip_loss_diff: Optional[float] = None
+    clip_loss_diff: Optional[float] = None,
+    meta_loss_with_aux_key: Optional[str] = None,
 ) -> Tuple[float, lopt_base.MetaParams]:
   """Compute an ES gradient estimate by recomputing the loss on both unrolls.
 
@@ -319,6 +356,9 @@ def last_recompute_antithetic_es(
     std: standard deviation of the perturbation.
     recompute_samples: number of samples to compute the loss over.
     clip_loss_diff: clipping applied to each task loss.
+    meta_loss_with_aux_key: Use some value from the given task's aux returns
+      for meta-training. This is useful for, say, meta-training against
+      accuracy rather than the loss.
 
   Returns:
     mean_loss: mean loss between positive and negative perturbations
@@ -328,9 +368,15 @@ def last_recompute_antithetic_es(
   def single_vec_batch(theta, state, key_data):
     key, data = key_data
     keys = jax.random.split(key, tree_utils.first_dim(state))
-    return common.vectorized_loss(task_family, learned_opt, theta,
-                                  state.inner_opt_state, state.task_param, keys,
-                                  data)
+    loss, aux_metrics = common.vectorized_loss_and_aux(task_family, learned_opt,
+                                                       theta,
+                                                       state.inner_opt_state,
+                                                       state.task_param, keys,
+                                                       data)
+    if meta_loss_with_aux_key:
+      return aux_metrics[meta_loss_with_aux_key]
+    else:
+      return loss
 
   keys = jax.random.split(key, recompute_samples)
 
@@ -396,6 +442,7 @@ class FullES(gradient_learner.GradientEstimator):
       recompute_split: str = "train",
       clip_loss_diff: Optional[float] = None,
       stack_antithetic_samples: bool = False,
+      meta_loss_with_aux_key: Optional[str] = None,
   ):
     """Initializer.
 
@@ -420,6 +467,9 @@ class FullES(gradient_learner.GradientEstimator):
       stack_antithetic_samples: Implementation detail of how antithetic samples
         are computed. Should we stack, and run with batch hardware or run
         sequentially?
+      meta_loss_with_aux_key: Use some value from the given task's aux returns
+        for meta-training. This is useful for, say, meta-training against
+        accuracy rather than the loss.
     """
     self.task_family = task_family
     self.learned_opt = learned_opt
@@ -430,6 +480,7 @@ class FullES(gradient_learner.GradientEstimator):
     self.train_and_meta = train_and_meta
     self.clip_loss_diff = clip_loss_diff
     self.stack_antithetic_samples = stack_antithetic_samples
+    self.meta_loss_with_aux_key = meta_loss_with_aux_key
 
     self.data_shape = jax.tree_map(
         lambda x: jax.ShapedArray(shape=x.shape, dtype=x.dtype),
@@ -489,9 +540,13 @@ class FullES(gradient_learner.GradientEstimator):
         # both models using the same random key and same data.
         key = next(rng)
         static_args = [
-            self.task_family, self.learned_opt, self.num_tasks,
-            self.steps_per_jit, self.train_and_meta,
-            self.stack_antithetic_samples
+            self.task_family,
+            self.learned_opt,
+            self.num_tasks,
+            self.steps_per_jit,
+            self.train_and_meta,
+            self.stack_antithetic_samples,
+            self.meta_loss_with_aux_key,
         ]
         datas = jax.tree_map(jnp.asarray, datas)
 
@@ -565,7 +620,8 @@ class FullES(gradient_learner.GradientEstimator):
               key,
               self.std,
               recompute_samples=self.recompute_samples,
-              clip_loss_diff=self.clip_loss_diff)
+              clip_loss_diff=self.clip_loss_diff,
+              meta_loss_with_aux_key=self.meta_loss_with_aux_key)
           # TODO(lmetz) don't just return the last component of the trunction.
           p_ys = p_yses[-1]
           unroll_info = gradient_learner.UnrollInfo(

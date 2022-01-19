@@ -187,9 +187,10 @@ def unroll_next_state(
         vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
                                 vec_keys)
 
-      loss = common.vectorized_loss(task_family, learned_opt, theta,
-                                    next_state_.inner_opt_state,
-                                    next_state_.task_param, vec_keys, meta_data)
+      loss, _ = common.vectorized_loss_and_aux(task_family, learned_opt, theta,
+                                               next_state_.inner_opt_state,
+                                               next_state_.task_param, vec_keys,
+                                               meta_data)
       ys = ys.replace(loss=loss)
 
     @jax.vmap
