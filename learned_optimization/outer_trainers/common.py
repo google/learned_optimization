@@ -112,14 +112,15 @@ def progress_or_reset_inner_opt_state(
 
 
 @functools.partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0))
-def vectorized_loss(task_family: tasks_base.TaskFamily,
-                    learned_opt: lopt_base.LearnedOptimizer,
-                    theta: lopt_base.MetaParams, inner_opt_state: Any,
-                    task_param: Any, key: PRNGKey, data: Any) -> jnp.ndarray:
+def vectorized_loss_and_aux(task_family: tasks_base.TaskFamily,
+                            learned_opt: lopt_base.LearnedOptimizer,
+                            theta: lopt_base.MetaParams, inner_opt_state: Any,
+                            task_param: Any, key: PRNGKey,
+                            data: Any) -> jnp.ndarray:
   """Vectorized computation of the task loss given data."""
   # TODO(lmetz) make use of eval task families?
   task = task_family.task_fn(task_param)
   opt = learned_opt.opt_fn(theta, is_training=True)
   p, s = opt.get_params_state(inner_opt_state)
-  l, _ = task.loss(p, s, key, data)
-  return l
+  l, _, aux = task.loss_and_aux(p, s, key, data)
+  return l, aux
