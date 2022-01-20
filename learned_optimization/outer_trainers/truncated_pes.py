@@ -140,9 +140,11 @@ def next_state(task_family: tasks_base.TaskFamily,
 @functools.partial(
     jax.jit,
     static_argnames=("task_family", "learned_opt", "num_tasks", "trunc_sched",
-                     "train_and_meta", "with_summary", "unroll_length"),
+                     "train_and_meta", "with_summary", "unroll_length",
+                     "stack_antithetic_samples"),
 )
-@functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 4, 5))
+@functools.partial(
+    summary.add_with_summary, static_argnums=(0, 1, 2, 3, 4, 5, 6))
 def unroll_next_state(
     task_family: tasks_base.TaskFamily,
     learned_opt: lopt_base.LearnedOptimizer,
@@ -150,6 +152,7 @@ def unroll_next_state(
     num_tasks: int,
     unroll_length: int,
     train_and_meta: bool,
+    stack_antithetic_samples: bool,
     theta: lopt_base.MetaParams,
     key: PRNGKey,
     state: SingleState,
@@ -167,15 +170,26 @@ def unroll_next_state(
       key, tr_data = key_and_data
 
     key1, key2 = jax.random.split(key)
+
+    # If stacking the antithetic samples, we want to share random keys across
+    # the antithetic samples.
+    vec_keys = jax.random.split(key1, num_tasks)
+    if stack_antithetic_samples:
+      vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
+                              vec_keys)
+
     next_state_, ys = next_state(task_family, learned_opt, trunc_sched, theta,
-                                 jax.random.split(key1, num_tasks), state,
-                                 tr_data, outer_state)
+                                 vec_keys, state, tr_data, outer_state)
 
     if train_and_meta:
-      keys = jax.random.split(key2, tree_utils.first_dim(state))
+      vec_keys = jax.random.split(key2, num_tasks)
+      if stack_antithetic_samples:
+        vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
+                                vec_keys)
+
       loss = common.vectorized_loss(task_family, learned_opt, theta,
                                     next_state_.inner_opt_state,
-                                    next_state_.task_param, keys, meta_data)
+                                    next_state_.task_param, vec_keys, meta_data)
       ys = ys.replace(loss=loss)
 
     @jax.vmap
@@ -290,6 +304,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       std=0.01,
       steps_per_jit=10,
       train_and_meta=False,
+      stack_antithetic_samples: bool = False,
   ):
     self.trunc_sched = trunc_sched
     self.task_family = task_family
@@ -301,6 +316,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     self.trunc_length = trunc_length
     self.steps_per_jit = steps_per_jit
     self.train_and_meta = train_and_meta
+    self.stack_antithetic_samples = stack_antithetic_samples
 
     self.data_shape = jax.tree_map(
         lambda x: jax.ShapedArray(shape=x.shape, dtype=x.dtype),
@@ -385,25 +401,45 @@ class TruncatedPES(gradient_learner.GradientEstimator):
 
       key = next(rng)
       static_args = [
-          self.task_family,
-          self.learned_opt,
-          self.trunc_sched,
-          self.num_tasks,
-          self.steps_per_jit,
-          self.train_and_meta,
+          self.task_family, self.learned_opt, self.trunc_sched, self.num_tasks,
+          self.steps_per_jit, self.train_and_meta, self.stack_antithetic_samples
       ]
-      (p_state, p_ys), m = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
-          *(static_args +
-            [vec_p_theta, key, p_state, datas, worker_weights.outer_state]),
-          with_summary=with_summary,
-          sample_rng_key=next(rng))
-      metrics.append(m)
 
+      # we provide 2 ways to compute the antithetic unrolls:
+      # First, we stack the positive and negative states and compute things
+      # in parallel
+      # Second, we do this serially in python.
+      if self.stack_antithetic_samples:
+
+        def stack(a, b, axis=0):
+          return jax.tree_map(lambda x, y: jnp.concatenate([x, y], axis=axis),
+                              a, b)
+
+        (pn_state, pn_ys), m = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+            *(static_args + [
+                stack(vec_p_theta, vec_n_theta), key,
+                stack(p_state, n_state),
+                stack(datas, datas, axis=1), worker_weights.outer_state
+            ]),
+            with_summary=with_summary,
+            sample_rng_key=next(rng))
+        p_state = jax.tree_map(lambda x: x[0:self.num_tasks], pn_state)
+        n_state = jax.tree_map(lambda x: x[self.num_tasks:], pn_state)
+        p_ys = jax.tree_map(lambda x: x[:, 0:self.num_tasks], pn_ys)
+        n_ys = jax.tree_map(lambda x: x[:, self.num_tasks:], pn_ys)
+      else:
+        (p_state, p_ys), m = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+            *(static_args +
+              [vec_p_theta, key, p_state, datas, worker_weights.outer_state]),
+            with_summary=with_summary,
+            sample_rng_key=next(rng))
+        (n_state, n_ys), _ = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+            *(static_args +
+              [vec_n_theta, key, n_state, datas, worker_weights.outer_state]),
+            with_summary=False)
+
+      metrics.append(m)
       p_yses.append(p_ys)
-      (n_state, n_ys), _ = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
-          *(static_args +
-            [vec_n_theta, key, n_state, datas, worker_weights.outer_state]),
-          with_summary=False)
       n_yses.append(n_ys)
 
     loss, es_grad, new_accumulator, p_ys, delta_loss = compute_pes_grad(
