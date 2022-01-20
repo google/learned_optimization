@@ -14,12 +14,13 @@
 # limitations under the License.
 
 """Base classes for Task and TaskFamily."""
-from typing import Any, Optional, Tuple, TypeVar, Generic
+from typing import Any, Callable, Generic, Optional, Tuple, TypeVar
 
 import gin
 import jax
 import jax.numpy as jnp
 from learned_optimization.tasks.datasets import base as datasets_base
+import numpy as onp
 
 Batch = Any
 Params = Any
@@ -135,3 +136,49 @@ def softmax_cross_entropy(
     labels: jnp.ndarray,
 ) -> jnp.ndarray:
   return -jnp.sum(labels * jax.nn.log_softmax(logits), axis=-1)
+
+
+@gin.configurable
+def get_task(task_family: Optional[TaskFamily] = None,
+             task_family_seed: Optional[int] = None,
+             sample_task_family_fn: Optional[Callable[[PRNGKey],
+                                                      TaskFamily]] = None,
+             sample_task_family_fn_seed: Optional[int] = None) -> Task:
+  """Return a task from one of the many options passed in.
+
+
+  Args:
+    task_family: Task family to use
+    task_family_seed: seed to use when sampling from a task_family. This is
+      useful to reduce eval variance if the task family has a wide variety of
+      tasks.
+    sample_task_family_fn: A callable that samples a task_family
+    sample_task_family_fn_seed: The seed used when drawing the sample from
+      sample_task_family_fn.
+
+  Returns:
+    Task instance from either the task family, or sample_task_family_fn.
+  """
+  # TODO(lmetz) refactor this to share more code with the continuous eval.
+  if sum([x is not None for x in [task_family, sample_task_family_fn]]) != 1:
+    raise ValueError(
+        "Must set only a single kind of task config in gin.\n"
+        f"Passed in: task_family: {task_family}\n"
+        f"Passed in: sample_task_family_fn: {sample_task_family_fn}\n")
+
+  if sample_task_family_fn:
+    if sample_task_family_fn_seed is None:
+      sample_task_family_fn_seed = onp.random.randint(0, 100000)
+    task_family = sample_task_family_fn(
+        jax.random.PRNGKey(sample_task_family_fn_seed))
+
+  if task_family_seed is None:
+    task_family_seed = onp.random.randint(0, 100000)
+
+  # TaskFamily must be non-None here.
+  if task_family:
+    cfg = task_family.sample(jax.random.PRNGKey(task_family_seed))
+    return task_family.task_fn(cfg)
+  else:
+    assert False, ("task_family was somehow Falsy."
+                   "This is a bug in learned_optimization.")
