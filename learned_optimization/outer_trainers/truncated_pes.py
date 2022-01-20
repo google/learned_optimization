@@ -517,7 +517,7 @@ class TruncatedPESPMAP(TruncatedPES):
         functools.partial(
             common.vector_sample_perturbations,
             std=self.std,
-            num_tasks=self.num_tasks),
+            num_samples=self.num_tasks),
         in_axes=(None, 0),
     )
 
