@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Tasks based on simple convolutional nets."""
+# pylint: disable=invalid-name
 
 from typing import Any, Tuple, Optional, Sequence, Callable
 
@@ -63,7 +64,7 @@ def _cross_entropy_pool_loss(
 
 
 @gin.configurable
-class Cifar10Conv32x64x64(base.Task):
+class Conv_Cifar10_32x64x64(base.Task):
   """A 3 hidden layer convnet designed for 16x16 cifar10."""
 
   def __init__(self):

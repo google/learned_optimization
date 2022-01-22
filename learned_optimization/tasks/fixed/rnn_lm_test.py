@@ -13,21 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for learned_optimizers.tasks.fixed_mlp."""
+"""Tests for learned_optimizers.tasks.fixed.rnn_lm."""
 
 from absl.testing import absltest
-from learned_optimization.tasks import fixed_mlp
+from absl.testing import parameterized
 from learned_optimization.tasks import test_utils
+from learned_optimization.tasks.fixed import rnn_lm
+
+tasks = [
+    "RNNLM_LM1BByte_Patch32_IRNN128_Embed64",
+    "RNNLM_LM1BByte_Patch32_LSTM128_Embed64",
+]
 
 
-class FixedMLPTest(absltest.TestCase):
+class RNNLM(parameterized.TestCase):
 
-  def test_FashionMnistRelu128x128(self):
-    test_utils.smoketest_task(fixed_mlp.FashionMnistRelu128x128())
+  @parameterized.parameters(tasks)
+  def test_tasks(self, task_name):
+    task = getattr(rnn_lm, task_name)()
+    test_utils.smoketest_task(task)
 
-  def test_Imagenet16Relu256x256x256(self):
-    test_utils.smoketest_task(fixed_mlp.Imagenet16Relu256x256x256())
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
   absltest.main()

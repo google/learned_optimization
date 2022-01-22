@@ -13,18 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for learned_optimizers.tasks.fixed_conv."""
+"""Tests for learned_optimizers.tasks.fixed_mlp."""
 
 from absl.testing import absltest
-from learned_optimization.tasks import fixed_conv
+from absl.testing import parameterized
 from learned_optimization.tasks import test_utils
+from learned_optimization.tasks.fixed import image_mlp_ae
+
+tasks = [
+    "ImageMLPAE_Cifar10_32x32x32_bs128",
+    "ImageMLPAE_Cifar10_256x256x256_bs128",
+    "ImageMLPAE_Cifar10_256x256x256_bs1024",
+    "ImageMLPAE_Cifar10_128x32x128_bs256",
+    "ImageMLPAE_Mnist_128x32x128_bs128",
+    "ImageMLPAE_FashionMnist_128x32x128_bs128",
+]
 
 
-class FixedconvTest(absltest.TestCase):
+class ImageMLPAETest(parameterized.TestCase):
 
-  def test_Cifar10Conv32x64x64(self):
-    test_utils.smoketest_task(fixed_conv.Cifar10Conv32x64x64())
+  @parameterized.parameters(tasks)
+  def test_tasks(self, task_name):
+    task = getattr(image_mlp_ae, task_name)()
+    test_utils.smoketest_task(task)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   absltest.main()

@@ -77,42 +77,42 @@ def _make_task(hk_fn: LossFN, datasets: datasets_base.Datasets) -> base.Task:
 
 
 @gin.configurable
-def FixedMLPAE_cifar10_32x32x32_bs128():  # pylint: disable=invalid-name
+def ImageMLPAE_Cifar10_32x32x32_bs128():  # pylint: disable=invalid-name
   base_model_fn = _fc_ae_loss_fn([32, 32, 32], jax.nn.relu)
   datasets = image.cifar10_datasets(batch_size=128)
   return _make_task(base_model_fn, datasets)
 
 
 @gin.configurable
-def FixedMLPAE_cifar10_256x256x256_bs128():  # pylint: disable=invalid-name
+def ImageMLPAE_Cifar10_256x256x256_bs128():  # pylint: disable=invalid-name
   base_model_fn = _fc_ae_loss_fn([256, 256, 256], jax.nn.relu)
   datasets = image.cifar10_datasets(batch_size=128)
   return _make_task(base_model_fn, datasets)
 
 
 @gin.configurable
-def FixedMLPAE_cifar10_256x256x256_bs1024():  # pylint: disable=invalid-name
+def ImageMLPAE_Cifar10_256x256x256_bs1024():  # pylint: disable=invalid-name
   base_model_fn = _fc_ae_loss_fn([256, 256, 256], jax.nn.relu)
   datasets = image.cifar10_datasets(batch_size=1024)
   return _make_task(base_model_fn, datasets)
 
 
 @gin.configurable
-def FixedMLPAE_cifar10_128x32x128_bs256():  # pylint: disable=invalid-name
+def ImageMLPAE_Cifar10_128x32x128_bs256():  # pylint: disable=invalid-name
   base_model_fn = _fc_ae_loss_fn([128, 32, 128], jax.nn.relu)
   datasets = image.cifar10_datasets(batch_size=256)
   return _make_task(base_model_fn, datasets)
 
 
 @gin.configurable
-def FixedMLPAE_mnist_128x32x128_bs128():  # pylint: disable=invalid-name
+def ImageMLPAE_Mnist_128x32x128_bs128():  # pylint: disable=invalid-name
   base_model_fn = _fc_ae_loss_fn([128, 32, 128], jax.nn.relu)
   datasets = image.mnist_datasets(batch_size=128)
   return _make_task(base_model_fn, datasets)
 
 
 @gin.configurable
-def FixedMLPAE_fashion_mnist_128x32x128_bs128():  # pylint: disable=invalid-name
+def ImageMLPAE_FashionMnist_128x32x128_bs128():  # pylint: disable=invalid-name
   base_model_fn = _fc_ae_loss_fn([128, 32, 128], jax.nn.relu)
   datasets = image.fashion_mnist_datasets(batch_size=128)
   return _make_task(base_model_fn, datasets)

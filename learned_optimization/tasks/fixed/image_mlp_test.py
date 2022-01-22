@@ -13,30 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for learned_optimizers.tasks.fixed_mlp."""
+"""Tests for learned_optimizers.tasks.fixed.image_mlp."""
 
 from absl.testing import absltest
-from absl.testing import parameterized
-from learned_optimization.tasks import fixed_mlp_ae
 from learned_optimization.tasks import test_utils
-
-tasks = [
-    "FixedMLPAE_cifar10_32x32x32_bs128",
-    "FixedMLPAE_cifar10_256x256x256_bs128",
-    "FixedMLPAE_cifar10_256x256x256_bs1024",
-    "FixedMLPAE_cifar10_128x32x128_bs256",
-    "FixedMLPAE_mnist_128x32x128_bs128",
-    "FixedMLPAE_fashion_mnist_128x32x128_bs128",
-]
+from learned_optimization.tasks.fixed import image_mlp
 
 
-class FixedMLPAETest(parameterized.TestCase):
+class ImageMLPTest(absltest.TestCase):
 
-  @parameterized.parameters(tasks)
-  def test_tasks(self, task_name):
-    task = getattr(fixed_mlp_ae, task_name)()
-    test_utils.smoketest_task(task)
+  def test_ImageMLP_FashionMnistRelu128x128(self):
+    test_utils.smoketest_task(image_mlp.ImageMLP_FashionMnist_Relu128x128())
+
+  def test_ImageMLP_Imagenet16Relu256x256x256(self):
+    test_utils.smoketest_task(image_mlp.ImageMLP_Imagenet16_Relu256x256x256())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   absltest.main()

@@ -13,26 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for learned_optimizers.tasks.rnn_lm."""
+"""Tests for learned_optimizers.tasks.fixed.conv."""
 
 from absl.testing import absltest
-from absl.testing import parameterized
-from learned_optimization.tasks import rnn_lm
 from learned_optimization.tasks import test_utils
-
-tasks = [
-    "RNNLM_LM1BByte_Patch32_IRNN128_Embed64",
-    "RNNLM_LM1BByte_Patch32_LSTM128_Embed64",
-]
+from learned_optimization.tasks.fixed import conv
 
 
-class RNNLM(parameterized.TestCase):
+class ConvTest(absltest.TestCase):
 
-  @parameterized.parameters(tasks)
-  def test_tasks(self, task_name):
-    task = getattr(rnn_lm, task_name)()
-    test_utils.smoketest_task(task)
+  def test_Conv_Cifar10_32x64x64(self):
+    test_utils.smoketest_task(conv.Conv_Cifar10_32x64x64())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   absltest.main()

@@ -45,7 +45,7 @@ from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import truncation_schedule
 
 from learned_optimization.tasks import quadratics
-from learned_optimization.tasks import fixed_mlp
+from learned_optimization.tasks.fixed import image_mlp
 from learned_optimization.tasks import base as tasks_base
 from learned_optimization.tasks.datasets import base as datasets_base
 
@@ -78,7 +78,6 @@ To account for this reuse, it is expected that these iterators are always random
 import numpy as np
 
 
-@datasets_base.dataset_lru_cache
 def data_iterator():
   bs = 3
   while True:
@@ -86,6 +85,7 @@ def data_iterator():
     yield batch
 
 
+@datasets_base.dataset_lru_cache
 def get_datasets():
   return datasets_base.Datasets(
       train=data_iterator(),
@@ -202,7 +202,7 @@ task = task_family.task_fn(task_cfg)
 key1, key = jax.random.split(key)
 params, model_state = task.init(key)
 batch = None
-task.loss(params, model_state, key, batch)
+task.loss(params, key, batch)
 ```
 
 +++ {"id": "QsYxiGvvdX8Y"}
@@ -225,7 +225,7 @@ def train_task(cfg, key):
     (loss, model_state), grad = jax.value_and_grad(
         task.loss, has_aux=True)(params, model_state, key, None)
     opt_state = opt.update(opt_state, grad, loss, model_state)
-  loss, model_state = task.loss(params, model_state, key, None)
+  loss = task.loss(params, key, None)
   return loss
 
 
@@ -245,7 +245,7 @@ Because of this ability to apply vmap over task families, this is the main build
 ```{code-cell}
 :id: xJtAFmcUofez
 
-single_task = fixed_mlp.FashionMnistRelu32_8()
+single_task = image_mlp.ImageMLP_FashionMnist8_Relu32()
 task_family = tasks_base.single_task_to_family(single_task)
 ```
 

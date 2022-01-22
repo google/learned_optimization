@@ -53,7 +53,7 @@ from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import truncation_schedule
 
 from learned_optimization.tasks import quadratics
-from learned_optimization.tasks import fixed_mlp
+from learned_optimization.tasks.fixed import image_mlp
 from learned_optimization.tasks import base as tasks_base
 from learned_optimization.tasks.datasets import base as datasets_base
 
@@ -82,7 +82,6 @@ import tqdm
 import numpy as np
 
 
-@datasets_base.dataset_lru_cache
 def data_iterator():
   bs = 3
   while True:
@@ -90,6 +89,7 @@ def data_iterator():
     yield batch
 
 
+@datasets_base.dataset_lru_cache
 def get_datasets():
   return datasets_base.Datasets(
       train=data_iterator(),
@@ -122,19 +122,19 @@ def noise_datasets():
 class MyTask(tasks_base.Task):
   datasets = noise_datasets()
 
-  def loss(self, params, state, rng, data):
-    return jnp.sum(jnp.square(params - data)), None
+  def loss(self, params, rng, data):
+    return jnp.sum(jnp.square(params - data))
 
   def init(self, key):
-    return jax.random.normal(key, shape=(4, 2)), None
+    return jax.random.normal(key, shape=(4, 2))
 
 
 task = MyTask()
 key = jax.random.PRNGKey(0)
 key1, key = jax.random.split(key)
-params, state = task.init(key)
+params = task.init(key)
 
-task.loss(params, state, key1, next(task.datasets.train))
+task.loss(params, key1, next(task.datasets.train))
 
 # + [markdown] id="yGOo6ixjhbR-"
 # ## Meta-training on multiple tasks: `TaskFamily`
@@ -174,12 +174,12 @@ class FixedDimQuadraticFamily(tasks_base.TaskFamily):
 
     class _Task(tasks_base.Task):
 
-      def loss(self, params, state, rng, _):
+      def loss(self, params, rng, _):
         # Compute MSE to the target task.
-        return jnp.sum(jnp.square(task_params - params)), state
+        return jnp.sum(jnp.square(task_params - params))
 
       def init(self, key):
-        return jax.random.normal(key, shape=(dim,)), None
+        return jax.random.normal(key, shape=(dim,))
 
     return _Task()
 
@@ -194,9 +194,9 @@ task_cfg = task_family.sample(key)
 task = task_family.task_fn(task_cfg)
 
 key1, key = jax.random.split(key)
-params, model_state = task.init(key)
+params = task.init(key)
 batch = None
-task.loss(params, model_state, key, batch)
+task.loss(params, key, batch)
 
 # + [markdown] id="QsYxiGvvdX8Y"
 # To achive speedups, we can now leverage `jax.vmap` to train *multiple* task instances in parallel! Depending on the task, this can be considerably faster than serially executing them.
@@ -206,17 +206,16 @@ task.loss(params, model_state, key, batch)
 def train_task(cfg, key):
   task = task_family.task_fn(cfg)
   key1, key = jax.random.split(key)
-  params, model_state = task.init(key1)
+  params = task.init(key1)
   opt = opt_base.Adam()
 
-  opt_state = opt.init(params, model_state)
+  opt_state = opt.init(params)
 
   for i in range(4):
-    params, model_state = opt.get_params_state(opt_state)
-    (loss, model_state), grad = jax.value_and_grad(
-        task.loss, has_aux=True)(params, model_state, key, None)
-    opt_state = opt.update(opt_state, grad, loss, model_state)
-  loss, model_state = task.loss(params, model_state, key, None)
+    params = opt.get_params(opt_state)
+    loss, grad = jax.value_and_grad(task.loss)(params, key, None)
+    opt_state = opt.update(opt_state, grad, loss=loss)
+  loss = task.loss(params, key, None)
   return loss
 
 
@@ -232,7 +231,7 @@ print("multiple losses", losses)
 # Because of this ability to apply vmap over task families, this is the main building block for a number of the high level libraries in this package. Single tasks can always be converted to a task family with:
 
 # + id="xJtAFmcUofez"
-single_task = fixed_mlp.FashionMnistRelu32_8()
+single_task = image_mlp.ImageMLP_FashionMnist8_Relu32()
 task_family = tasks_base.single_task_to_family(single_task)
 
 # + [markdown] id="mFOa2JDZokiy"

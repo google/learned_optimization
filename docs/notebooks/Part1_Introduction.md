@@ -49,7 +49,7 @@ from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import truncation_schedule
 
 from learned_optimization.tasks import quadratics
-from learned_optimization.tasks import fixed_mlp
+from learned_optimization.tasks.fixed import image_mlp
 from learned_optimization.tasks import base as tasks_base
 from learned_optimization.tasks.datasets import base as datasets_base
 
@@ -85,7 +85,7 @@ For tasks which make use of a model state (e.g. tasks with batchnorm), a `init_w
 
 We'll begin by looking at some built-in tasks in the library. In future colabs, we will discuss how custom tasks can be designed, and how families of tasks can be efficiently designed for parallelization.
 
-We will look at the `FashionMnistRelu32_8` task. This task consists of a 1 hidden layer MLP trained on Fashion MNIST resized to 8x8.
+We will look at the `ImageMLP_FashionMnist8_Relu32` task. This task consists of a 1 hidden layer MLP trained on Fashion MNIST resized to 8x8.
 
 First, let's initialize the parameters.
 
@@ -93,7 +93,7 @@ First, let's initialize the parameters.
 :id: xQQ-82RFIlln
 
 key = jax.random.PRNGKey(0)
-task = fixed_mlp.FashionMnistRelu32_8()
+task = image_mlp.ImageMLP_FashionMnist8_Relu32()
 
 params = task.init(key)
 jax.tree_map(lambda x: x.shape, params)
@@ -228,7 +228,7 @@ Now let's pull this all together and train a Task with this optimizer API.
 ```{code-cell}
 :id: klycie9FS7vJ
 
-task = fixed_mlp.FashionMnistRelu32_8()
+task = image_mlp.ImageMLP_FashionMnist8_Relu32()
 key = jax.random.PRNGKey(0)
 params = task.init(key)
 
@@ -251,7 +251,7 @@ The above doesn't make use of any sort of `jax.jit` and thus it is slow. In prac
 ```{code-cell}
 :id: A0qeh0ZWT9qD
 
-task = fixed_mlp.FashionMnistRelu32_8()
+task = image_mlp.ImageMLP_FashionMnist8_Relu32()
 key = jax.random.PRNGKey(0)
 params = task.init(key)
 
@@ -391,7 +391,7 @@ As an example, let us define a function, `meta_loss` which is the result of appl
 ```{code-cell}
 :id: 6pm07D0haajD
 
-task = fixed_mlp.FashionMnistRelu32_8()
+task = image_mlp.ImageMLP_FashionMnist8_Relu32()
 key = jax.random.PRNGKey(0)
 
 lopt = lopt_base.LearnableAdam()

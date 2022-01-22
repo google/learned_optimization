@@ -28,7 +28,7 @@ from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import truncated_pes
 from learned_optimization.outer_trainers import truncation_schedule
 from learned_optimization.tasks import base as tasks_base
-from learned_optimization.tasks import fixed_mlp
+from learned_optimization.tasks.fixed import image_mlp
 import numpy as np
 import tqdm
 
@@ -41,7 +41,7 @@ def train(train_log_dir: str,
   """Train a learned optimizer!"""
 
   if not task:
-    task = fixed_mlp.FashionMnistRelu32_8()
+    task = image_mlp.ImageMLP_FashionMnist8_Relu32()
 
   #### Hparams
   # learning rate used to train the learned optimizer

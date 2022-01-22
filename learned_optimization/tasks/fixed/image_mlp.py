@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Tasks based on MLP."""
+# pylint: disable=invalid-name
 
 from typing import Any
 
@@ -31,7 +32,7 @@ PRNGKey = jnp.ndarray
 
 
 @gin.configurable
-class FashionMnistRelu128x128(base.Task):
+class ImageMLP_FashionMnist_Relu128x128(base.Task):
   """A 2 hidden layer, 128 hidden unit MLP designed for fashion mnist."""
 
   def __init__(self):
@@ -59,8 +60,8 @@ class FashionMnistRelu128x128(base.Task):
     return jnp.nan_to_num(loss, nan=maxval, posinf=maxval, neginf=maxval)
 
 
-@gin.configurable  # pylint: disable=invalid-name
-class FashionMnistRelu32_8(base.Task):
+@gin.configurable
+class ImageMLP_FashionMnist8_Relu32(base.Task):
   """A 1 hidden layer, 32 hidden unit MLP designed for 8x8 fashion mnist."""
 
   def __init__(self):
@@ -90,7 +91,7 @@ class FashionMnistRelu32_8(base.Task):
 
 
 @gin.configurable
-class Imagenet16Relu256x256x256(base.Task):
+class ImageMLP_Imagenet16_Relu256x256x256(base.Task):
   """A 3 hidden layer MLP trained on 16x16 resized imagenet."""
 
   def __init__(self):
