@@ -21,14 +21,16 @@ seek to do a similar set of transformations but these transformations now must
 operate on Task and TaskFamiliy resulting in new Task and TaskFamily.
 """
 
-from typing import Mapping, Union, Tuple
+from typing import Mapping, Tuple, Union
 
+import functools
 import gin
 import jax
 import jax.numpy as jnp
 from learned_optimization import summary
 from learned_optimization.tasks import base
 from learned_optimization.tasks.base import Batch, ModelState, Params  # pylint: disable=g-multiple-import
+from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.parametric import cfgobject
 import numpy as onp
 
@@ -178,3 +180,53 @@ class ReparamWeightsFamily(base.TaskFamily):
       })
     else:
       raise ValueError(f"level={self._level} not supported")
+
+
+@gin.configurable
+class ReducedBatchsizeTask(base.Task):
+  """Reduce the batchsize of another task.
+
+  This is an augmentation which decreases a batchsize. This transformation is
+  useful as it allows different sized batches with the same data iterator which
+  saves on memory. This does come at the cost of wasting some samples (and thus
+  compute).
+  """
+
+  def __init__(self, task: base.Task, fraction_of_batchsize: float):
+    self.task = task
+    self._fraction_of_batchsize = fraction_of_batchsize
+    self.init = task.init
+    self.init_with_state = task.init_with_state
+    self.loss = task.loss
+    self.loss_with_state = task.loss_with_state
+    self.loss_with_state_and_aux = task.loss_with_state_and_aux
+    self.normalizer = task.normalizer
+
+    def reduce_bs(x):
+      bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
+      return x[0:bs]
+
+    self.datasets = datasets_base.datasets_map(
+        functools.partial(jax.tree_map, reduce_bs), task.datasets)
+
+
+@gin.configurable
+class ReducedBatchsizeFamily(base.TaskFamily):
+  """Reduce the batchsize of another TaskFamily.
+
+  See `ReducedBatchsizeTask` for more info.
+  """
+
+  def __init__(self, task_family: base.TaskFamily,
+               fraction_of_batchsize: float):
+    self.task_family = task_family
+    self._fraction_of_batchsize = fraction_of_batchsize
+
+    def reduce_bs(x):
+      bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
+      return x[0:bs]
+
+    self.datasets = datasets_base.datasets_map(
+        functools.partial(jax.tree_map, reduce_bs), task_family.datasets)
+    self.task_fn = task_family.task_fn
+    self.sample = task_family.sample

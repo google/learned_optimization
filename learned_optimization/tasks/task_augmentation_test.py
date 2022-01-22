@@ -22,8 +22,18 @@ import jax
 import jax.numpy as jnp
 from learned_optimization.tasks import base
 from learned_optimization.tasks import task_augmentation
+from learned_optimization.tasks.datasets import base as datasets_base
 import numpy as onp
 from numpy import testing
+
+
+def dummary_datasets():
+
+  def it():
+    while True:
+      yield jnp.ones([32])
+
+  return datasets_base.Datasets(it(), it(), it(), it())
 
 
 class DummyTask(base.Task):
@@ -37,6 +47,9 @@ class DummyTask(base.Task):
 
 
 class DummyTaskFamily(base.TaskFamily):
+
+  def __init__(self):
+    self.datasets = dummary_datasets()
 
   def sample(self, key: jnp.ndarray) -> Any:
     return {'cfg': 123}
@@ -131,6 +144,12 @@ class TaskAugmentationTest(absltest.TestCase):
     params2 = task_family.sample_task(jax.random.PRNGKey(1)).init(key)
     a2, _ = params2[0]
     self.assertGreater((a - a2)**2, 0.001)
+
+  def test_ReducedBatchsizeFamily(self):
+    task_family = task_augmentation.ReducedBatchsizeFamily(
+        DummyTaskFamily(), fraction_of_batchsize=0.5)
+    batch = next(task_family.datasets.train)
+    self.assertEqual(batch.shape, (16,))
 
 
 if __name__ == '__main__':
