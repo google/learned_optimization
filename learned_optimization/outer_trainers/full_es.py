@@ -82,7 +82,8 @@ def init_state(task_family: tasks_base.TaskFamily,
   rng = hk.PRNGSequence(key)
 
   task_param = task_family.sample(next(rng))
-  inner_param, inner_state = task_family.task_fn(task_param).init(next(rng))
+  inner_param, inner_state = task_family.task_fn(task_param).init_with_state(
+      next(rng))
   opt_state = learned_opt.opt_fn(
       theta, is_training=True).init(
           inner_param, inner_state, total_train_steps, key=next(rng))
@@ -126,7 +127,7 @@ def next_state(task_family: tasks_base.TaskFamily,
   task = task_family.task_fn(state.task_param)
 
   def loss_fn(p, s, key, data):
-    l, s, aux = task.loss_and_aux(p, s, key, data)
+    l, s, aux = task.loss_with_state_and_aux(p, s, key, data)
     return l, (s, aux)
 
   (l, (s, aux_metrics)), g = jax.value_and_grad(

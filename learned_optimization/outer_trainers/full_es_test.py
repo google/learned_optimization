@@ -38,11 +38,11 @@ class TaskFamilyWithAux(tasks_base.TaskFamily):
     class _Task(tasks_base.Task):
       datasets = None
 
-      def loss_and_aux(self, params, state, _, data):
-        return 0.0, None, {"aux_name": 1.0}
+      def loss_and_aux(self, params, _, data):
+        return 0.0, {"aux_name": 1.0}
 
       def init(self, key):
-        return jnp.asarray(1.), None
+        return jnp.asarray(1.)
 
     return _Task()
 

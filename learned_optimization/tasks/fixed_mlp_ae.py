@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Fixed MLP autoencoder tasks."""
-from typing import Callable, Sequence, Tuple, Any
+from typing import Callable, Sequence, Any
 
 import gin
 import haiku as hk
@@ -55,7 +55,7 @@ def _fc_ae_loss_fn(hidden_units: Sequence[int],
 
 def _make_task(hk_fn: LossFN, datasets: datasets_base.Datasets) -> base.Task:
   """Make a Task subclass for the haiku loss and datasets."""
-  init_net, apply_net = hk.transform_with_state(hk_fn)
+  init_net, apply_net = hk.transform(hk_fn)
 
   class _Task(base.Task):
     """Annonomous task object with corresponding loss and datasets."""
@@ -63,12 +63,12 @@ def _make_task(hk_fn: LossFN, datasets: datasets_base.Datasets) -> base.Task:
     def __init__(self):
       self.datasets = datasets
 
-    def init(self, key: PRNGKey) -> Tuple[base.Params, base.ModelState]:
+    def init(self, key: PRNGKey) -> base.Params:
       batch = next(datasets.train)
       return init_net(key, batch)
 
-    def loss(self, params, state, key, data):
-      return apply_net(params, state, key, data)
+    def loss(self, params, key, data):
+      return apply_net(params, key, data)
 
     def normalizer(self, loss):
       return jnp.clip(loss, .0, 1.)

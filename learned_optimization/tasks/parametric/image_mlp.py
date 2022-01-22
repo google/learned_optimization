@@ -15,7 +15,7 @@
 
 """Parametric image model that uses an MLP."""
 
-from typing import Any, Sequence, Tuple
+from typing import Any, Sequence
 
 import gin
 import haiku as hk
@@ -83,10 +83,9 @@ class ParametricImageMLP(base.TaskFamily):
         init_net, unused_apply_net = hk.without_apply_rng(
             hk.transform(_forward))
         image = next(self.datasets.train)["image"]
-        return init_net(rng, image), None
+        return init_net(rng, image)
 
-      def loss(self, params: Params, state: ModelState, rng: PRNGKey,
-               data: Batch) -> Tuple[jnp.ndarray, ModelState]:
+      def loss(self, params: Params, rng: PRNGKey, data: Batch) -> jnp.ndarray:
         unused_init_net, apply_net = hk.without_apply_rng(
             hk.transform(_forward))
 
@@ -94,7 +93,7 @@ class ParametricImageMLP(base.TaskFamily):
         logits = apply_net(params, image)
         labels = jax.nn.one_hot(data["label"], num_clases)
         vec_loss = base.softmax_cross_entropy(logits=logits, labels=labels)
-        return jnp.mean(vec_loss), state
+        return jnp.mean(vec_loss)
 
       def normalizer(self, out):
         max_class = onp.log(2 * num_clases)

@@ -386,7 +386,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
       def init(
           self,
           params: opt_base.Params,
-          state: Optional[opt_base.ModelState] = None,
+          model_state: Optional[opt_base.ModelState] = None,
           num_steps: Optional[int] = None,
           key: Optional[PRNGKey] = None,
       ) -> AdafacMLPLOptState:
@@ -397,7 +397,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
 
         return AdafacMLPLOptState(
             params=params,
-            state=state,
+            state=model_state,
             rms_rolling=rms_roll.init(params),
             mom_rolling=mom_roll.init(params),
             fac_rolling_features=fac_vec_roll.init(params),

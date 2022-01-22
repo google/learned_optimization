@@ -47,9 +47,10 @@ class Optimizer(abc.ABC):
 
   def init(self,
            params: Params,
-           state: ModelState = None,
+           state: Optional[ModelState] = None,
            num_steps: Optional[int] = None,
-           key: Optional[PRNGKey] = None) -> OptState:
+           key: Optional[PRNGKey] = None,
+           **kwargs) -> OptState:
     raise NotImplementedError
 
   def set_params(self, state: OptState, params: Params) -> OptState:
@@ -59,10 +60,9 @@ class Optimizer(abc.ABC):
       self,
       opt_state: OptState,
       grad: Gradient,
-      loss: jnp.asarray = None,
-      model_state: ModelState = None,
-      is_valid: jnp.asarray = False,
-      key: PRNGKey = None,
+      model_state: Optional[ModelState] = None,
+      key: Optional[PRNGKey] = None,
+      **kwargs,
   ) -> OptState:
     raise NotImplementedError()
 
@@ -91,13 +91,13 @@ class OptaxOptimizer(Optimizer):
 
   def init(self,
            params: Params,
-           state: ModelState = None,
+           model_state: Optional[ModelState] = None,
            num_steps: Optional[int] = None,
            key: Optional[PRNGKey] = None):
     return OptaxState(
         params=params,
         optax_opt_state=self.opt.init(params),
-        state=state,
+        state=model_state,
         iteration=0)
 
   @functools.partial(jax.jit, static_argnums=(0,))
@@ -106,8 +106,9 @@ class OptaxOptimizer(Optimizer):
              grad: Gradient,
              loss: Optional[jnp.ndarray],
              model_state: Optional[ModelState] = None,
-             is_valid: bool = False,
-             key: Optional[PRNGKey] = None):
+             key: Optional[PRNGKey] = None,
+             **kwargs):
+    del loss
     update, new_opt_state = self.opt.update(grad, opt_state.optax_opt_state,
                                             opt_state.params)
     return OptaxState(

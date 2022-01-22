@@ -13,7 +13,7 @@ help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 sync-notebooks:
-	jupytext --sync notebooks/*
+	jupytext --sync notebooks/*{py,md,ipynb}
 
 .PHONY: help Makefile
 

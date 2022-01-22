@@ -104,14 +104,14 @@ class MLPLOpt(lopt_base.LearnedOptimizer):
 
       def init(self,
                params: lopt_base.Params,
-               state: Any = None,
+               model_state: Any = None,
                num_steps: Optional[int] = None,
                key: Optional[PRNGKey] = None) -> MLPLOptState:
         """Initialize inner opt state."""
 
         return MLPLOptState(
             params=params,
-            state=state,
+            state=model_state,
             rolling_features=common.vec_rolling_mom(decays).init(params),
             iteration=jnp.asarray(0, dtype=jnp.int32))
 

@@ -80,7 +80,7 @@ def progress_or_reset_inner_opt_state(
 
     key1, key2, key3 = jax.random.split(key, 3)
     task_param = task_family.sample(key1)
-    s, p = task_family.task_fn(task_param).init(key2)
+    s, p = task_family.task_fn(task_param).init_with_state(key2)
 
     opt_state = opt.init(s, p, num_steps=num_steps, key=key3)
     summary.summary(num_steps, name="opt_init_num_steps")
@@ -92,7 +92,8 @@ def progress_or_reset_inner_opt_state(
     key1, key2 = jax.random.split(key)
 
     task = task_family.task_fn(task_param)
-    (l, s), g = jax.value_and_grad(task.loss, has_aux=True)(p, s, key1, data)
+    (l, s), g = jax.value_and_grad(
+        task.loss_with_state, has_aux=True)(p, s, key1, data)
 
     if axis_name:
       g = jax.lax.pmean(g, axis_name=axis_name)
@@ -100,7 +101,8 @@ def progress_or_reset_inner_opt_state(
 
     summary.summary(l, name="task_loss")
 
-    next_inner_opt_state = opt.update(inner_opt_state, g, l, s, key=key2)
+    next_inner_opt_state = opt.update(
+        inner_opt_state, g, loss=l, model_state=s, key=key2)
     next_inner_step = inner_step + 1
 
     return next_inner_opt_state, task_param, next_inner_step, l
@@ -122,5 +124,5 @@ def vectorized_loss_and_aux(task_family: tasks_base.TaskFamily,
   task = task_family.task_fn(task_param)
   opt = learned_opt.opt_fn(theta, is_training=True)
   p, s = opt.get_params_state(inner_opt_state)
-  l, _, aux = task.loss_and_aux(p, s, key, data)
+  l, _, aux = task.loss_with_state_and_aux(p, s, key, data)
   return l, aux

@@ -82,7 +82,7 @@ def _unrolled_meta_loss(opt: opt_base.Optimizer,
     params, model_state = opt.get_params_state(opt_state)
     key1, key2 = jax.random.split(jax.random.fold_in(key, idx))
     task = task_family.task_fn(task_params)
-    value_grad_fn = jax.value_and_grad(task.loss, has_aux=True)
+    value_grad_fn = jax.value_and_grad(task.loss_with_state, has_aux=True)
     (loss, model_state), grad = jax.jit(value_grad_fn)(params, model_state,
                                                        key1, data)
     next_opt_state = opt.update(
@@ -144,7 +144,7 @@ def time_for_task_family_vmap_unroll(
 
     @jax.vmap
     def init(task_param, key):
-      return task_family.task_fn(task_param).init(key)
+      return task_family.task_fn(task_param).init_with_state(key)
 
     logging.info("init_params")
     p, s = jax.jit(init)(task_params, keys)

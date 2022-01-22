@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Base classes for Task and TaskFamily."""
-from typing import Any, Callable, Generic, Optional, Tuple, TypeVar
+from typing import Any, Optional, Tuple, TypeVar, Generic, Mapping, Callable
 
 import gin
 import jax
@@ -36,16 +36,35 @@ class Task:
   """Base class for task interface."""
   datasets: Optional[datasets_base.Datasets] = None
 
-  def loss(self, params: Params, state: ModelState, key: PRNGKey,
+  def loss(self, params: Params, key: PRNGKey,
            data: Batch) -> Tuple[jnp.ndarray, ModelState]:
     raise NotImplementedError()
 
-  def loss_and_aux(self, params: Params, state: ModelState, key: PRNGKey,
-                   data: Batch) -> Tuple[jnp.ndarray, Any, Any]:
-    loss, model_state = self.loss(params, state, key, data)
-    return loss, model_state, {}
+  def loss_with_state(self, params: Params, state: ModelState, key: PRNGKey,
+                      data: Batch) -> Tuple[jnp.ndarray, ModelState]:
+    if state is not None:
+      raise ValueError("Define a custom loss_with_state when using a state!")
+    return self.loss(params, key, data), None
 
-  def init(self, key: PRNGKey) -> Tuple[Params, ModelState]:
+  def loss_and_aux(
+      self, params: Params, key: PRNGKey,
+      data: Batch) -> Tuple[jnp.ndarray, Mapping[str, jnp.ndarray]]:
+    loss = self.loss(params, key, data)
+    return loss, {}
+
+  def loss_with_state_and_aux(
+      self, params: Params, state: ModelState, key: PRNGKey,
+      data: Batch) -> Tuple[jnp.ndarray, ModelState, Mapping[str, jnp.ndarray]]:
+    if state is not None:
+      raise ValueError("Define a custom loss_with_state_and_aux when using a"
+                       " state!")
+    loss, aux = self.loss_and_aux(params, key, data)
+    return loss, None, aux
+
+  def init_with_state(self, key: PRNGKey) -> Tuple[Params, ModelState]:
+    return self.init(key), None
+
+  def init(self, key: PRNGKey) -> Params:
     raise NotImplementedError()
 
   def normalizer(self, loss: jnp.ndarray) -> jnp.ndarray:

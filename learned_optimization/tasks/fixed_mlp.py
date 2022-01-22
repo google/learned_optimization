@@ -15,7 +15,7 @@
 
 """Tasks based on MLP."""
 
-from typing import Any, Tuple
+from typing import Any
 
 import gin
 import haiku as hk
@@ -44,15 +44,14 @@ class FashionMnistRelu128x128(base.Task):
     self._mod = hk.without_apply_rng(hk.transform(_forward))
     self.datasets = image.fashion_mnist_datasets(batch_size=128)
 
-  def init(self, key: PRNGKey) -> Tuple[Any, Any]:
-    return self._mod.init(key, next(self.datasets.train)["image"]), None
+  def init(self, key: PRNGKey) -> Any:
+    return self._mod.init(key, next(self.datasets.train)["image"])
 
-  def loss(self, params: Params, state: ModelState, key: PRNGKey,
-           data: Any) -> Tuple[jnp.ndarray, ModelState]:
+  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
     logits = self._mod.apply(params, data["image"])
     labels = jax.nn.one_hot(data["label"], 10)
     vec_loss = base.softmax_cross_entropy(logits=logits, labels=labels)
-    return jnp.mean(vec_loss), state
+    return jnp.mean(vec_loss)
 
   def normalizer(self, loss):
     maxval = 1.5 * onp.log(10.)
@@ -75,15 +74,14 @@ class FashionMnistRelu32_8(base.Task):
     self.datasets = image.fashion_mnist_datasets(
         batch_size=128, image_size=(8, 8))
 
-  def init(self, key: PRNGKey) -> Tuple[Any, Any]:
-    return self._mod.init(key, next(self.datasets.train)["image"]), None
+  def init(self, key: PRNGKey) -> Any:
+    return self._mod.init(key, next(self.datasets.train)["image"])
 
-  def loss(self, params: Params, state: ModelState, key: PRNGKey,
-           data: Any) -> Tuple[jnp.ndarray, ModelState]:
+  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
     logits = self._mod.apply(params, data["image"])
     labels = jax.nn.one_hot(data["label"], 10)
     vec_loss = base.softmax_cross_entropy(logits=logits, labels=labels)
-    return jnp.mean(vec_loss), state
+    return jnp.mean(vec_loss)
 
   def normalizer(self, loss):
     maxval = 1.5 * onp.log(10.)
@@ -105,15 +103,14 @@ class Imagenet16Relu256x256x256(base.Task):
     self._mod = hk.without_apply_rng(hk.transform(_forward))
     self.datasets = image.imagenet16_datasets(batch_size=128)
 
-  def init(self, key: PRNGKey) -> Tuple[Any, Any]:
-    return self._mod.init(key, next(self.datasets.train)["image"]), None
+  def init(self, key: PRNGKey) -> Any:
+    return self._mod.init(key, next(self.datasets.train)["image"])
 
-  def loss(self, params: Params, state: ModelState, key: PRNGKey,
-           data: Any) -> Tuple[jnp.ndarray, ModelState]:
+  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
     logits = self._mod.apply(params, data["image"])
     labels = jax.nn.one_hot(data["label"], 1000)
     vec_loss = base.softmax_cross_entropy(logits=logits, labels=labels)
-    return jnp.mean(vec_loss), state
+    return jnp.mean(vec_loss)
 
   def normalizer(self, loss):
     maxval = 1.5 * onp.log(1000.)

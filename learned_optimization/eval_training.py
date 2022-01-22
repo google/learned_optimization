@@ -57,14 +57,15 @@ def _next_state(
     key, key1 = jax.random.split(key)
     p, s = opt.get_params_state(opt_state)
     (l, state), grad = jax.value_and_grad(
-        task.loss, has_aux=True)(p, s, key1, data)
+        task.loss_with_state, has_aux=True)(p, s, key1, data)
 
     if pmap_axis_name:
       grad = lax.pmean(grad, pmap_axis_name)
       l = lax.pmean(l, pmap_axis_name)
 
     key, key1 = jax.random.split(key)
-    next_opt_state = opt.update(opt_state, grad, l, state, is_valid, key=key1)
+    next_opt_state = opt.update(
+        opt_state, grad, loss=l, model_state=state, is_valid=is_valid, key=key1)
     return next_opt_state, l, key
 
   if with_metrics:
@@ -89,7 +90,7 @@ def _loss_and_aux(
 ) -> Tuple[jnp.ndarray, jnp.ndarray, Mapping[str, jnp.ndarray]]:
   """Compute loss and auxilary data from a task."""
   p, s = opt.get_params_state(opt_state)
-  l, _, aux = task.loss_and_aux(p, s, key, data)
+  l, _, aux = task.loss_with_state_and_aux(p, s, key, data)
   if pmap_axis_name:
     l = lax.pmean(l, pmap_axis_name)
     aux = lax.pmean(aux, pmap_axis_name)
@@ -153,7 +154,7 @@ def single_task_training_curves(
     key = jax.device_put(key, device)
 
     key, key1 = jax.random.split(key)
-    p, s = task.init(key)
+    p, s = task.init_with_state(key)
     opt_state = opt.init(p, s, num_steps=num_steps)
 
     losses = []
@@ -246,7 +247,7 @@ def _cached_vectorize_train_fns(task_family: tasks_base.TaskFamily,
     A dataclass containing functions which initialize, unroll, and evalute the
       inner problem being trained.
   """
-  logging.info(  # pylint: disable=logging-format-interpolation
+  logging.info(  # pylint: disable=logging-fstring-interpolation
       f"Recreating get_function with: {task_family} ({id(task_family)}), {learned_opt} ({id(learned_opt)}), {n_tasks}"
   )
 
@@ -258,7 +259,8 @@ def _cached_vectorize_train_fns(task_family: tasks_base.TaskFamily,
     def fn(key):
       key1, key2, key3 = jax.random.split(key, 3)
       task_param = task_family.sample(key1)
-      inner_param, inner_state = task_family.task_fn(task_param).init(key2)
+      inner_param, inner_state = task_family.task_fn(
+          task_param).init_with_state(key2)
       opt_state = opt.init(inner_param, inner_state, num_steps, key=key3)
       return opt_state, task_param
 
@@ -297,7 +299,7 @@ def _cached_vectorize_train_fns(task_family: tasks_base.TaskFamily,
       def single_batch(data, key):
         p = opt.get_params(opt_state)
         s = opt.get_state(opt_state)
-        l = task.loss(p, s, key, data)[0]
+        l, _ = task.loss_with_state(p, s, key, data)
         return l, task.normalizer(l)
 
       data, key = data_key
@@ -370,7 +372,7 @@ def multi_task_training_curves(
   keys = jax.random.split(key, n_devices)
   keys = jax.vmap(lambda k: jax.random.split(k, n_tasks // n_devices))(keys)
 
-  logging.info(f"Running _cached_vectorize_train_fns with: "  # pylint: disable=logging-format-interpolation
+  logging.info(f"Running _cached_vectorize_train_fns with: "  # pylint: disable=logging-fstring-interpolation
                f"{task_family} ({id(task_family)}), "
                f"{learned_opt} ({id(learned_opt)}).")
 

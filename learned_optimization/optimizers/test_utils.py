@@ -47,18 +47,19 @@ def smoketest_optimizer(optimizer: base.Optimizer, strict_types: bool = True):
     p = optimizer.get_params(opt_state)
 
     l, grad = jax.value_and_grad(loss)(p)
-    opt_state = optimizer.update(opt_state, grad, l, key=key)
+    opt_state = optimizer.update(opt_state, grad, loss=l, key=key)
 
     p = optimizer.get_params(opt_state)
     l, grad = jax.value_and_grad(loss)(p)
-    _ = optimizer.update(opt_state, grad, l, key=key)
+    _ = optimizer.update(opt_state, grad, loss=l, key=key)
 
     # # Now test with state
     def loss_and_state(param, state):
       return jnp.mean(param["a"]**2 + param["b"]**2), state + 1
 
     initial_state = jnp.asarray(0)
-    opt_state = optimizer.init(init_param, initial_state, num_steps=100)
+    opt_state = optimizer.init(
+        init_param, model_state=initial_state, num_steps=100)
     struct1 = jax.tree_structure(opt_state)
 
     def shape_fn(x):
@@ -69,11 +70,13 @@ def smoketest_optimizer(optimizer: base.Optimizer, strict_types: bool = True):
     s = optimizer.get_state(opt_state)
 
     (l, s), grad = jax.value_and_grad(loss_and_state, has_aux=True)(p, s)
-    opt_state = optimizer.update(opt_state, grad, l, model_state=s, key=key)
+    opt_state = optimizer.update(
+        opt_state, grad, loss=l, model_state=s, key=key)
     struct2 = jax.tree_structure(opt_state)
     shape2 = jax.tree_map(shape_fn, opt_state)
 
-    opt_state = optimizer.update(opt_state, grad, l, model_state=s, key=key)
+    opt_state = optimizer.update(
+        opt_state, grad, loss=l, model_state=s, key=key)
 
     assert struct1 == struct2, "does not have the same input output structure"
 
@@ -89,6 +92,6 @@ def smoketest_optimizer(optimizer: base.Optimizer, strict_types: bool = True):
       assert shape1 == shape2, "miss-match dtypes/shapes!"
 
     opt_state = optimizer.update(
-        opt_state, grad, l, model_state=s, is_valid=True, key=key)
+        opt_state, grad, loss=l, model_state=s, is_valid=True, key=key)
 
     assert optimizer.get_state(opt_state) == 1

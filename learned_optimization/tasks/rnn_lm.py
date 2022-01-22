@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Language modeling done with recurrent neural networks."""
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional
 
 import gin
 import haiku as hk
@@ -67,15 +67,14 @@ class TeacherForcedRNNLM(base.Task):
           rnn_core, embed, initial_state, time_major=False)
       return hk.Linear(vocab_size)(out)
 
-    self._mod = hk.transform_with_state(_forward)
+    self._mod = hk.transform(_forward)
     self.datasets = datasets
     self._vocab_size = vocab_size
 
-  def init(self, key: PRNGKey) -> Tuple[Any, Any]:
+  def init(self, key: PRNGKey) -> base.Params:
     return self._mod.init(key, next(self.datasets.train)["obs"])
 
-  def loss(self, params: Params, state: ModelState, key: PRNGKey,
-           data: Any) -> Tuple[jnp.ndarray, ModelState]:
+  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
     obs = data["obs"]
     target = data["target"]
 
@@ -83,12 +82,12 @@ class TeacherForcedRNNLM(base.Task):
     obs = jnp.minimum(obs, self._vocab_size - 1)
     target = jnp.minimum(target, self._vocab_size - 1)
 
-    logits, s = self._mod.apply(params, state, key, data["obs"])
+    logits = self._mod.apply(params, key, data["obs"])
     vec_loss = softmax_cross_entropy(logits=logits, labels=target)
 
     mask = (data["obs"] != 0)
 
-    return jnp.sum(vec_loss * mask) / jnp.sum(mask), s
+    return jnp.sum(vec_loss * mask) / jnp.sum(mask)
 
 
 class IRNN(hk.VanillaRNN):

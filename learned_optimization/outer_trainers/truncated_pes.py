@@ -75,7 +75,8 @@ def init_single_state(task_family: tasks_base.TaskFamily,
 
   key1, key2, key3, key4 = jax.random.split(key, 4)
   task_param = task_family.sample(key1)
-  inner_param, inner_state = task_family.task_fn(task_param).init(key2)
+  inner_param, inner_state = task_family.task_fn(task_param).init_with_state(
+      key2)
   trunc_state = trunc_sched.init(key3, outer_state)
   num_steps = trunc_state.length
   opt_state = learned_opt.opt_fn(

@@ -1,6 +1,7 @@
 ---
 jupytext:
-  formats: ipynb,md:myst
+  formats: ipynb,md:myst,py
+  main_language: python
   text_representation:
     extension: .md
     format_name: myst
@@ -76,18 +77,22 @@ To account for this reuse, it is expected that these iterators are always random
 
 import numpy as np
 
+
 @datasets_base.dataset_lru_cache
 def data_iterator():
   bs = 3
   while True:
     batch = {"data": np.zeros([bs, 5])}
     yield batch
-  
+
+
 def get_datasets():
-  return datasets_base.Datasets(train=data_iterator(),
-                           inner_valid=data_iterator(),
-                           outer_valid=data_iterator(),
-                           test=data_iterator())
+  return datasets_base.Datasets(
+      train=data_iterator(),
+      inner_valid=data_iterator(),
+      outer_valid=data_iterator(),
+      test=data_iterator())
+
 
 ds = get_datasets()
 next(ds.train)
@@ -104,12 +109,14 @@ To define a custom class, one simply needs to write a base class of `Task`. Let'
 
 # First we construct data iterators.
 def noise_datasets():
+
   def _fn():
     while True:
       yield np.random.normal(size=[4, 2]).astype(dtype=np.float32)
 
-  return datasets_base.Datasets(train=_fn(), inner_valid=_fn(),
-                                outer_valid=_fn(), test=_fn())
+  return datasets_base.Datasets(
+      train=_fn(), inner_valid=_fn(), outer_valid=_fn(), test=_fn())
+
 
 class MyTask(tasks_base.Task):
   datasets = noise_datasets()
@@ -119,6 +126,7 @@ class MyTask(tasks_base.Task):
 
   def init(self, key):
     return jax.random.normal(key, shape=(4, 2)), None
+
 
 task = MyTask()
 key = jax.random.PRNGKey(0)
@@ -150,6 +158,7 @@ As a simple example, let's consider a family of quadratics parameterized by mean
 
 PRNGKey = jnp.ndarray
 TaskParams = jnp.ndarray
+
 
 class FixedDimQuadraticFamily(tasks_base.TaskFamily):
   """A simple TaskFamily with a fixed dimensionality but sampled target."""
@@ -213,14 +222,16 @@ def train_task(cfg, key):
 
   for i in range(4):
     params, model_state = opt.get_params_state(opt_state)
-    (loss, model_state), grad = jax.value_and_grad(task.loss, has_aux=True)(params, model_state, key, None)
+    (loss, model_state), grad = jax.value_and_grad(
+        task.loss, has_aux=True)(params, model_state, key, None)
     opt_state = opt.update(opt_state, grad, loss, model_state)
   loss, model_state = task.loss(params, model_state, key, None)
   return loss
 
+
 task_cfg = task_family.sample(key)
-print("single loss",  train_task(task_cfg, key))
-  
+print("single loss", train_task(task_cfg, key))
+
 keys = jax.random.split(key, 32)
 task_cfgs = jax.vmap(task_family.sample)(keys)
 losses = jax.vmap(train_task)(task_cfgs, keys)

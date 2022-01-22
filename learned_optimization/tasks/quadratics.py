@@ -40,11 +40,11 @@ class QuadraticTask(base.Task):
     super().__init__()
     self._dim = dim
 
-  def loss(self, params, state, rng, _):
-    return jnp.sum(jnp.square(params)), state
+  def loss(self, params, rng, _):
+    return jnp.sum(jnp.square(params))
 
   def init(self, key):
-    return jax.random.normal(key, shape=(self._dim,)), None
+    return jax.random.normal(key, shape=(self._dim,))
 
 
 def batch_datasets() -> datasets_base.Datasets:
@@ -65,32 +65,32 @@ class BatchQuadraticTask(base.Task):
   """Simple task consisting of a quadratic loss with noised data."""
   datasets = batch_datasets()
 
-  def loss(self, params, state, rng, _):
-    return jnp.sum(jnp.square(params)), state
+  def loss(self, params, rng, _):
+    return jnp.sum(jnp.square(params))
 
   def init(self, key):
-    return jax.random.normal(key, shape=(10,)), None
+    return jax.random.normal(key, shape=(10,))
 
 
 @gin.configurable
 class LogQuadraticTask(base.Task):
   """Simple task consisting of a log quadratic loss."""
 
-  def loss(self, params, state, rng, _):
-    return jnp.log(jnp.sum(jnp.square(params))), state
+  def loss(self, params, rng, _):
+    return jnp.log(jnp.sum(jnp.square(params)))
 
   def init(self, key):
-    return jax.random.normal(key, shape=(10,)), None
+    return jax.random.normal(key, shape=(10,))
 
 
 @gin.configurable
 class SumQuadraticTask(base.Task):
   """Simple task consisting of sum of two parameters in a quadratic loss."""
 
-  def loss(self, params, state, rng, _):
+  def loss(self, params, rng, _):
     a = params["a"]
     b = params["b"]
-    return jnp.sum(jnp.square(a + b)), state
+    return jnp.sum(jnp.square(a + b))
 
   def init(self, key):
     key1, key2 = jax.random.split(key)
@@ -98,7 +98,7 @@ class SumQuadraticTask(base.Task):
         "a": jax.random.normal(key1, shape=(10,)),
         "b": jax.random.normal(key2, shape=(10,))
     })
-    return param, None
+    return param
 
 
 @gin.configurable
@@ -117,11 +117,11 @@ class FixedDimQuadraticFamily(base.TaskFamily):
 
     class _Task(base.Task):
 
-      def loss(self, params, state, rng, _):
-        return jnp.sum(jnp.square(task_params - params)), state
+      def loss(self, params, rng, _):
+        return jnp.sum(jnp.square(task_params - params))
 
       def init(self, key) -> Params:
-        return jax.random.normal(key, shape=(dim,)), None
+        return jax.random.normal(key, shape=(dim,))
 
     return _Task()
 
@@ -163,11 +163,11 @@ class FixedDimQuadraticFamilyData(base.TaskFamily):
       """Generated Task."""
       datasets = ds
 
-      def loss(self, params, state, _, data) -> Tuple[jnp.ndarray, ModelState]:
-        return jnp.sum(jnp.square(task_params - params)) + data, state
+      def loss(self, params, _, data) -> Tuple[jnp.ndarray, ModelState]:
+        return jnp.sum(jnp.square(task_params - params)) + data
 
       def init(self, key: PRNGKey) -> Params:
-        return jax.random.normal(key, shape=(dim,)), None
+        return jax.random.normal(key, shape=(dim,))
 
       def normalizer(self, x):
         return jnp.clip(x, 0, 1000)

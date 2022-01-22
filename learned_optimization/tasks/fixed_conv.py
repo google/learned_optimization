@@ -71,14 +71,14 @@ class Cifar10Conv32x64x64(base.Task):
     base_model_fn = _cross_entropy_pool_loss([32, 64, 64],
                                              jax.nn.relu,
                                              num_classes=10)
-    self._mod = hk.transform_with_state(base_model_fn)
+    self._mod = hk.transform(base_model_fn)
     self.datasets = image.cifar10_datasets(batch_size=128, image_size=(16, 16))
 
   def init(self, key) -> Tuple[Params, ModelState]:
     return self._mod.init(key, next(self.datasets.train))
 
-  def loss(self, params, state, key, data):
-    return self._mod.apply(params, state, key, data)
+  def loss(self, params, key, data):
+    return self._mod.apply(params, key, data)
 
   def normalizer(self, loss):
     return jnp.clip(loss, 0, 1.5 * jnp.log(10.))

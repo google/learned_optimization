@@ -23,7 +23,7 @@ from learned_optimization.tasks import base
 def smoketest_task(task: base.Task):
   """Smoke test a Task."""
   key = jax.random.PRNGKey(0)
-  param, state = task.init(key)
+  param, state = task.init_with_state(key)
 
   logging.info("Getting data for %s task", str(task))
   if task.datasets:
@@ -33,10 +33,11 @@ def smoketest_task(task: base.Task):
   logging.info("Got data")
 
   logging.info("starting forward")
-  loss = task.loss(param, state, key, batch)
-  del loss
+  loss_and_state = task.loss_with_state(param, state, key, batch)
+  del loss_and_state
   logging.info("starting backward")
-  grad, aux = jax.grad(task.loss, has_aux=True)(param, state, key, batch)
+  grad, aux = jax.grad(
+      task.loss_with_state, has_aux=True)(param, state, key, batch)
   del grad, aux
   logging.info("done")
 
