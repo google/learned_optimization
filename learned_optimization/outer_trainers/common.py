@@ -70,7 +70,7 @@ def progress_or_reset_inner_opt_state(
     axis_name: Optional[str] = None,
 ) -> Tuple[T, G, int, jnp.ndarray]:
   """Train a single step, or reset the current inner problem."""
-  summary.summary(num_steps, name="num_steps", aggregation="sample")
+  summary.summary("num_steps", num_steps, aggregation="sample")
 
   def true_fn(key):
     # When training with pmap, we want to sync keys over the axis
@@ -83,7 +83,7 @@ def progress_or_reset_inner_opt_state(
     s, p = task_family.task_fn(task_param).init_with_state(key2)
 
     opt_state = opt.init(s, p, num_steps=num_steps, key=key3)
-    summary.summary(num_steps, name="opt_init_num_steps")
+    summary.summary("opt_init_num_steps", num_steps)
     return opt_state, task_param, jnp.asarray(0), jnp.asarray(0.)
 
   def false_fn(key):
@@ -99,7 +99,7 @@ def progress_or_reset_inner_opt_state(
       g = jax.lax.pmean(g, axis_name=axis_name)
       l = jax.lax.pmean(l, axis_name=axis_name)
 
-    summary.summary(l, name="task_loss")
+    summary.summary("task_loss", l)
 
     next_inner_opt_state = opt.update(
         inner_opt_state, g, loss=l, model_state=s, key=key2)

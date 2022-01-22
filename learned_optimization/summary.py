@@ -96,8 +96,8 @@ class AggregationType(str, enum.Enum):
 
 
 def summary(
-    val: jnp.ndarray,
     name: str,
+    val: jnp.ndarray,
     aggregation: Union[AggregationType,
                        str] = AggregationType.mean) -> jnp.ndarray:
   """Create a summary.
@@ -105,14 +105,17 @@ def summary(
   This is for use exclusivly inside jax functions.
 
   Args:
-    val: scalar value to write
     name: name of summary
+    val: scalar value to write
     aggregation: How to aggregate duplicate names. Currently supported are mean,
       sample, and collect.
 
   Returns:
     val which has the summary in the computation graph
   """
+  if not isinstance(name, str):
+    raise ValueError("First argument must be a string. The order of arguments "
+                     " was changed Q1 2022.")
 
   assert "||" not in name
   prefix = "/".join(_summary_scope_stack)
@@ -295,13 +298,13 @@ def add_with_summary(fn: F, static_argnums=()) -> G:
 
 def tree_scalar_mean(prefix, values):
   for li, l in enumerate(jax.tree_leaves(values)):
-    summary(jnp.mean(l), name=prefix + "/" + str(li))
+    summary(prefix + "/" + str(li), jnp.mean(l))
 
 
 def tree_step(prefix, values):
   for ui, u in enumerate(jax.tree_leaves(values)):
     avg_step_size = jnp.mean(jnp.abs(u))
-    summary(avg_step_size, prefix + "/%d_avg_step_size" % ui)
+    summary(prefix + "/%d_avg_step_size" % ui, avg_step_size)
 
 
 def _nested_to_names(ss: Any) -> Sequence[Tuple[str, jnp.ndarray]]:
@@ -323,8 +326,8 @@ def _nested_to_names(ss: Any) -> Sequence[Tuple[str, jnp.ndarray]]:
 
 def summarize_inner_params(params: Any):
   for k, v in _nested_to_names(params):
-    summary(jnp.mean(v), name=k + "/mean")
-    summary(jnp.mean(jnp.abs(v)), name=k + "/mean_abs")
+    summary(k + "/mean", jnp.mean(v))
+    summary(k + "/mean_abs", jnp.mean(jnp.abs(v)))
 
 
 class SummaryWriterBase:

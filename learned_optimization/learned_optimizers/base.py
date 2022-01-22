@@ -64,8 +64,8 @@ class LearnableSGD(LearnedOptimizer):
   def opt_fn(self, theta, is_training=False) -> opt_base.Optimizer:
     lr = jnp.exp(theta["log_lr"])
 
-    summary.summary(theta["log_lr"], "learnable_sgd/pre_lr")
-    summary.summary(lr, "learnable_sgd/lr")
+    summary.summary("learnable_sgd/pre_lr", theta["log_lr"])
+    summary.summary("learnable_sgd/lr", lr)
 
     return opt_base.SGD(lr)
 
@@ -90,10 +90,10 @@ class LearnableSGDM(LearnedOptimizer):
     lr = jnp.exp(theta["log_lr"])
     mom = one_minus_log.inverse(theta["one_minus_momentum"])
 
-    summary.summary(theta["log_lr"], "learnable_sgdm/pre_lr")
-    summary.summary(lr, "learnable_sgdm/lr")
-    summary.summary(theta["one_minus_momentum"], "learnable_sgdm/pre_mom")
-    summary.summary(mom, "learnable_sgdm/mom")
+    summary.summary("learnable_sgdm/pre_lr", theta["log_lr"])
+    summary.summary("learnable_sgdm/lr", lr)
+    summary.summary("learnable_sgdm/pre_mom", theta["one_minus_momentum"])
+    summary.summary("learnable_sgdm/mom", mom)
 
     return opt_base.SGDM(lr, mom)
 
@@ -131,14 +131,14 @@ class LearnableAdam(LearnedOptimizer):
     eps = jnp.exp(theta["log_epsilon"])
 
     if self.use_summary:
-      summary.summary(theta["log_lr"], "learnable_adam/pre_lr")
-      summary.summary(lr, "learnable_adam/lr")
-      summary.summary(theta["one_minus_beta1"], "learnable_adam/pre_beta1")
-      summary.summary(beta1, "learnable_adam/beta1")
-      summary.summary(theta["one_minus_beta2"], "learnable_adam/pre_beta2")
-      summary.summary(beta2, "learnable_adam/beta2")
-      summary.summary(theta["log_epsilon"], "learnable_adam/pre_epsilon")
-      summary.summary(eps, "learnable_adam/epsilon")
+      summary.summary("learnable_adam/pre_lr", theta["log_lr"])
+      summary.summary("learnable_adam/lr", lr)
+      summary.summary("learnable_adam/pre_beta1", theta["one_minus_beta1"])
+      summary.summary("learnable_adam/beta1", beta1)
+      summary.summary("learnable_adam/pre_beta2", theta["one_minus_beta2"])
+      summary.summary("learnable_adam/beta2", beta2)
+      summary.summary("learnable_adam/pre_epsilon", theta["log_epsilon"])
+      summary.summary("learnable_adam/epsilon", eps)
 
     return opt_base.Adam(lr, beta1, beta2, eps)
 

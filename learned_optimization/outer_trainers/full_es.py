@@ -133,7 +133,7 @@ def next_state(task_family: tasks_base.TaskFamily,
   (l, (s, aux_metrics)), g = jax.value_and_grad(
       loss_fn, has_aux=True)(p, s, next(rng), data)
 
-  summary.summary(l, name="task_loss")
+  summary.summary("task_loss", l)
 
   next_inner_opt_state = opt.update(
       state.inner_opt_state, grad=g, loss=l, model_state=s, key=next(rng))

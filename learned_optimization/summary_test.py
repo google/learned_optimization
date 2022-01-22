@@ -24,11 +24,11 @@ from learned_optimization import summary
 
 @jax.jit
 def fn(a):
-  summary.summary(a[0], name="a")
+  summary.summary("a", a[0])
 
   def update(state, _):
     s = state + 1
-    summary.summary(s[0], name="loop")
+    summary.summary("loop", s[0])
     return s, s
 
   a, _ = lax.scan(update, a, jnp.arange(20))
@@ -37,7 +37,7 @@ def fn(a):
 
 
 def fn2(static, a):
-  summary.summary(a, name=static)
+  summary.summary(static, a)
   return a * 2
 
 

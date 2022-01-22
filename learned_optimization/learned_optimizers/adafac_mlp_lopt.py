@@ -306,17 +306,17 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
 
     # Finally, log some metrics out
     avg_step_size = jnp.mean(jnp.abs(step))
-    summary.summary(avg_step_size, "adafac_mlp_lopt/avg_step_size")
+    summary.summary("adafac_mlp_lopt/avg_step_size", avg_step_size)
     summary.summary(
-        avg_step_size,
         "adafac_mlp_lopt/avg_step_size_hist",
+        avg_step_size,
         aggregation="collect")
-    summary.summary(
-        jnp.mean(jnp.abs(direction)), "adafac_mlp_lopt/direction/mean_abs")
-    summary.summary(
-        jnp.mean(jnp.abs(magnitude)), "adafac_mlp_lopt/magnitude/mean_abs")
-    summary.summary(jnp.mean(magnitude), "adafac_mlp_lopt/magnitude/mean")
-    summary.summary(jnp.mean(jnp.abs(g)), "adafac_mlp_lopt/grad/mean_abs")
+    summary.summary("adafac_mlp_lopt/direction/mean_abs",
+                    jnp.mean(jnp.abs(direction)))
+    summary.summary("adafac_mlp_lopt/magnitude/mean_abs",
+                    jnp.mean(jnp.abs(magnitude)))
+    summary.summary("adafac_mlp_lopt/magnitude/mean", jnp.mean(magnitude))
+    summary.summary("adafac_mlp_lopt/grad/mean_abs", jnp.mean(jnp.abs(g)))
 
     return new_p
 

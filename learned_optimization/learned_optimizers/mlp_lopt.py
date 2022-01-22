@@ -180,24 +180,24 @@ class MLPLOpt(lopt_base.LearnedOptimizer):
 
           if compute_summary:
             for fi, f in enumerate(inp):
-              summary.summary(
-                  jnp.mean(jnp.abs(f)), f"mlp_lopt/inp{fi}/mean_abs")
+              summary.summary(f"mlp_lopt/inp{fi}/mean_abs",
+                              jnp.mean(jnp.abs(f)))
 
             avg_step_size = jnp.mean(jnp.abs(step))
-            summary.summary(avg_step_size, "mlp_lopt/avg_step_size")
+            summary.summary("mlp_lopt/avg_step_size", avg_step_size)
 
             summary.summary(
-                avg_step_size,
                 "mlp_lopt/avg_step_size_hist",
+                avg_step_size,
                 aggregation="collect")
 
-            summary.summary(
-                jnp.mean(jnp.abs(direction)), "mlp_lopt/direction/mean_abs")
-            summary.summary(
-                jnp.mean(jnp.abs(magnitude)), "mlp_lopt/magnitude/mean_abs")
-            summary.summary(jnp.mean(magnitude), "mlp_lopt/magnitude/mean")
+            summary.summary("mlp_lopt/direction/mean_abs",
+                            jnp.mean(jnp.abs(direction)))
+            summary.summary("mlp_lopt/magnitude/mean_abs",
+                            jnp.mean(jnp.abs(magnitude)))
+            summary.summary("mlp_lopt/magnitude/mean", jnp.mean(magnitude))
 
-            summary.summary(jnp.mean(jnp.abs(g)), "mlp_lopt/grad/mean_abs")
+            summary.summary("mlp_lopt/grad/mean_abs", jnp.mean(jnp.abs(g)))
 
           return new_p
 
