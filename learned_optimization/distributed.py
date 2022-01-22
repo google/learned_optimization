@@ -73,7 +73,8 @@ class AsyncLearner(Generic[T, W]):
                staleness: int,
                buffer_size: Optional[int] = None,
                block_when_buffer_full=True,
-               start_server: bool = True):
+               start_server: bool = True,
+               port: Optional[int] = None):
     """Initializer.
 
     Args:
@@ -90,6 +91,7 @@ class AsyncLearner(Generic[T, W]):
         To controll memmory if workers compute very quickly.
       block_when_buffer_full: Block if buffer is full. Otherwise throw away data
       start_server: Option to not start the courier server.
+      port: int port to host server at.
     """
 
     self._outer_gradients = []
@@ -108,6 +110,7 @@ class AsyncLearner(Generic[T, W]):
     self._lock = threading.Lock()
     self._cv = threading.Condition()
     self._server = None
+    self._port = port
 
     if start_server:
       self.start_server()
@@ -115,7 +118,8 @@ class AsyncLearner(Generic[T, W]):
   def start_server(self):
     if not self._server:
       self._server = courier.Server(
-          uniquify_server_name("learner", self._experiment_name))
+          uniquify_server_name("learner", self._experiment_name),
+          port=self._port)
       self._server.Bind("put_grads", self.put_grads)
       self._server.Bind("get_weights", self.get_weights)
       logging.info("Started Async Server!")
@@ -236,16 +240,21 @@ class AsyncWorker(Generic[T, W]):
   This can be run on a large number of workers concurrently.
   """
 
-  def __init__(self, experiment_name: str, worker_id: Any):
+  def __init__(self,
+               experiment_name: str,
+               worker_id: Any,
+               learner_address: Optional[str] = None):
     """Initializer.
 
     Args:
       experiment_name: Name of experiment. Should be the same for the entire
         job.
       worker_id: ID of the current worker.
+      learner_adress: adress of learner courier server.
     """
     self._client = courier.Client(
-        uniquify_server_name("learner", experiment_name))
+        learner_address if learner_address else uniquify_server_name(
+            "learner", experiment_name))
     self._worker_id = worker_id
 
   @profile.wrap()
