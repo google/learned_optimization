@@ -163,14 +163,15 @@ class TaskGroupChief(threading.Thread):
   def get_work(self, worker_id: Any) -> Optional[EvalTask]:
     """Get a task to do work on."""
     with self._lock:
-      if not self._tasks:
-        logging.info("No tasks found in queue.")
-        return None
-
       if self._worker_state[worker_id] is None:
-        # If the worker is not currently working on anything,
-        # pop off the first element of the task queue and assign it to the
-        # worker.
+        # If the worker is not currently working on anything, first see if there
+        # are any free tasks. If none, return None.
+        if not self._tasks:
+          logging.info("No tasks found in queue.")
+          return None
+
+        # Otherwise pop off the first element of the task queue and assign it to
+        # the worker.
         task = self._tasks.pop(0)
         logging.info("Assigning worker%d to task_group%s id%d task %s",
                      worker_id, task.task_group, task.task_index,
