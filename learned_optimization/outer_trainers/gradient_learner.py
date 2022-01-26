@@ -235,6 +235,7 @@ class GradientLearner:
 class GradientEstimator(abc.ABC):
   """Base class for classes which estimate grads (via ES, PES, or backprop)."""
   task_family: tasks_base.TaskFamily
+  learned_opt: lopt_base.LearnedOptimizer
 
   def init_worker_state(self, worker_weights: WorkerWeights,
                         key: PRNGKey) -> GradientEstimatorState:

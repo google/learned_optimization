@@ -121,19 +121,19 @@ def noise_datasets():
 class MyTask(tasks_base.Task):
   datasets = noise_datasets()
 
-  def loss(self, params, state, rng, data):
-    return jnp.sum(jnp.square(params - data)), None
+  def loss(self, params, rng, data):
+    return jnp.sum(jnp.square(params - data))
 
   def init(self, key):
-    return jax.random.normal(key, shape=(4, 2)), None
+    return jax.random.normal(key, shape=(4, 2))
 
 
 task = MyTask()
 key = jax.random.PRNGKey(0)
 key1, key = jax.random.split(key)
-params, state = task.init(key)
+params = task.init(key)
 
-task.loss(params, state, key1, next(task.datasets.train))
+task.loss(params, key1, next(task.datasets.train))
 ```
 
 +++ {"id": "yGOo6ixjhbR-"}
@@ -177,12 +177,12 @@ class FixedDimQuadraticFamily(tasks_base.TaskFamily):
 
     class _Task(tasks_base.Task):
 
-      def loss(self, params, state, rng, _):
+      def loss(self, params, rng, _):
         # Compute MSE to the target task.
-        return jnp.sum(jnp.square(task_params - params)), state
+        return jnp.sum(jnp.square(task_params - params))
 
       def init(self, key):
-        return jax.random.normal(key, shape=(dim,)), None
+        return jax.random.normal(key, shape=(dim,))
 
     return _Task()
 ```
@@ -200,7 +200,7 @@ task_cfg = task_family.sample(key)
 task = task_family.task_fn(task_cfg)
 
 key1, key = jax.random.split(key)
-params, model_state = task.init(key)
+params = task.init(key)
 batch = None
 task.loss(params, key, batch)
 ```
@@ -215,16 +215,15 @@ To achive speedups, we can now leverage `jax.vmap` to train *multiple* task inst
 def train_task(cfg, key):
   task = task_family.task_fn(cfg)
   key1, key = jax.random.split(key)
-  params, model_state = task.init(key1)
+  params = task.init(key1)
   opt = opt_base.Adam()
 
-  opt_state = opt.init(params, model_state)
+  opt_state = opt.init(params)
 
   for i in range(4):
-    params, model_state = opt.get_params_state(opt_state)
-    (loss, model_state), grad = jax.value_and_grad(
-        task.loss, has_aux=True)(params, model_state, key, None)
-    opt_state = opt.update(opt_state, grad, loss, model_state)
+    params = opt.get_params(opt_state)
+    loss, grad = jax.value_and_grad(task.loss)(params, key, None)
+    opt_state = opt.update(opt_state, grad, loss=loss)
   loss = task.loss(params, key, None)
   return loss
 

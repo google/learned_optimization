@@ -101,11 +101,11 @@ def get_datasets():
 ds = get_datasets()
 next(ds.train)
 
+
 # + [markdown] id="l6aOBXMhQ_Pe"
 # ## Defining a custom `Task`
 #
 # To define a custom class, one simply needs to write a base class of `Task`. Let's look at a simple task consisting of a quadratic task with noisy targets.
-
 
 # + id="oyKqzLvnnyhs"
 # First we construct data iterators.
@@ -198,9 +198,9 @@ params = task.init(key)
 batch = None
 task.loss(params, key, batch)
 
+
 # + [markdown] id="QsYxiGvvdX8Y"
 # To achive speedups, we can now leverage `jax.vmap` to train *multiple* task instances in parallel! Depending on the task, this can be considerably faster than serially executing them.
-
 
 # + id="-xdtw53zmkS7"
 def train_task(cfg, key):

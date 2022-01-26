@@ -10,6 +10,8 @@ optimizers. It implements hand designed and learned optimizers, tasks to meta-tr
 
    notebooks/Part1_Introduction
    notebooks/Part2_CustomTasks
+   notebooks/Part3_Truncation_GradientEstimators
+   notebooks/Part4_Meta_training_with_GradientLearner
    
 .. toctree::
    :maxdepth: 0
