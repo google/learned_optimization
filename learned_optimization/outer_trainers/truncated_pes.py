@@ -39,184 +39,19 @@ PRNGKey = jnp.ndarray
 
 
 @flax.struct.dataclass
-class SingleState:
-  inner_opt_state: Any
-  inner_step: jnp.ndarray
-  truncation_state: Any
-  task_param: Any
-  is_done: jnp.ndarray
-
-
-@flax.struct.dataclass
 class PESWorkerState(gradient_learner.GradientEstimatorState):
-  pos_state: SingleState
-  neg_state: SingleState
+  pos_state: common.TruncatedUnrollState
+  neg_state: common.TruncatedUnrollState
   accumulator: Any
-
-
-@flax.struct.dataclass
-class PESWorkerOut:
-  loss: jnp.ndarray
-  is_done: jnp.ndarray
-  task_param: Any
-  iteration: jnp.ndarray
-  mask: jnp.ndarray
-
-
-@functools.partial(
-    jax.jit, static_argnames=("task_family", "learned_opt", "trunc_sched"))
-@functools.partial(jax.vmap, in_axes=(None, None, None, None, None, 0))
-def init_single_state(task_family: tasks_base.TaskFamily,
-                      learned_opt: lopt_base.LearnedOptimizer,
-                      trunc_sched: truncation_schedule.TruncationSchedule,
-                      theta: lopt_base.MetaParams, outer_state: Any,
-                      key: PRNGKey) -> SingleState:
-  """Initialize a single inner problem state."""
-
-  key1, key2, key3, key4 = jax.random.split(key, 4)
-  task_param = task_family.sample(key1)
-  inner_param, inner_state = task_family.task_fn(task_param).init_with_state(
-      key2)
-  trunc_state = trunc_sched.init(key3, outer_state)
-  num_steps = trunc_state.length
-  opt_state = learned_opt.opt_fn(
-      theta, is_training=True).init(
-          inner_param, inner_state, num_steps=num_steps, key=key4)
-
-  return SingleState(
-      inner_opt_state=opt_state,
-      inner_step=jnp.asarray(0, dtype=jnp.int32),
-      truncation_state=trunc_state,
-      task_param=task_param,
-      is_done=False)
-
-
-@functools.partial(
-    jax.jit, static_argnames=("task_family", "learned_opt", "trunc_sched"))
-@functools.partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0, None))
-def next_state(task_family: tasks_base.TaskFamily,
-               learned_opt: lopt_base.LearnedOptimizer,
-               trunc_sched: truncation_schedule.TruncationSchedule,
-               theta: lopt_base.MetaParams, key: PRNGKey, state: SingleState,
-               data: Any, outer_state: Any) -> Tuple[SingleState, PESWorkerOut]:
-  """Train a given inner problem state a single step or reset it when done."""
-  key1, key2 = jax.random.split(key)
-
-  next_inner_opt_state, task_param, next_inner_step, l = common.progress_or_reset_inner_opt_state(
-      task_family=task_family,
-      opt=learned_opt.opt_fn(theta),
-      num_steps=state.truncation_state.length,
-      key=key1,
-      inner_opt_state=state.inner_opt_state,
-      task_param=state.task_param,
-      inner_step=state.inner_step,
-      is_done=state.is_done,
-      data=data)
-
-  next_truncation_state, is_done = trunc_sched.next_state(
-      state.truncation_state, next_inner_step, key2, outer_state)
-
-  # summaries
-  opt = learned_opt.opt_fn(theta, is_training=True)
-  summary.summarize_inner_params(opt.get_params(next_inner_opt_state))
-
-  output_state = SingleState(
-      inner_opt_state=next_inner_opt_state,
-      inner_step=next_inner_step,
-      truncation_state=next_truncation_state,
-      task_param=task_param,
-      is_done=is_done,
-  )
-
-  out = PESWorkerOut(
-      is_done=is_done,
-      loss=l,
-      mask=(next_inner_step != 0),
-      iteration=next_inner_step,
-      task_param=state.task_param)
-
-  return output_state, out
-
-
-@functools.partial(
-    jax.jit,
-    static_argnames=("task_family", "learned_opt", "num_tasks", "trunc_sched",
-                     "train_and_meta", "with_summary", "unroll_length",
-                     "stack_antithetic_samples"),
-)
-@functools.partial(
-    summary.add_with_summary, static_argnums=(0, 1, 2, 3, 4, 5, 6))
-def unroll_next_state(
-    task_family: tasks_base.TaskFamily,
-    learned_opt: lopt_base.LearnedOptimizer,
-    trunc_sched: truncation_schedule.TruncationSchedule,
-    num_tasks: int,
-    unroll_length: int,
-    train_and_meta: bool,
-    stack_antithetic_samples: bool,
-    theta: lopt_base.MetaParams,
-    key: PRNGKey,
-    state: SingleState,
-    datas: Any,
-    outer_state: Any,
-    with_summary: bool = False,  # used by add_with_summary. pylint: disable=unused-argument
-) -> Tuple[Tuple[SingleState, PESWorkerOut], Mapping[str, jnp.ndarray]]:
-  """Unroll train a single state some number of steps."""
-
-  def unroll(state, key_and_data):
-    # keep consistent with trunc state?
-    if train_and_meta:
-      key, (tr_data, meta_data) = key_and_data
-    else:
-      key, tr_data = key_and_data
-
-    key1, key2 = jax.random.split(key)
-
-    # If stacking the antithetic samples, we want to share random keys across
-    # the antithetic samples.
-    vec_keys = jax.random.split(key1, num_tasks)
-    if stack_antithetic_samples:
-      vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
-                              vec_keys)
-
-    next_state_, ys = next_state(task_family, learned_opt, trunc_sched, theta,
-                                 vec_keys, state, tr_data, outer_state)
-
-    if train_and_meta:
-      vec_keys = jax.random.split(key2, num_tasks)
-      if stack_antithetic_samples:
-        vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
-                                vec_keys)
-
-      loss, _ = common.vectorized_loss_and_aux(task_family, learned_opt, theta,
-                                               next_state_.inner_opt_state,
-                                               next_state_.task_param, vec_keys,
-                                               meta_data)
-      ys = ys.replace(loss=loss)
-
-    @jax.vmap
-    def norm(loss, task_param):
-      return task_family.task_fn(task_param).normalizer(loss)
-
-    ys = ys.replace(loss=norm(ys.loss, state.task_param))
-
-    return next_state_, ys
-
-  if jax.tree_leaves(datas):
-    assert tree_utils.first_dim(datas) == unroll_length, (
-        f"got a mismatch in data size. Expected to have data of size: {unroll_length} "
-        f"but got data of size {tree_utils.first_dim(datas)}")
-  key_and_data = jax.random.split(key, unroll_length), datas
-  state, ys = lax.scan(unroll, state, key_and_data)
-  return state, ys
 
 
 @functools.partial(jax.jit, static_argnames=("std",))
 def compute_pes_grad(
-    p_yses: Sequence[PESWorkerOut], n_yses: Sequence[PESWorkerOut],
+    p_yses: Sequence[common.TruncatedUnrollOut],
+    n_yses: Sequence[common.TruncatedUnrollOut],
     accumulator: lopt_base.MetaParams, vec_pos: lopt_base.MetaParams, std: float
-) -> Tuple[float, lopt_base.MetaParams, lopt_base.MetaParams, PESWorkerOut,
-           float]:
+) -> Tuple[float, lopt_base.MetaParams, lopt_base.MetaParams,
+           common.TruncatedUnrollOut, float]:
   """Compute the PES gradient estimate from the outputs of many unrolls.
 
   Args:
@@ -336,10 +171,9 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     # Note this doesn't use sampled theta for the first init.
     # I believe this is fine most of the time.
     # TODO(lmetz) consider init-ing at an is_done state instead.
-    pos_unroll_state = init_single_state(self.task_family, self.learned_opt,
-                                         self.trunc_sched, theta,
-                                         worker_weights.outer_state,
-                                         jax.random.split(key1, self.num_tasks))
+    pos_unroll_state = common.init_truncation_state(
+        self.task_family, self.learned_opt, self.trunc_sched, theta,
+        worker_weights.outer_state, jax.random.split(key1, self.num_tasks))
 
     neg_unroll_state = pos_unroll_state
 
@@ -402,9 +236,16 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       n_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), n_state)
 
       key = next(rng)
+      vectorized_theta = True
       static_args = [
-          self.task_family, self.learned_opt, self.trunc_sched, self.num_tasks,
-          self.steps_per_jit, self.train_and_meta, self.stack_antithetic_samples
+          self.task_family,
+          self.learned_opt,
+          self.trunc_sched,
+          self.num_tasks,
+          self.steps_per_jit,
+          self.train_and_meta,
+          self.stack_antithetic_samples,
+          vectorized_theta,
       ]
 
       # we provide 2 ways to compute the antithetic unrolls:
@@ -417,7 +258,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
           return jax.tree_map(lambda x, y: jnp.concatenate([x, y], axis=axis),
                               a, b)
 
-        (pn_state, pn_ys), m = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+        (pn_state, pn_ys), m = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
             *(static_args + [
                 stack(vec_p_theta, vec_n_theta), key,
                 stack(p_state, n_state),
@@ -430,12 +271,12 @@ class TruncatedPES(gradient_learner.GradientEstimator):
         p_ys = jax.tree_map(lambda x: x[:, 0:self.num_tasks], pn_ys)
         n_ys = jax.tree_map(lambda x: x[:, self.num_tasks:], pn_ys)
       else:
-        (p_state, p_ys), m = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+        (p_state, p_ys), m = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
             *(static_args +
               [vec_p_theta, key, p_state, datas, worker_weights.outer_state]),
             with_summary=with_summary,
             sample_rng_key=next(rng))
-        (n_state, n_ys), _ = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+        (n_state, n_ys), _ = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
             *(static_args +
               [vec_n_theta, key, n_state, datas, worker_weights.outer_state]),
             with_summary=False)
@@ -506,8 +347,9 @@ class TruncatedPESPMAP(TruncatedPES):
                        f" Found: {jax.local_devices()}."
                        f" Expected {num_devices} devices.")
 
-    init_single_partial = functools.partial(init_single_state, self.task_family,
-                                            self.learned_opt, self.trunc_sched)
+    init_single_partial = functools.partial(common.init_truncation_state,
+                                            self.task_family, self.learned_opt,
+                                            self.trunc_sched)
     self.pmap_init_single_state = jax.pmap(
         init_single_partial, in_axes=(None, None, 0))
 
@@ -540,7 +382,7 @@ class TruncatedPESPMAP(TruncatedPES):
         self.train_and_meta,
     ]
     key1, key2 = jax.random.split(key)
-    (p_state, p_ys), m = unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
+    (p_state, p_ys), m = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
         *(static_args + [vec_theta, key1, state, datas, outer_state]),
         with_summary=with_summary,
         sample_rng_key=key2)
