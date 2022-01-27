@@ -16,7 +16,7 @@
 """Tasks based on simple convolutional nets."""
 # pylint: disable=invalid-name
 
-from typing import Any, Tuple, Optional, Sequence, Callable
+from typing import Any, Optional, Sequence, Callable
 
 import gin
 import haiku as hk
@@ -63,23 +63,40 @@ def _cross_entropy_pool_loss(
   return _fn
 
 
-@gin.configurable
-class Conv_Cifar10_32x64x64(base.Task):
-  """A 3 hidden layer convnet designed for 16x16 cifar10."""
+class _ConvTask(base.Task):
+  """Helper class to construct tasks with different configs."""
 
-  def __init__(self):
+  def __init__(self, base_model_fn, datasets):
     super().__init__()
-    base_model_fn = _cross_entropy_pool_loss([32, 64, 64],
-                                             jax.nn.relu,
-                                             num_classes=10)
     self._mod = hk.transform(base_model_fn)
-    self.datasets = image.cifar10_datasets(batch_size=128, image_size=(16, 16))
+    self.datasets = datasets
 
-  def init(self, key) -> Tuple[Params, ModelState]:
+  def init(self, key) -> Params:
     return self._mod.init(key, next(self.datasets.train))
 
   def loss(self, params, key, data):
     return self._mod.apply(params, key, data)
 
   def normalizer(self, loss):
-    return jnp.clip(loss, 0, 1.5 * jnp.log(10.))
+    return jnp.clip(loss, 0,
+                    1.5 * jnp.log(self.datasets.extra_info["num_classes"]))
+
+
+@gin.configurable
+def Conv_Cifar10_16_32x64x64():
+  """A 3 hidden layer convnet designed for 16x16 cifar10."""
+  base_model_fn = _cross_entropy_pool_loss([32, 64, 64],
+                                           jax.nn.relu,
+                                           num_classes=10)
+  datasets = image.cifar10_datasets(batch_size=128, image_size=(16, 16))
+  return _ConvTask(base_model_fn, datasets)
+
+
+@gin.configurable
+def Conv_Cifar10_32x64x64():
+  """A 3 hidden layer convnet designed for 32x32 cifar10."""
+  base_model_fn = _cross_entropy_pool_loss([32, 64, 64],
+                                           jax.nn.relu,
+                                           num_classes=10)
+  datasets = image.cifar10_datasets(batch_size=128)
+  return _ConvTask(base_model_fn, datasets)

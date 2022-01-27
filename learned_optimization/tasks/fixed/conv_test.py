@@ -16,15 +16,24 @@
 """Tests for learned_optimizers.tasks.fixed.conv."""
 
 from absl.testing import absltest
+from absl.testing import parameterized
 from learned_optimization.tasks import test_utils
 from learned_optimization.tasks.fixed import conv
 
 
-class ConvTest(absltest.TestCase):
+tasks = [
+    "Conv_Cifar10_32x64x64",
+    "Conv_Cifar10_16_32x64x64",
+]
 
-  def test_Conv_Cifar10_32x64x64(self):
-    test_utils.smoketest_task(conv.Conv_Cifar10_32x64x64())
+
+class ConvTest(parameterized.TestCase):
+
+  @parameterized.parameters(tasks)
+  def test_tasks(self, task_name):
+    task = getattr(conv, task_name)()
+    test_utils.smoketest_task(task)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   absltest.main()
