@@ -229,10 +229,13 @@ class _CachedTrainFun:
 
 
 @functools.lru_cache(maxsize=None)
-def _cached_vectorize_train_fns(task_family: tasks_base.TaskFamily,
-                                learned_opt: lopt_base.LearnedOptimizer,
-                                n_tasks: int,
-                                steps_per_jit: int = 10) -> _CachedTrainFun:
+def _cached_vectorize_train_fns(
+    task_family: tasks_base.TaskFamily,
+    learned_opt: lopt_base.LearnedOptimizer,
+    n_tasks: int,
+    steps_per_jit: int = 10,
+    with_aux_values: Sequence[str] = ()
+) -> _CachedTrainFun:
   """Construct the pmap, vmap functions for training.
 
   This function is cached, so repeated calls don't have to pay compile times.
@@ -242,6 +245,7 @@ def _cached_vectorize_train_fns(task_family: tasks_base.TaskFamily,
     learned_opt: learned optimizer
     n_tasks: number of tasks to train spread across devices
     steps_per_jit: number of steps to fuse together.
+    with_aux_values: aux values to return in addition to losses.
 
   Returns:
     A dataclass containing functions which initialize, unroll, and evalute the
@@ -299,12 +303,13 @@ def _cached_vectorize_train_fns(task_family: tasks_base.TaskFamily,
       def single_batch(data, key):
         p = opt.get_params(opt_state)
         s = opt.get_state(opt_state)
-        l, _ = task.loss_with_state(p, s, key, data)
-        return l, task.normalizer(l)
+        l, _, aux = task.loss_with_state_and_aux(p, s, key, data)
+        aux = {k: v for k, v in aux.items() if k in with_aux_values}
+        return l, task.normalizer(l), aux
 
       data, key = data_key
-      loss, norm_loss = jax.vmap(single_batch)(data, key)
-      return jnp.mean(loss), jnp.mean(norm_loss)
+      loss, norm_loss, aux = jax.vmap(single_batch)(data, key)
+      return jnp.mean(loss), jnp.mean(norm_loss), jax.tree_map(jnp.mean, aux)
 
     return fn(opt_state, task_params, data_key)
 
@@ -330,7 +335,8 @@ def multi_task_training_curves(
     steps_per_jit: int = 10,
     eval_just_at_end: bool = False,
     steps: int = 10000,
-    splits: Sequence[str] = ("train",)
+    splits: Sequence[str] = ("train",),
+    with_aux_values: Sequence[str] = (),
 ) -> Mapping[str, onp.ndarray]:
   """Train n_tasks which are sampled from the task_family using a learned opt.
 
@@ -354,8 +360,11 @@ def multi_task_training_curves(
     eval_just_at_end: Just evaluate at the end of training.
     steps: total number of steps to run.
     splits: data splits to evaluate on.
+    with_aux_values: aux values to return in addition to losses.
 
   Returns:
+    A dictionary containing training curves for the trained models. All values
+      will have a leading `n_tasks` dimension.
     eval_losses: 1d array of unnormalized losses
     normalized_eval_losses: 1d array of normalized losses. This is using the
     inner norm.
@@ -377,7 +386,11 @@ def multi_task_training_curves(
                f"{learned_opt} ({id(learned_opt)}).")
 
   train_fns = _cached_vectorize_train_fns(
-      task_family, learned_opt, n_tasks, steps_per_jit=steps_per_jit)
+      task_family,
+      learned_opt,
+      n_tasks,
+      steps_per_jit=steps_per_jit,
+      with_aux_values=with_aux_values)
 
   opt_states, task_params = train_fns.init(theta, keys, steps)
 
@@ -398,22 +411,29 @@ def multi_task_training_curves(
       def losses_for_split(split):
         sub_l = []
         sub_norm_l = []
+        sub_auxs = []
         for _ in range(n_eval_batches):
           eval_datas = get_datas(n_eval_batches_vec, split=split)
-          l, norm_l = train_fns.eval_loss(theta, task_params, opt_states,
-                                          (eval_datas, keys))
+          l, norm_l, auxs = train_fns.eval_loss(theta, task_params, opt_states,
+                                                (eval_datas, keys))
           sub_l.append(l)
           sub_norm_l.append(norm_l)
+          sub_auxs.append(auxs)
 
+        sub_auxs = tree_utils.tree_zip_onp(sub_auxs)
         with profile.Profile("eval_agg_blocked"):
           # mean over the n_eval_batches sample
-          return onp.mean(sub_l, axis=0), onp.mean(sub_norm_l, axis=0)
+          return (onp.mean(sub_l, axis=0), onp.mean(sub_norm_l, axis=0),
+                  {k: onp.mean(l, axis=0) for k, v in sub_auxs.items()})
 
       all_losses = {}
       for s in splits:
-        unnorm_l, norm_l = losses_for_split(s)
+        unnorm_l, norm_l, auxs = losses_for_split(s)
         all_losses[f"eval/{s}/loss"] = unnorm_l
         all_losses[f"eval/{s}/norm_loss"] = norm_l
+        for k, v in auxs.items():
+          all_losses[f"eval/{s}/aux/{k}"] = v
+
       return all_losses
 
   eval_losses = []

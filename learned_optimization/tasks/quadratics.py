@@ -15,7 +15,7 @@
 
 # lint as: python3
 """Tasks that are very simple, usually based on quadratics."""
-from typing import Any, Tuple
+from typing import Any, Tuple, Mapping
 
 from flax.training import prefetch_iterator
 import gin
@@ -163,8 +163,16 @@ class FixedDimQuadraticFamilyData(base.TaskFamily):
       """Generated Task."""
       datasets = ds
 
-      def loss(self, params, _, data) -> Tuple[jnp.ndarray, ModelState]:
+      def loss(self, params: Any, key: PRNGKey, data: Any) -> jnp.ndarray:
         return jnp.sum(jnp.square(task_params - params)) + data
+
+      def loss_and_aux(
+          self, params: Any, key: PRNGKey,
+          data: Any) -> Tuple[jnp.ndarray, Mapping[str, jnp.ndarray]]:
+        return self.loss(params, key, data), {
+            "l2": jnp.mean(params**2),
+            "l1": jnp.mean(jnp.abs(params)),
+        }
 
       def init(self, key: PRNGKey) -> Params:
         return jax.random.normal(key, shape=(dim,))

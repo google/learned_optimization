@@ -84,6 +84,8 @@ class RunEvalChiefTest(absltest.TestCase):
         "eval/train/norm_loss": onp.asarray([0.0, 0.0]),
         "eval/outer_valid/loss": onp.asarray([0.0, 0.0]),
         "eval/outer_valid/norm_loss": onp.asarray([0.0, 0.0]),
+        "eval/train/aux/l2": onp.asarray([0.0, 0.0]),
+        "eval/outer_valid/aux/l2": onp.asarray([0.0, 0.0]),
         "total_time": 1.0,
         "gen_id": "my_genid",
         "step": i
@@ -94,6 +96,8 @@ class RunEvalChiefTest(absltest.TestCase):
         "eval/train/norm_loss": onp.asarray([0.0, 0.0, 1.0]),
         "eval/outer_valid/loss": onp.asarray([0.0, 0.0, 1.0]),
         "eval/outer_valid/norm_loss": onp.asarray([0.0, 0.0, 1.0]),
+        "eval/train/aux/l2": onp.asarray([0.0, 0.0]),
+        "eval/outer_valid/aux/l2": onp.asarray([0.0, 0.0]),
         "total_time": 1.0,
         "gen_id": "my_genid",
         "step": i
@@ -144,6 +148,11 @@ class RunEvalChiefTest(absltest.TestCase):
 
     assert "eval_chief_name/task1/time" in summary_writer.data
     assert "eval_chief_name/task1/nonorm_avg_meta_loss" in summary_writer.data
+
+    print(summary_writer.data.keys())
+    print("@@")
+    assert "eval_chief_name/aux_loss_mean/train/l2" in summary_writer.data
+    assert "eval_chief_name/aux_loss_last/outer_valid/l2" in summary_writer.data
 
   def test_write_results_population(self):
     server_name = "test_server_name"

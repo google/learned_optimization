@@ -59,7 +59,9 @@ class EvalTrainingTest(absltest.TestCase):
         key=key,
         eval_every=2,
         steps_per_jit=2,
-        steps=10)
+        steps=10,
+        with_aux_values=("l2",),
+    )
     self.assertIn("train/xs", res)
     self.assertIn("train/loss", res)
     self.assertIn("eval/train/loss", res)
@@ -73,6 +75,9 @@ class EvalTrainingTest(absltest.TestCase):
         5,
         6,
     ))
+
+    self.assertIn("eval/train/aux/l2", res)
+    self.assertNotIn("eval/train/aux/l1", res)
 
 
 if __name__ == "__main__":

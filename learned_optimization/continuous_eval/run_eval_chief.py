@@ -183,7 +183,38 @@ def convert_result_to_metric_dict(task_group: Tuple[int, Mapping[str, str]],
   inner_norm_meta_loss = onp.nanmean([v[-1] for v in norm_v])
   to_write["last_inner_norm_meta_loss"] = float(inner_norm_meta_loss)
 
-  if "outer_valid" in values[0]:
+  # aggregates without any form of normalization
+  meta_loss = onp.mean([onp.nanmean(x) for x in unnorm_v])
+  to_write["inner_nonorm_meta_loss"] = float(meta_loss)
+
+  inner_unnorm_meta_loss = onp.mean([onp.nanmin(v) for v in unnorm_v])
+  to_write["min_inner_nonorm_meta_loss"] = float(inner_unnorm_meta_loss)
+
+  inner_unnorm_meta_loss = onp.nanmean([v[-1] for v in norm_v])
+  to_write["last_inner_nonorm_meta_loss"] = float(inner_unnorm_meta_loss)
+
+  def aggregate_aux_for_split(split):
+    all_keys = values[0].keys()
+    ret = {}
+    for k in all_keys:
+      prefix = f"eval/{split}/aux/"
+      if k.startswith(prefix):
+        aux_name = k[len(prefix):]
+
+        mean_aux = onp.mean([onp.nanmean(r[k]) for r in values])
+        ret[f"aux_loss_mean/{split}/{aux_name}"] = mean_aux
+
+        min_aux = onp.mean([onp.nanmin(r[k]) for r in values])
+        ret[f"aux_loss_min/{split}/{aux_name}"] = min_aux
+
+        last_aux = onp.mean([r[k][-1] for r in values])
+        ret[f"aux_loss_last/{split}/{aux_name}"] = last_aux
+    return ret
+
+  to_write = {**to_write, **aggregate_aux_for_split("train")}
+
+  # check if we ran over the outer_valid data split by checking the loss.
+  if "eval/outer_valid/loss" in values[0]:
     valid_norm_v = [r["eval/outer_valid/norm_loss"] for r in values]
 
     valid_meta_loss = onp.mean([onp.nanmean(x) for x in valid_norm_v])
@@ -196,6 +227,8 @@ def convert_result_to_metric_dict(task_group: Tuple[int, Mapping[str, str]],
     valid_inner_norm_meta_loss = onp.nanmean([v[-1] for v in valid_norm_v])
     to_write["last_inner_norm_valid_meta_loss"] = float(
         valid_inner_norm_meta_loss)
+
+    to_write = {**to_write, **aggregate_aux_for_split("outer_valid")}
 
   # Create features now for each task
 
