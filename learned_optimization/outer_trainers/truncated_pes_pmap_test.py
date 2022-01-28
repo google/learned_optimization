@@ -34,9 +34,9 @@ class TruncatedPesTest(parameterized.TestCase):
     trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
 
     num_devices = len(jax.local_devices())
-    if num_devices != 4:
-      self.skipTest(f"Not enough accelerators! Expected 4, found {num_devices}."
-                    " Please fun this test with exactly 4 accelerators.")
+    if num_devices != 8:
+      self.skipTest(f"Not enough accelerators! Expected 8, found {num_devices}."
+                    " Please fun this test with exactly 8 accelerators.")
 
     trainer = truncated_pes.TruncatedPESPMAP(
         num_devices=num_devices,

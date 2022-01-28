@@ -373,6 +373,7 @@ class TruncatedPESPMAP(TruncatedPES):
       ))
   def pmap_unroll_next_state(self, vec_theta, key, state, datas, outer_state,
                              with_summary):
+    vectorized_theta = True
     static_args = [
         self.task_family,
         self.learned_opt,
@@ -380,6 +381,8 @@ class TruncatedPESPMAP(TruncatedPES):
         self.num_tasks,
         self.steps_per_jit,
         self.train_and_meta,
+        self.stack_antithetic_samples,
+        vectorized_theta,
     ]
     key1, key2 = jax.random.split(key)
     (p_state, p_ys), m = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
