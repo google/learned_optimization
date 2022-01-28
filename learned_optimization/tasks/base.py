@@ -119,11 +119,11 @@ def single_task_to_family(task: Task,
   if eval_task is None:
     eval_task = task
 
-  cur_name = name
+  cur_name = name if name else task.name
 
   class _TaskFamily(TaskFamily, Generic[T]):
     """Task Family built from single_task_to_family."""
-    name = cur_name
+    _name = cur_name
     datasets = task.datasets
     eval_datasets = eval_task.datasets
 

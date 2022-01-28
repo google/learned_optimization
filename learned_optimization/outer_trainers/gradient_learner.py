@@ -355,15 +355,15 @@ def gradient_worker_compute(
         # Metrics don't take into account which task they are comming from.
         # Let's add additional metrics with the task name pulled out.
         with profile.Profile("metric_computation"):
+          family_name = estimator.task_family.name
           keys = list(metrics.keys())
           for k in keys:
             v = metrics[k]
             assert "||" in k, f"bad metric format? Got: {k}"
             agg, name = k.split("||")
-            metrics[f"{agg}||{estimator.task_family.name}/{name}"] = v
+            metrics[f"{agg}||{family_name}/{name}"] = v
 
           mean_abs = tree_utils.tree_mean_abs(estimator_out.grad)
-          family_name = estimator.task_family.name
           metrics[f"mean||{family_name}/grad_mean_abs"] = mean_abs
 
           norm = tree_utils.tree_norm(estimator_out.grad)
@@ -495,6 +495,9 @@ class SingleMachineGradientLearner:
 
     next_theta_state, metrics = self.gradient_learner.update(
         state.gradient_learner_state, [worker_compute_out.to_put], key=key2)
+
+    metrics = summary.aggregate_metric_list(
+        [worker_compute_out.metrics, metrics])
 
     return (SingleMachineState(
         gradient_learner_state=next_theta_state,

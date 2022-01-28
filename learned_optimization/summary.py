@@ -93,6 +93,7 @@ class AggregationType(str, enum.Enum):
   mean = "mean"
   sample = "sample"
   collect = "collect"
+  none = "none"
 
 
 def summary(
@@ -177,6 +178,16 @@ def aggregate_metric(k: str, vs: Sequence[jnp.ndarray]) -> onp.ndarray:
   elif agg == AggregationType.collect:
     # This might be multi dim if vmap is used, so ravel first.
     return onp.concatenate([onp.asarray(v).ravel() for v in vs], axis=0)
+  elif agg == AggregationType.none:
+    if len(vs) != 1:
+      raise ValueError("when using no aggregation one must ensure only scalar "
+                       "values are logged out exactly once. "
+                       f"Got {len(vs)} vals.")
+    val = vs[0]
+    if val.size != 1:
+      raise ValueError("Value with none aggregation type was not a scalar?"
+                       f" Found {val}")
+    return onp.reshape(val, ())
   else:
     raise ValueError(f"Unsupported Aggregation type {agg}")
 
@@ -363,11 +374,16 @@ class InMemorySummaryWriter(SummaryWriterBase):
 class PrintWriter(SummaryWriterBase):
   """Summary writer which prints values."""
 
+  def __init__(self, filter_fn=lambda tag: True):
+    self.filter_fn = filter_fn
+
   def scalar(self, name, val, step):
-    print(f"{step}] {name}={val}")
+    if self.filter_fn(name):
+      print(f"{step}] {name}={val}")
 
   def histogram(self, name, val, step):
-    print(f"{step}] {name}={val}")
+    if self.filter_fn(name):
+      print(f"{step}] {name}={val}")
 
   def flush(self):
     pass
@@ -380,6 +396,7 @@ class MultiWriter(SummaryWriterBase):
     self.writers = writers
 
   def scalar(self, name, val, step):
+    print(name, val)
     _ = [w.scalar(name, val, step) for w in self.writers]
 
   def flush(self):

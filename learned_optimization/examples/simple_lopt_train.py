@@ -98,8 +98,11 @@ def train(train_log_dir: str,
       summary_writer.scalar("average_meta_loss", np.mean(losses), step=i)
       losses = []
       for k, v in metrics.items():
-        metric_name = k.split("||")[-1]  # ignore aggregation type
-        summary_writer.scalar(metric_name, v, step=i)
+        agg_type, metric_name = k.split("||")
+        if agg_type == "collect":
+          summary_writer.histogram(metric_name, v, step=i)
+        else:
+          summary_writer.scalar(metric_name, v, step=i)
       summary_writer.flush()
 
 
