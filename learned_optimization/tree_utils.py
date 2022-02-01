@@ -64,6 +64,9 @@ def first_dim(a):
 
 
 def match_type(struct1, struct2):
+  print("=====")
+  print(jax.tree_map(lambda x: isinstance(x, jnp.ndarray), struct1))
+  print(jax.tree_map(lambda x: isinstance(x, jnp.ndarray), struct2))
   leaves = jax.tree_leaves(struct2)
   for l in leaves:
     if not hasattr(l, "dtype"):
