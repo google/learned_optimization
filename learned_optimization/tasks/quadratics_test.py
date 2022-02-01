@@ -34,6 +34,8 @@ class QuadraticsTest(absltest.TestCase):
   def test_fixed_dim_quadratic_family_data(self):
     test_utils.smoketest_task_family(quadratics.FixedDimQuadraticFamilyData(10))
 
+  def test_noisy_quadratic_family(self):
+    test_utils.smoketest_task_family(quadratics.NoisyQuadraticFamily(10, 0.1))
 
 if __name__ == '__main__':
   absltest.main()

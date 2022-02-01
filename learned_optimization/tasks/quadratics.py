@@ -181,3 +181,47 @@ class FixedDimQuadraticFamilyData(base.TaskFamily):
         return jnp.clip(x, 0, 1000)
 
     return _Task()
+
+
+class NoisyQuadraticFamily(base.TaskFamily):
+  """Quadratic task family with randomized scale + center and noisy gradients."""
+
+  def __init__(self, dim: int, cov: float):
+    super().__init__()
+    self._dim = dim
+    self.datasets = None
+    self._cov = cov
+    self.scale_constant = 25.
+
+  def sample(self, key):
+    # Sample the target for the quadratic task.
+
+    key, subkey = jax.random.split(key)
+    center = jax.random.normal(key, shape=(self._dim,))
+    scale = jax.random.uniform(subkey, shape=(self._dim,)) * self.scale_constant
+
+    return (center, scale)
+
+  def task_fn(self, task_params) -> base.Task:
+    dim = self._dim
+    cov = self._cov
+    center, scaling = task_params
+
+    class _Task(base.Task):
+      """Generated Task."""
+
+      def loss(self, params, rng, _):
+        # Compute MSE to the target task.
+
+        # Scaling is isotropic right now; can relax
+        noise = cov * jax.random.normal(rng, shape=(dim,)) * params
+
+        # add noise to the gradient measurement only
+        grad_noise = noise - jax.lax.stop_gradient(noise)
+        loss = jnp.sum(jnp.square(scaling * (center - params)) + grad_noise)
+        return loss
+
+      def init(self, key):
+        return jax.random.normal(key, shape=(dim,))
+
+    return _Task()
