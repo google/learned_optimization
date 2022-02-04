@@ -17,6 +17,7 @@
 
 from absl import logging
 import jax
+import jax.numpy as jnp
 from learned_optimization.tasks import base
 
 
@@ -39,6 +40,8 @@ def smoketest_task(task: base.Task):
   grad, aux = jax.grad(
       task.loss_with_state, has_aux=True)(param, state, key, batch)
   del grad, aux
+  logging.info("checking normalizer")
+  task.normalizer(jnp.asarray(1.0))
   logging.info("done")
 
 
