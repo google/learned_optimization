@@ -190,7 +190,7 @@ def convert_result_to_metric_dict(task_group: Tuple[int, Mapping[str, str]],
   inner_unnorm_meta_loss = onp.mean([onp.nanmin(v) for v in unnorm_v])
   to_write["min_inner_nonorm_meta_loss"] = float(inner_unnorm_meta_loss)
 
-  inner_unnorm_meta_loss = onp.nanmean([v[-1] for v in norm_v])
+  inner_unnorm_meta_loss = onp.nanmean([v[-1] for v in unnorm_v])
   to_write["last_inner_nonorm_meta_loss"] = float(inner_unnorm_meta_loss)
 
   def aggregate_aux_for_split(split):
