@@ -42,6 +42,10 @@ def smoketest_task(task: base.Task):
   del grad, aux
   logging.info("checking normalizer")
   task.normalizer(jnp.asarray(1.0))
+
+  logging.info("checking loss_with_state_and_aux")
+  loss, state, aux = task.loss_with_state_and_aux(param, state, key, batch)
+  del loss, state, aux
   logging.info("done")
 
 

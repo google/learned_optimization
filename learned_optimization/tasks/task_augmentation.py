@@ -21,9 +21,9 @@ seek to do a similar set of transformations but these transformations now must
 operate on Task and TaskFamiliy resulting in new Task and TaskFamily.
 """
 
+import functools
 from typing import Mapping, Tuple, Union
 
-import functools
 import gin
 import jax
 import jax.numpy as jnp
