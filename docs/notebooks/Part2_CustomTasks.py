@@ -202,7 +202,6 @@ task.loss(params, key, batch)
 # + [markdown] id="8b25914f"
 # To achive speedups, we can now leverage `jax.vmap` to train *multiple* task instances in parallel! Depending on the task, this can be considerably faster than serially executing them.
 
-
 # + executionInfo={"elapsed": 1508, "status": "ok", "timestamp": 1643173377718, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 480} id="7dded1ea" outputId="d75a21c5-0210-4482-f088-1b5a0ce92c17"
 def train_task(cfg, key):
   task = task_family.task_fn(cfg)

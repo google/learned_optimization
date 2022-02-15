@@ -2,7 +2,7 @@ learned_optimization reference documentation
 ============================================
 
 learned\_optimization is a research codebase for training learned
-optimizers. It implements hand designed and learned optimizers, tasks to meta-train and meta-test them on, and outer-training algorithms such as ES and PES.
+optimizers. It implements hand designed and learned optimizers, tasks to meta-train and meta-test them on, and outer-training algorithms such as ES, gradients and PES.
 
 .. toctree::
    :maxdepth: 0
@@ -12,6 +12,7 @@ optimizers. It implements hand designed and learned optimizers, tasks to meta-tr
    notebooks/Part2_CustomTasks
    notebooks/Part3_Truncation_GradientEstimators
    notebooks/Part4_Meta_training_with_GradientLearner
+   notebooks/no_dependency_learned_optimizer
    
 .. toctree::
    :maxdepth: 0
@@ -23,8 +24,6 @@ optimizers. It implements hand designed and learned optimizers, tasks to meta-tr
    outer_trainers
    continuous_eval
    population
-   
-   
    
    
 Indices and tables
