@@ -16,18 +16,28 @@
 """Tests for learned_optimizers.tasks.fixed.image_mlp."""
 
 from absl.testing import absltest
+from absl.testing import parameterized
 from learned_optimization.tasks import test_utils
 from learned_optimization.tasks.fixed import image_mlp
 
 
-class ImageMLPTest(absltest.TestCase):
+tasks = [
+    "ImageMLP_FashionMnist_Relu128x128",
+    "ImageMLP_Imagenet16_Relu256x256x256",
+    "ImageMLP_Cifar10_128x128x128_Relu",
+    "ImageMLP_Cifar10_128x128_Dropout05_Relu_MSE",
+    "ImageMLP_Cifar10_128x128x128_BatchNorm_Relu",
+    "ImageMLP_Cifar10_128x128x128_LayerNorm_Relu",
+]
 
-  def test_ImageMLP_FashionMnistRelu128x128(self):
-    test_utils.smoketest_task(image_mlp.ImageMLP_FashionMnist_Relu128x128())
 
-  def test_ImageMLP_Imagenet16Relu256x256x256(self):
-    test_utils.smoketest_task(image_mlp.ImageMLP_Imagenet16_Relu256x256x256())
+class ImageMLPTest(parameterized.TestCase):
+
+  @parameterized.parameters(tasks)
+  def test_tasks(self, task_name):
+    task = getattr(image_mlp, task_name)()
+    test_utils.smoketest_task(task)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   absltest.main()
