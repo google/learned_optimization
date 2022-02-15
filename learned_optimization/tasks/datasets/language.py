@@ -17,6 +17,7 @@
 
 import functools
 from typing import Tuple
+import gin
 
 import haiku as hk
 from learned_optimization.tasks.datasets import base
@@ -92,13 +93,31 @@ def _make_datasets(tfds_datasetname: str, vocab: seqio.vocabularies.Vocabulary,
       extra_info={'vocab_size': vocab.vocab_size})
 
 
+@gin.configurable
 @base.dataset_lru_cache
 def lm1b_32k_datasets(batch_size, sequence_length):
   vocab = get_32k_sentence_piece_vocab()
   return _make_datasets('lm1b', vocab, batch_size, sequence_length)
 
 
+@gin.configurable
 @base.dataset_lru_cache
 def lm1b_bytes_datasets(batch_size, sequence_length):
   vocab = get_bytes_vocab()
   return _make_datasets('lm1b', vocab, batch_size, sequence_length)
+
+
+@gin.configurable
+@base.dataset_lru_cache
+def wikipedia_en_32k_datasets(batch_size, sequence_length):
+  vocab = get_32k_sentence_piece_vocab()
+  return _make_datasets('wikipedia/20201201.en', vocab, batch_size,
+                        sequence_length)
+
+
+@gin.configurable
+@base.dataset_lru_cache
+def wikipedia_en_bytes_datasets(batch_size, sequence_length):
+  vocab = get_bytes_vocab()
+  return _make_datasets('wikipedia/20201201.en', vocab, batch_size,
+                        sequence_length)
