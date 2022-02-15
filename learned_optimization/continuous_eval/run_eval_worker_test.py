@@ -24,10 +24,10 @@ from absl.testing import parameterized
 import jax
 from learned_optimization import checkpoints
 from learned_optimization import filesystem
-from learned_optimization import outer_train
 from learned_optimization.continuous_eval import run_eval_worker
 from learned_optimization.continuous_eval import task_group_server
 from learned_optimization.learned_optimizers import base as lopt_base
+from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.tasks import quadratics  # pylint: disable=unused-import
 
 
@@ -42,7 +42,7 @@ class RunEvalWorkerTest(parameterized.TestCase):
 
     lopt = lopt_base.LearnableSGD()
     theta = lopt.init(jax.random.PRNGKey(0))
-    ckpt = outer_train.ParameterCheckpoint(theta, "genid", 123)
+    ckpt = gradient_learner.ParameterCheckpoint(theta, "genid", 123)
 
     load_path = checkpoints.save_checkpoint(trainlogdir.name, "params_", ckpt,
                                             0)

@@ -16,7 +16,7 @@
 """Worker for continuous evaluation."""
 import os
 import time
-from typing import Mapping, Optional, TypeVar, Union, Any, Callable
+from typing import Any, Callable, Mapping, Optional, TypeVar, Union
 
 from absl import app
 from absl import flags
@@ -29,12 +29,12 @@ from learned_optimization import checkpoints
 from learned_optimization import distributed
 from learned_optimization import eval_training
 from learned_optimization import filesystem
-from learned_optimization import outer_train
 from learned_optimization import profile
 from learned_optimization import setup_experiment
 from learned_optimization.continuous_eval import run_eval_chief
 from learned_optimization.continuous_eval import task_group_server
 from learned_optimization.learned_optimizers import base as lopt_base
+from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.tasks import base as tasks_base
 import numpy as onp
 
@@ -183,7 +183,7 @@ def load_gin_and_run(
     theta = learned_optimizer.init(key)
 
   with profile.Profile("loading_state"):
-    param_checkpoint = outer_train.ParameterCheckpoint(theta, "gen_id", 0)
+    param_checkpoint = gradient_learner.ParameterCheckpoint(theta, "gen_id", 0)
     load_path = saved_paths["params_"]
     param_checkpoint = _cache_load_state(load_path, param_checkpoint)
     theta, gen_id, step = (param_checkpoint.params, param_checkpoint.gen_id,

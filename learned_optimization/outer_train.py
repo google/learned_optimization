@@ -105,22 +105,6 @@ def build_gradient_estimators(
 
 
 @flax.struct.dataclass
-class ParameterCheckpoint:
-  """State that we write out to disk for using the optimizer."""
-  params: lopt_base.MetaParams
-  gen_id: str
-  step: int
-
-
-@flax.struct.dataclass
-class OptCheckpoint:
-  """State that we write out to disk for training the optimizer."""
-  gradient_learner_state: gradient_learner.GradientLearnerState
-  elapsed_time: Union[float, jnp.ndarray]
-  total_inner_steps: int
-
-
-@flax.struct.dataclass
 class DataForWorker:
   """Data we send from the central learner to the workers."""
   worker_weights: Optional[gradient_learner.WorkerWeights]
@@ -488,12 +472,12 @@ def train_learner(
 
   gen_id = "fake_initial_gen_id"
 
-  checkpoint_data = OptCheckpoint(
+  checkpoint_data = gradient_learner.OptCheckpoint(
       gradient_learner_state,
       elapsed_time=jnp.asarray(elapsed_time, dtype=jnp.float64),
       total_inner_steps=int(total_inner_steps))
 
-  param_checkpoint_data = ParameterCheckpoint(
+  param_checkpoint_data = gradient_learner.ParameterCheckpoint(
       outer_learner.get_lopt_params(gradient_learner_state), gen_id,
       gradient_learner_state.theta_opt_state.iteration)
 
@@ -532,8 +516,9 @@ def train_learner(
 
   def _load_checkpoint(checkpoint_path):
     """Load state from the checkpoint path."""
-    checkpoint_data = OptCheckpoint(gradient_learner_state, elapsed_time,
-                                    int(total_inner_steps))
+    checkpoint_data = gradient_learner.OptCheckpoint(gradient_learner_state,
+                                                     elapsed_time,
+                                                     int(total_inner_steps))
     checkpoint_data = checkpoints.load_state(checkpoint_path, checkpoint_data)
     return (checkpoint_data.gradient_learner_state,
             checkpoint_data.elapsed_time, checkpoint_data.total_inner_steps)
@@ -596,10 +581,10 @@ def train_learner(
 
         dist_learner.start_server()
 
-    opt_checkpoint = OptCheckpoint(gradient_learner_state,
-                                   jnp.asarray(elapsed_time, dtype=jnp.float64),
-                                   total_inner_steps)
-    param_checkpoint = ParameterCheckpoint(
+    opt_checkpoint = gradient_learner.OptCheckpoint(
+        gradient_learner_state, jnp.asarray(elapsed_time, dtype=jnp.float64),
+        total_inner_steps)
+    param_checkpoint = gradient_learner.ParameterCheckpoint(
         outer_learner.get_lopt_params(gradient_learner_state), gen_id, step)
     paths = checkpoints.periodically_save_checkpoint(train_log_dir, {
         "checkpoint_": opt_checkpoint,
@@ -731,7 +716,7 @@ def local_train(
 
   gradient_learner_state = outer_learner.init(key)
 
-  checkpoint_data = OptCheckpoint(
+  checkpoint_data = gradient_learner.OptCheckpoint(
       gradient_learner_state,
       elapsed_time=jnp.asarray(elapsed_time, dtype=jnp.float64),
       total_inner_steps=int(total_inner_steps))
@@ -741,7 +726,7 @@ def local_train(
                                                      checkpoint_data,
                                                      "checkpoint_")
   else:
-    param_checkpoint_data = ParameterCheckpoint(
+    param_checkpoint_data = gradient_learner.ParameterCheckpoint(
         outer_learner.get_lopt_params(gradient_learner_state), "not_genid",
         gradient_learner_state.theta_opt_state.iteration)
 
@@ -789,11 +774,12 @@ def local_train(
     checkpoints.periodically_save_checkpoint(
         train_log_dir, {
             "checkpoint_":
-                OptCheckpoint(gradient_learner_state,
-                              jnp.asarray(elapsed_time, dtype=jnp.float64),
-                              int(total_inner_steps)),
+                gradient_learner.OptCheckpoint(
+                    gradient_learner_state,
+                    jnp.asarray(elapsed_time, dtype=jnp.float64),
+                    int(total_inner_steps)),
             "params_":
-                ParameterCheckpoint(
+                gradient_learner.ParameterCheckpoint(
                     outer_learner.get_lopt_params(gradient_learner_state),
                     "no_gen_id", step)
         })

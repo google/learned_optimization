@@ -16,16 +16,16 @@
 """Train a learned optimizer with gradients."""
 import abc
 import functools
-from typing import Any, Mapping, Optional, Sequence, Tuple
+from typing import Any, Mapping, Optional, Sequence, Tuple, Union
 
 from absl import logging
 import flax
 import gin
 import jax
 import jax.numpy as jnp
+from learned_optimization import checkpoints
 from learned_optimization import profile
 from learned_optimization import summary
-from learned_optimization import training
 from learned_optimization import tree_utils
 from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.optimizers import base as opt_base
@@ -90,6 +90,22 @@ class GradientEstimatorOut:
   unroll_info: UnrollInfo
 
 
+@flax.struct.dataclass
+class ParameterCheckpoint:
+  """State that we write out to disk for using the optimizer."""
+  params: lopt_base.MetaParams
+  gen_id: str
+  step: int
+
+
+@flax.struct.dataclass
+class OptCheckpoint:
+  """State that we write out to disk for training the optimizer."""
+  gradient_learner_state: GradientLearnerState
+  elapsed_time: Union[float, jnp.ndarray]
+  total_inner_steps: int
+
+
 @jax.jit
 def _tree_mean(stack):
   return jax.tree_map(lambda x: jnp.mean(x, axis=0), stack)
@@ -140,6 +156,7 @@ class GradientLearner:
     Returns:
       gradient_learner_state: A new initial state of the gradient learner.
     """
+
     theta_init = self._lopt.init(key)
     # TODO(lmetz) hook up model state for learned optimizers
     model_state = None
@@ -147,22 +164,15 @@ class GradientLearner:
     if self._init_theta_from_path:
       logging.info(  # pylint: disable=logging-fstring-interpolation
           f"Got a init from params path {self._init_theta_from_path}."
-          " Using this instead of random randomly initializing.")
+          " Using this instead of random initialization.")
 
-      # parameter checkpoints are stored as tuples of lopt weights, (theta),
-      # lopt model state, a string generation id (used for population based
-      # training), and the outer-training iteration / number of weight updates
-      # performed.
       # To load a checkpoint, the state of the target object must be specified,
       # so we pass fake values here.
-      gen_id = ""
-      iteration = 0
-      (theta_init, model_state,
-       unused_gen_id, unused_iteration) = training.load_state(
-           self._init_theta_from_path,
-           (theta_init, model_state, gen_id, iteration))
-      del unused_gen_id
-      del unused_iteration
+      fake_param_checkpoint = ParameterCheckpoint(
+          params=theta_init, gen_id="", step=0)
+      real_param_checkpoint = checkpoints.load_state(self._init_theta_from_path,
+                                                     fake_param_checkpoint)
+      theta_init = real_param_checkpoint.params
 
     theta_opt_state = self._theta_opt.init(
         theta_init, model_state, num_steps=self._num_steps)
@@ -171,8 +181,13 @@ class GradientLearner:
       logging.info(  # pylint: disable=logging-fstring-interpolation
           f"Got a init from outer state path {self._init_outer_state_from_path}."
           " Using this instead of randomly initializing.")
-      theta_opt_state = training.load_state(self._init_outer_state_from_path,
-                                            theta_opt_state)
+      fake_checkpoint = OptCheckpoint(
+          gradient_learner_state=GradientLearnerState(theta_opt_state),
+          elapsed_time=0.0,
+          total_inner_steps=1)
+      real_checkpoint = checkpoints.load_state(self._init_outer_state_from_path,
+                                               fake_checkpoint)
+      theta_opt_state = real_checkpoint.gradient_learner_state.theta_opt_state
 
     return GradientLearnerState(theta_opt_state)
 

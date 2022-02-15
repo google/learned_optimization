@@ -54,7 +54,7 @@ def uniquify_server_name(server_name: str, experiment_name: str) -> str:
   hmod = hashlib.sha256()
   hmod.update(experiment_name.encode("utf-8"))
   hval = hmod.hexdigest()[0:20]
-  logging.info(f"Hashing experiment name [{experiment_name}] => {str(hval)}")  #. pylint: disable=g-fstring-interpolation
+  logging.info(f"Hashing experiment name [{experiment_name}] => {str(hval)}")  #. pylint: disable=logging-fstring-interpolation
   return str(hval) + "__" + server_name
 
 
@@ -135,7 +135,7 @@ class AsyncLearner(Generic[T, W]):
     while True:
       if self._is_step_valid(step):
         self._lock.acquire(blocking=True)
-        logging.info(  # pylint: disable=logging-format-interpolation
+        logging.info(  # pylint: disable=logging-fstring-interpolation
             f"size of outer_gradients {len(self._outer_gradients)}....")
         if len(self._outer_gradients) < self._buffer_size:
           self._outer_gradients.append((int(step), value))
@@ -144,10 +144,10 @@ class AsyncLearner(Generic[T, W]):
         else:
           self._lock.release()
           if self._block_when_buffer_full:
-            logging.info(f"Hanging worker {worker_id}....")  # pylint: disable=logging-format-interpolation
+            logging.info(f"Hanging worker {worker_id}....")  # pylint: disable=logging-fstring-interpolation
             time.sleep(1)
           else:
-            logging.info(f"Throwing away data for {worker_id}....")  # pylint: disable=logging-format-interpolation
+            logging.info(f"Throwing away data for {worker_id}....")  # pylint: disable=logging-fstring-interpolation
             return
           with self._cv:
             self._cv.notify_all()
@@ -250,7 +250,7 @@ class AsyncWorker(Generic[T, W]):
       experiment_name: Name of experiment. Should be the same for the entire
         job.
       worker_id: ID of the current worker.
-      learner_adress: adress of learner courier server.
+      learner_address: adress of learner courier server.
     """
     self._client = courier.Client(
         learner_address if learner_address else uniquify_server_name(

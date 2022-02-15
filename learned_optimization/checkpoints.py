@@ -92,7 +92,7 @@ def save_checkpoint(ckpt_dir: str, prefix: str, value: Any, step: int) -> str:
   Returns:
     the path of the saved checkpoint.
   """
-  logging.info(f"saving checkpoint prefix: {prefix} step:{step}")  # pylint: disable=logging-format-interpolation
+  logging.info(f"saving checkpoint prefix: {prefix} step:{step}")  # pylint: disable=logging-fstring-interpolation
   path = os.path.join(ckpt_dir, f"{prefix}{step}")
   if filesystem.exists(path):
     filesystem.remove(path)
@@ -137,10 +137,10 @@ def periodically_save_checkpoint(
     if checkpoint is not None:
       last_step = int(checkpoint.split(prefix)[-1])
       step = last_step + 1
-      logging.info(f"Last Step found {last_step}, saving to {step}")  # pylint: disable=logging-format-interpolation
+      logging.info(f"Last Step found {last_step}, saving to {step}")  # pylint: disable=logging-fstring-interpolation
     else:
       step = 0
-      logging.info(f"No last checkpoint found. Waving to {step}")  # pylint: disable=logging-format-interpolation
+      logging.info(f"No last checkpoint found. Waving to {step}")  # pylint: disable=logging-fstring-interpolation
 
     for prefix, value_or_fn in checkpoint_state_map.items():
       if callable(value_or_fn):

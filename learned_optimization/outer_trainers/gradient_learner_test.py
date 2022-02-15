@@ -15,10 +15,14 @@
 
 """Tests for learned_optimizers.outer_trainer.gradient_learner."""
 
+import os
+import tempfile
+
 from absl.testing import absltest
 import haiku as hk
 import jax
 import jax.numpy as jnp
+from learned_optimization import checkpoints
 from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.optimizers import base as opt_base
 from learned_optimization.outer_trainers import gradient_learner
@@ -111,6 +115,55 @@ class GradientLearnerTest(absltest.TestCase):
     # check that the learned optimizer params changed.
     self.assertEqual(learner.get_lopt_params(state)["log_lr"], 0.0)
     self.assertEqual(learner.get_lopt_params(state2)["log_lr"], -1.5)
+
+  def test_init_from_params(self):
+    with tempfile.TemporaryDirectory() as d:
+      lopt = lopt_base.LearnableSGD(1)
+      theta_opt = opt_base.SGD(3)
+      key = jax.random.PRNGKey(0)
+      theta = lopt.init(key)
+      theta = jax.tree_map(lambda x: (x + 1) * 10, theta)
+
+      # save a checkpoint.
+      params = gradient_learner.ParameterCheckpoint(
+          params=theta, gen_id="test", step=123)
+      param_path = os.path.join(d, "param.param")
+      checkpoints.save_state(param_path, params)
+
+      learner = gradient_learner.GradientLearner(
+          lopt, theta_opt, init_theta_from_path=param_path)
+      grad_state = learner.init(key)
+      restore_theta = theta_opt.get_params(grad_state.theta_opt_state)
+
+      restore_val = jax.tree_leaves(restore_theta)[0]
+      base_val = jax.tree_leaves(theta)[0]
+
+      self.assertAlmostEqual(restore_val, base_val)
+
+  def test_init_from_checkpoint(self):
+    with tempfile.TemporaryDirectory() as d:
+      lopt = lopt_base.LearnableSGD(1)
+      theta_opt = opt_base.SGD(3)
+      key = jax.random.PRNGKey(0)
+
+      learner = gradient_learner.GradientLearner(lopt, theta_opt)
+      grad_state = learner.init(key)
+
+      # modify everything, including the opt_state iteration.
+      grad_state = jax.tree_map(lambda x: x + 11, grad_state)
+
+      # save a checkpoint.
+      opt_checkpoint = gradient_learner.OptCheckpoint(
+          grad_state, elapsed_time=123., total_inner_steps=123)
+
+      checkpoint_path = os.path.join(d, "checkpoint.param")
+      checkpoints.save_state(checkpoint_path, opt_checkpoint)
+
+      learner = gradient_learner.GradientLearner(
+          lopt, theta_opt, init_outer_state_from_path=checkpoint_path)
+      grad_state = learner.init(key)
+
+      self.assertEqual(grad_state.theta_opt_state.iteration, 11)
 
 
 if __name__ == "__main__":
