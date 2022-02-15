@@ -90,16 +90,20 @@ id: UM2Yg-HP6LhO
 outputId: 9f650077-1cad-4edd-bbe2-4b47c9b38631
 ---
 import tensorflow as tf
+
 ds = tfds.load("fashion_mnist", split="train")
 
+
 def resize_and_scale(batch):
-  batch["image"] = tf.image.resize(batch["image"], (8,8)) / 255.
+  batch["image"] = tf.image.resize(batch["image"], (8, 8)) / 255.
   return batch
 
-ds = ds.map(resize_and_scale).cache().repeat(-1).shuffle(64*10).batch(128).prefetch(5)
+
+ds = ds.map(resize_and_scale).cache().repeat(-1).shuffle(
+    64 * 10).batch(128).prefetch(5)
 data_iterator = ds.as_numpy_iterator()
 batch = next(data_iterator)
-fig, axs = plt.subplots(4,4, figsize=(10,10))
+fig, axs = plt.subplots(4, 4, figsize=(10, 10))
 for ai, a in enumerate(axs.ravel()):
   a.imshow(batch["image"][ai][:, :, 0], cmap="gray")
 
@@ -130,14 +134,15 @@ id: SNUAeWO65TzL
 outputId: ec453b0b-bdb9-4896-d24f-c405e57b374a
 ---
 class MLPTask:
+
   def init(self, key):
     key1, key2 = jax.random.split(key)
-    w0 = jax.random.normal(key1, [input_size, 128])*0.02
-    w1 = jax.random.normal(key2, [128, 10])*0.02
+    w0 = jax.random.normal(key1, [input_size, 128]) * 0.02
+    w1 = jax.random.normal(key2, [128, 10]) * 0.02
     b0 = jnp.zeros([128])
     b1 = jnp.ones([10])
     return (w0, b0, w1, b1)
-  
+
   def loss(self, params, batch):
     data = batch["image"]
     data = jnp.reshape(data, [data.shape[0], -1])
@@ -147,8 +152,9 @@ class MLPTask:
     vec_loss = -jnp.sum(labels * jax.nn.log_softmax(logits), axis=-1)
     return jnp.mean(vec_loss)
 
+
 task = MLPTask()
-key = jax.random.PRNGKey(0)  
+key = jax.random.PRNGKey(0)
 params = task.init(key)
 task.loss(params, batch)
 ```
@@ -185,7 +191,7 @@ num_steps = int(os.environ.get("LOPT_TRAIN_LENGTH", 1000))
 for i in range(num_steps):
   batch = next(data_iterator)
   loss, grads = value_grad_fn(params, batch)
-  params = [p-lr*g for p,g in zip(params, grads)]
+  params = [p - lr * g for p, g in zip(params, grads)]
   losses.append(loss)
 plt.plot(losses)
 ```
@@ -201,12 +207,15 @@ In the case of SGD, this state is just the parameter values.
 :id: WX6fbsYu8Xmy
 
 class SGD:
+
   def __init__(self, lr):
     self.lr = lr
+
   def init(self, params):
     return (params,)
+
   def update(self, opt_state, grads):
-    return (tuple([p-self.lr*g for p,g in zip(opt_state[0], grads)]), )
+    return (tuple([p - self.lr * g for p, g in zip(opt_state[0], grads)]),)
 ```
 
 +++ {"id": "ah5U6H1_qzpv"}
@@ -250,16 +259,18 @@ Now, let's define some other optimizers. Momentum makes use of an additional acc
 :id: h70Uo7TB89zk
 
 class Momentum:
+
   def __init__(self, lr, decay=0.9):
     self.lr = lr
     self.decay = decay
+
   def init(self, params):
     return (params, [jnp.zeros_like(p) for p in params])
 
   def update(self, state, grads):
     params, momentum = state
-    momentum = [m*self.decay+self.lr*g for m,g in zip(momentum, grads)]
-    params = [p-m for p,m in zip(params, momentum)]
+    momentum = [m * self.decay + self.lr * g for m, g in zip(momentum, grads)]
+    params = [p - m for p, m in zip(params, momentum)]
     return (params, momentum)
 ```
 
@@ -306,11 +317,13 @@ And finally, we can implement Adam.
 :id: L7gd-MqEH2da
 
 class Adam:
+
   def __init__(self, lr, beta1=0.9, beta2=0.999, epsilon=1e-8):
     self.lr = lr
     self.beta1 = beta1
     self.beta2 = beta2
     self.epsilon = epsilon
+
   def init(self, params):
     return (params, jnp.asarray(0), [jnp.zeros_like(p) for p in params],
             [jnp.zeros_like(p) for p in params])
@@ -319,11 +332,18 @@ class Adam:
   def update(self, state, grads):
     params, iteration, momentum, rms = state
     iteration += 1
-    momentum = [m*self.beta1+(1-self.beta1)*g for m,g in zip(momentum, grads)]
-    rms = [v*self.beta2+(1-self.beta2)*(g**2) for v,g in zip(rms, grads)]
-    mhat = [m / (1-self.beta1**iteration) for m in momentum]
-    vhat = [v / (1-self.beta2**iteration) for v in rms]
-    params = [p-self.lr * m / (jnp.sqrt(v) + self.epsilon) for p,m,v in zip(params, mhat, vhat)]
+    momentum = [
+        m * self.beta1 + (1 - self.beta1) * g for m, g in zip(momentum, grads)
+    ]
+    rms = [
+        v * self.beta2 + (1 - self.beta2) * (g**2) for v, g in zip(rms, grads)
+    ]
+    mhat = [m / (1 - self.beta1**iteration) for m in momentum]
+    vhat = [v / (1 - self.beta2**iteration) for v in rms]
+    params = [
+        p - self.lr * m / (jnp.sqrt(v) + self.epsilon)
+        for p, m, v in zip(params, mhat, vhat)
+    ]
     return (params, iteration, momentum, rms)
 ```
 
@@ -348,15 +368,18 @@ Choosing input parameterizations, and output parameterizations varies across lea
 :id: ymF3QnR0-UdM
 
 class LOpt:
+
   def __init__(self, decay=0.9):
-    self.decay= decay
-    self.hidden_size=64
+    self.decay = decay
+    self.hidden_size = 64
 
   def init_meta_params(self, key):
     """Initialize the learned optimizer weights -- in this case the weights of
-    the per parameter mlp."""
+
+    the per parameter mlp.
+    """
     key1, key2 = jax.random.split(key)
-    input_feats = 3 # parameter value, momentum value, and gradient value
+    input_feats = 3  # parameter value, momentum value, and gradient value
 
     # the optimizer is a 2 hidden layer MLP.
     w0 = jax.random.normal(key1, [input_feats, self.hidden_size])
@@ -373,11 +396,14 @@ class LOpt:
 
   @functools.partial(jax.jit, static_argnums=(0,))
   def update_inner_opt_state(self, meta_params, inner_opt_state, inner_grads):
-    "Perform 1 step of learning using the learned optimizer."""
-    params, momentum = inner_opt_state 
+    "Perform 1 step of learning using the learned optimizer." ""
+    params, momentum = inner_opt_state
 
     # compute momentum
-    momentum = [m*self.decay+(g * (1-self.decay)) for m,g in zip(momentum, inner_grads)]
+    momentum = [
+        m * self.decay + (g * (1 - self.decay))
+        for m, g in zip(momentum, inner_grads)
+    ]
 
     def predict_step(features):
       """Predict the update for a single ndarray."""
@@ -394,7 +420,7 @@ class LOpt:
       features = jnp.asarray([p, m, g])
       # transpose to have features dim last. The MLP will operate on this,
       # and treat the leading dimensions as a batch dimension.
-      features = jnp.transpose(features, list(range(1, 1+len(p.shape))) + [0])
+      features = jnp.transpose(features, list(range(1, 1 + len(p.shape))) + [0])
 
       step = predict_step(features)
       out_params.append(p - step)
@@ -465,14 +491,19 @@ outputId: 5e1a71f3-9ca5-4b73-cc59-17c2a3eb46d7
 ---
 lopt = LOpt()
 
+
 def get_batch_seq(seq_len):
   batches = [next(data_iterator) for _ in range(seq_len)]
   # stack the data to add a leading dim.
-  return {"image": jnp.asarray([b["image"] for b in batches]),
-   "label": jnp.asarray([b["label"] for b in batches])}
+  return {
+      "image": jnp.asarray([b["image"] for b in batches]),
+      "label": jnp.asarray([b["label"] for b in batches])
+  }
+
 
 @jax.jit
 def meta_loss(meta_params, key, sequence_of_batches):
+
   def step(opt_state, batch):
     loss, grads = value_grad_fn(opt_state[0], batch)
     opt_state = lopt.update_inner_opt_state(meta_params, opt_state, grads)
@@ -485,8 +516,9 @@ def meta_loss(meta_params, key, sequence_of_batches):
 
   return jnp.mean(losses)
 
+
 key = jax.random.PRNGKey(0)
-meta_loss(meta_params, key, get_batch_seq(10))  
+meta_loss(meta_params, key, get_batch_seq(10))
 ```
 
 ```{code-cell}
@@ -596,7 +628,7 @@ for j in range(10):
   key = jax.random.PRNGKey(j)
   params = task.init(key)
   opt_state = lopt.initial_inner_opt_state(meta_params, params)
-  
+
   for i in range(10):
     batch = next(data_iterator)
     loss, grads = value_grad_fn(opt_state[0], batch)
@@ -616,7 +648,7 @@ We can see our optimizer works, and is able to optimize for these first 10 steps
 
 ## Vectorization: Speeding up Meta-training
 
-The above example, we are training a single problem instance for 10 iterations, and using this single training to compute meta-gradients. Oftentimes we seek to compute meta-gradients from more than one problem or to average over multiple random initializations / batches of data. To do this, we will leverage `jax.vmap`. 
+The above example, we are training a single problem instance for 10 iterations, and using this single training to compute meta-gradients. Oftentimes we seek to compute meta-gradients from more than one problem or to average over multiple random initializations / batches of data. To do this, we will leverage `jax.vmap`.
 
 We will define a vectorized meta-loss, which computes the original `meta_loss` function in parallel, then averages the losses. We can then call `jax.value_and_grad` on this function to compute meta-gradients which are the average of these samples.
 
@@ -628,12 +660,17 @@ One big advantage to vectorizing in this way is to make better use of hardware a
 def get_vec_batch_seq(vec_size, seq_len):
   batches = [get_batch_seq(seq_len) for _ in range(vec_size)]
   # stack them
-  return {"image": jnp.asarray([b["image"] for b in batches]),
-   "label": jnp.asarray([b["label"] for b in batches])}
+  return {
+      "image": jnp.asarray([b["image"] for b in batches]),
+      "label": jnp.asarray([b["label"] for b in batches])
+  }
+
 
 def vectorized_meta_loss(meta_params, key, sequence_of_batches):
-  vec_loss = jax.vmap(meta_loss, in_axes=(None, 0, 0))(meta_params, key, sequence_of_batches)
+  vec_loss = jax.vmap(
+      meta_loss, in_axes=(None, 0, 0))(meta_params, key, sequence_of_batches)
   return jnp.mean(vec_loss)
+
 
 vec_meta_loss_grad = jax.jit(jax.value_and_grad(vectorized_meta_loss))
 vec_sec_batch = get_vec_batch_seq(4, 10)
@@ -715,14 +752,17 @@ def antithetic_es_estimate(meta_params, key, seq_of_batches):
   """Compute a ES estimated gradient along a single direction."""
   std = 0.001
   keys = jax.random.split(key, len(meta_params))
-  noise = [jax.random.normal(keys[i], p.shape)*std for i,p in enumerate(meta_params)]
-  meta_params_pos = [p+n for p,n in zip(meta_params, noise)]
-  meta_params_neg = [p-n for p,n in zip(meta_params, noise)]
+  noise = [
+      jax.random.normal(keys[i], p.shape) * std
+      for i, p in enumerate(meta_params)
+  ]
+  meta_params_pos = [p + n for p, n in zip(meta_params, noise)]
+  meta_params_neg = [p - n for p, n in zip(meta_params, noise)]
 
   pos_loss = meta_loss(meta_params_pos, key, seq_of_batches)
   neg_loss = meta_loss(meta_params_neg, key, seq_of_batches)
 
-  factor = (pos_loss - neg_loss) / (2 * std ** 2)
+  factor = (pos_loss - neg_loss) / (2 * std**2)
   es_grads = [factor * n for n in noise]
   return (pos_loss + neg_loss) / 2.0, es_grads
 
@@ -730,8 +770,11 @@ def antithetic_es_estimate(meta_params, key, seq_of_batches):
 @jax.jit
 def vec_antithetic_es_estimate(meta_params, keys, vec_seq_batches):
   """Compute a ES estimated gradient along multiple directions."""
-  losses, grads = jax.vmap(antithetic_es_estimate, in_axes=(None, 0, 0))(meta_params, keys, vec_seq_batches)
+  losses, grads = jax.vmap(
+      antithetic_es_estimate, in_axes=(None, 0, 0))(meta_params, keys,
+                                                    vec_seq_batches)
   return jnp.mean(losses), [jnp.mean(g, axis=0) for g in grads]
+
 
 keys = jax.random.split(key, 8)
 vec_sec_batch = get_vec_batch_seq(8, 10)
@@ -820,25 +863,32 @@ executionInfo:
 id: ri9wWMPizb-G
 outputId: 9704ab4f-6831-4ace-a9bb-37f11fa18ea6
 ---
-def short_segment_unroll(meta_params, key, inner_opt_state, on_iteration, seq_of_batches):
+def short_segment_unroll(meta_params, key, inner_opt_state, on_iteration,
+                         seq_of_batches):
+
   def step(scan_state, batch):
     opt_state, i, key = scan_state
 
     # If we have trained more than 100 steps, reset the inner problem.
     key1, key = jax.random.split(key)
-    opt_state, i = jax.lax.cond(i >= 100,
-                             lambda k: (lopt.initial_inner_opt_state(meta_params, task.init(k)), 0),
-                             lambda k: (opt_state, i+1), key)
+    opt_state, i = jax.lax.cond(
+        i >= 100, lambda k:
+        (lopt.initial_inner_opt_state(meta_params, task.init(k)), 0), lambda k:
+        (opt_state, i + 1), key)
 
     loss, grads = value_grad_fn(opt_state[0], batch)
     opt_state = lopt.update_inner_opt_state(meta_params, opt_state, grads)
 
     # clip the loss to prevent diverging inner models
-    loss = jax.lax.cond(jnp.isnan(loss), lambda loss: 3.0, lambda loss: jnp.minimum(loss, 3.0), loss)
+    loss = jax.lax.cond(
+        jnp.isnan(loss), lambda loss: 3.0, lambda loss: jnp.minimum(loss, 3.0),
+        loss)
 
     return (opt_state, i, key), loss
 
-  (inner_opt_state, on_iteration, _), losses = jax.lax.scan(step, (inner_opt_state, on_iteration, key), seq_of_batches) 
+  (inner_opt_state, on_iteration,
+   _), losses = jax.lax.scan(step, (inner_opt_state, on_iteration, key),
+                             seq_of_batches)
 
   return jnp.mean(losses), inner_opt_state, on_iteration
 
@@ -846,7 +896,8 @@ def short_segment_unroll(meta_params, key, inner_opt_state, on_iteration, seq_of
 inner_opt_state = lopt.initial_inner_opt_state(meta_params, task.init(key))
 batch = get_batch_seq(10)
 
-loss, inner_opt_state, on_iteration = short_segment_unroll(meta_params, key, inner_opt_state, 0, batch)
+loss, inner_opt_state, on_iteration = short_segment_unroll(
+    meta_params, key, inner_opt_state, 0, batch)
 on_iteration
 ```
 
@@ -859,11 +910,17 @@ As before, we construct a vectorized version of this unroll function, and comput
 ```{code-cell}
 :id: xJRkyAX_1Oge
 
-def vec_short_segment_unroll(meta_params, keys, inner_opt_states, on_iterations, vec_seq_of_batches):
-  losses, inner_opt_states, on_iterations = jax.vmap(short_segment_unroll, in_axes=(None, 0, 0, 0, 0))(meta_params, keys, inner_opt_states, on_iterations, vec_seq_of_batches)
+def vec_short_segment_unroll(meta_params, keys, inner_opt_states, on_iterations,
+                             vec_seq_of_batches):
+  losses, inner_opt_states, on_iterations = jax.vmap(
+      short_segment_unroll,
+      in_axes=(None, 0, 0, 0, 0))(meta_params, keys, inner_opt_states,
+                                  on_iterations, vec_seq_of_batches)
   return jnp.mean(losses), (inner_opt_states, on_iterations)
 
-vec_short_segment_grad = jax.jit(jax.value_and_grad(vec_short_segment_unroll, has_aux=True))
+
+vec_short_segment_grad = jax.jit(
+    jax.value_and_grad(vec_short_segment_unroll, has_aux=True))
 ```
 
 +++ {"id": "QYrO5_ik1vbm"}
@@ -878,8 +935,10 @@ num_tasks = 32
 key = jax.random.PRNGKey(1)
 meta_params = lopt.init_meta_params(key)
 
+
 def init_single_inner_opt_state(key):
   return lopt.initial_inner_opt_state(meta_params, task.init(key))
+
 
 keys = jax.random.split(key, num_tasks)
 inner_opt_states = jax.vmap(init_single_inner_opt_state)(keys)
@@ -912,7 +971,8 @@ for i in range(num_steps):
   data = get_vec_batch_seq(num_tasks, 10)
   key1, key = jax.random.split(key)
   keys = jax.random.split(key1, num_tasks)
-  (loss, (inner_opt_states, on_iterations)), meta_grad = vec_short_segment_grad(meta_opt_state[0], keys, inner_opt_states, on_iterations, data)
+  (loss, (inner_opt_states, on_iterations)), meta_grad = vec_short_segment_grad(
+      meta_opt_state[0], keys, inner_opt_states, on_iterations, data)
   meta_losses.append(loss)
   if i % 20 == 0:
     print(i, onp.mean(meta_losses[-20:]))
@@ -999,27 +1059,27 @@ For those curious in getting their feet wet, fork this notebook and try to imple
 We hope this notebook gives you an introduction to learned optimizers.
 This is an incredibly minimal implementation, and as a result suboptimal in a number of ways.
 The `learned_optimization` library was designed based on the patterns used above, but expanded upon to be more general, more scalable, and more fully featured.
- 
+
 The core designs of how to implement these things in jax remain very consistent.
 We outline a few of the main differences.
- 
- 
+
+
 ### PyTree all the things
 In the above examples, we made use of tuples and lists to store parameters, and opt states. This is simple, but gets unwieldy with more complex structures.
 With `learned_optimization` every piece of data is stored as some kind of jax pytree -- oftentimes a dataclass registered as a pytree. These pytree require the use of the [pytree library](https://jax.readthedocs.io/en/latest/pytrees.html).
- 
+
 ### Tasks
 The task interface is quite similar to what we have shown here. There is one other layer of abstraction in `learned_optimization`, namely `TaskFamily`. In this example, we meta-train on multiple tasks in parallel -- the only difference between these tasks is their random initialization. A `TaskFamily` let's one instead vectorize over other aspects of the problem. Common examples include vectorizing over different kinds of initializations, or different kinds of activation functions.
- 
+
 ### Optimizers
 The optimizer interface is also basically the same. The main differences being that the learned optimization optimizers can accept additional arguments such as `num_steps` (target number of steps for learning rate schedules and related), jax.PRNGKey for stochastic optimizers, and loss values.
- 
+
 ### LearnedOptimizers
 In this colab, the learned optimizers and optimizers here have different signatures.
 In `learned_optimization` a LearnedOptimizer contains a function of meta-parameters which itself returns an instance of an Optimizer. For example the update can be called as: `lopt.opt_fn(meta_params).update(opt_state, grads)`.
 
-The learned optimizer implemented in this notebook is designed to be simple and easy to follow as opposed to performant / easy to meta-train. `learned_optimization` comes packaged with a number of learned optimizer implementations which will give much better performance. 
- 
+The learned optimizer implemented in this notebook is designed to be simple and easy to follow as opposed to performant / easy to meta-train. `learned_optimization` comes packaged with a number of learned optimizer implementations which will give much better performance.
+
 ### Meta-training
 This is the biggest divergence. Meta-training algorithms are implemented as subclasses of `GradientEstimator`. These operate internally like the truncated training in that they store state which is passed from iteration to iteration, but are much more general.
 They implement 2 functions, one to initialize the state of the inner-problems, and the second to perform updates. This mirrors the 2 functions we needed to write for truncated training.

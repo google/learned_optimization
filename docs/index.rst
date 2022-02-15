@@ -12,7 +12,13 @@ optimizers. It implements hand designed and learned optimizers, tasks to meta-tr
    notebooks/Part2_CustomTasks
    notebooks/Part3_Truncation_GradientEstimators
    notebooks/Part4_Meta_training_with_GradientLearner
+   
+.. toctree::
+   :maxdepth: 0
+   :caption: Tutorials
+   
    notebooks/no_dependency_learned_optimizer
+   notebooks/summary_tutorial
    
 .. toctree::
    :maxdepth: 0
