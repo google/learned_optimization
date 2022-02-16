@@ -25,6 +25,7 @@ from absl import logging
 from flax.training import prefetch_iterator
 import haiku as hk
 import jax
+import jax.numpy as jnp
 from learned_optimization import filesystem
 import numpy as onp
 import tensorflow as tf
@@ -48,7 +49,8 @@ class Datasets:
                inner_valid: Iterator[Batch],
                outer_valid: Iterator[Batch],
                test: Iterator[Batch],
-               extra_info: Optional[Mapping[str, Any]] = None):
+               extra_info: Optional[Mapping[str, Any]] = None,
+               abstract_batch: Optional[Any] = None):
     if not extra_info:
       extra_info = {}
     self.train = train
@@ -56,6 +58,7 @@ class Datasets:
     self.outer_valid = outer_valid
     self.test = test
     self.extra_info = extra_info
+    self.abstract_batch = abstract_batch
 
   def split(self, name: str) -> Iterator[Batch]:
     """Return an iterator corresponding to the given data split."""
@@ -128,6 +131,10 @@ class LazyDataset(Datasets):
   def extra_info(self):
     return self._fn().extra_info
 
+  @property
+  def abstract_batch(self):
+    return self._fn().abstract_batch
+
 
 _CACHED_DATASETS = []
 
@@ -150,7 +157,8 @@ def datasets_map(fn: Callable[[Batch], Batch], datasets: Datasets) -> Datasets:
       train=map(fn, datasets.train),
       inner_valid=map(fn, datasets.inner_valid),
       outer_valid=map(fn, datasets.outer_valid),
-      test=map(fn, datasets.test))
+      test=map(fn, datasets.test),
+      abstract_batch=datasets.abstract_batch)
 
 
 def _image_map_fn(cfg: Mapping[str, Any], batch: Batch) -> Batch:
@@ -252,9 +260,23 @@ def preload_tfds_image_classification_datasets(
 
   builder = tfds.builder(datasetname)
   num_classes = builder.info.features["label"].num_classes
+
+  if stack_channels == 1:
+    output_channel = builder.info.features["image"].shape[-1:]
+  else:
+    output_channel = (stack_channels,)
+
+  abstract_batch = {
+      "image":
+          jax.ShapedArray(
+              (batch_size,) + image_size + output_channel, dtype=jnp.float32),
+      "label":
+          jax.ShapedArray((batch_size,), dtype=jnp.int32)
+  }
   return Datasets(
       *[make_python_iter(split) for split in splits],
-      extra_info={"num_classes": num_classes})
+      extra_info={"num_classes": num_classes},
+      abstract_batch=abstract_batch)
 
 
 def _tfrecord_filenames_from_dataset_name(datasetname: str,
@@ -305,6 +327,7 @@ def tfrecord_image_classification_datasets(
   """
 
   num_classes_map = {"imagenet2012_16": 1000}
+  image_shapes_map = {"imagenet2012_16": (16, 16, 3)}
   if datasetname not in num_classes_map:
     raise ValueError(f"Trying to access an unsupported dataset: {datasetname}?")
 
@@ -348,6 +371,16 @@ def tfrecord_image_classification_datasets(
     ds = ds.prefetch(128)
     return ThreadSafeIterator(LazyIterator(ds.as_numpy_iterator))
 
+  if stack_channels == 1:
+    shape = (batch_size,) + image_size + (image_shapes_map[datasetname][-1],)
+  else:
+    shape = (batch_size,) + image_size + (stack_channels,)
+  abstract_batch = {
+      "image": jax.ShapedArray(shape, jnp.float32),
+      "label": jax.ShapedArray((batch_size,), jnp.int32)
+  }
+
   return Datasets(
       *[make_python_iter(split) for split in splits],
-      extra_info={"num_classes": num_classes_map[datasetname]})
+      extra_info={"num_classes": num_classes_map[datasetname]},
+      abstract_batch=abstract_batch)

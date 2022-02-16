@@ -17,9 +17,11 @@
 
 import functools
 from typing import Tuple
-import gin
 
+import gin
 import haiku as hk
+import jax
+import jax.numpy as jnp
 from learned_optimization.tasks.datasets import base
 import seqio
 import tensorflow.compat.v2 as tf
@@ -85,12 +87,17 @@ def _make_datasets(tfds_datasetname: str, vocab: seqio.vocabularies.Vocabulary,
     return base.ThreadSafeIterator(base.LazyIterator(iterator_fn))
 
   train, inner_valid, outer_valid, test = [make(split) for split in splits]
+  abstract_batch = {
+      'obs': jax.ShapedArray((batch_size, sequence_length), jnp.int32),
+      'target': jax.ShapedArray((batch_size, sequence_length), jnp.int32),
+  }
   return base.Datasets(
       train=train,
       inner_valid=inner_valid,
       outer_valid=outer_valid,
       test=test,
-      extra_info={'vocab_size': vocab.vocab_size})
+      extra_info={'vocab_size': vocab.vocab_size},
+      abstract_batch=abstract_batch)
 
 
 @gin.configurable

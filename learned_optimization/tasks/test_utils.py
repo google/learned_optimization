@@ -21,14 +21,25 @@ import jax.numpy as jnp
 from learned_optimization.tasks import base
 
 
-def smoketest_task(task: base.Task):
-  """Smoke test a Task."""
+def smoketest_task(task: base.Task, abstract_data: bool = True):
+  """Smoke test a Task.
+
+  Args:
+    task: Task to test.
+    abstract_data: To use abstract data, or to use the real dataset for this
+      test. Using abstract batches does not require loading the underlying
+      dataset which can be faster if datasets are stored on a remote machine.
+  """
   key = jax.random.PRNGKey(0)
   param, state = task.init_with_state(key)
 
   logging.info("Getting data for %s task", str(task))
   if task.datasets:
-    batch = next(task.datasets.train)
+    if abstract_data and task.datasets.abstract_batch is not None:
+      batch = jax.tree_map(lambda x: jnp.zeros(x.shape, x.dtype),
+                           task.datasets.abstract_batch)
+    else:
+      batch = next(task.datasets.train)
   else:
     batch = ()
   logging.info("Got data")

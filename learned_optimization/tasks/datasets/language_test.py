@@ -22,6 +22,9 @@ class ImageTest(absltest.TestCase):
 
   def test_lm1b_32k_datasets(self):
     datasets = language.lm1b_32k_datasets(32, 8)
+    self.assertEqual(datasets.abstract_batch["obs"].shape, (32, 8))
+    self.assertEqual(datasets.abstract_batch["target"].shape, (32, 8))
+
     data = next(datasets.train)
     self.assertEqual(data["obs"].shape, (32, 8))
     self.assertEqual(data["target"].shape, (32, 8))
@@ -29,11 +32,14 @@ class ImageTest(absltest.TestCase):
 
   def test_lm1b_bytes_datasets(self):
     datasets = language.lm1b_bytes_datasets(32, 10)
+    self.assertEqual(datasets.abstract_batch["obs"].shape, (32, 10))
     data = next(datasets.train)
     self.assertEqual(data["obs"].shape, (32, 10))
 
   def test_wikipedia_en_32k_datasets(self):
     datasets = language.wikipedia_en_32k_datasets(32, 8)
+    self.assertEqual(datasets.abstract_batch["obs"].shape, (32, 8))
+    self.assertEqual(datasets.abstract_batch["target"].shape, (32, 8))
     data = next(datasets.train)
     self.assertEqual(data["obs"].shape, (32, 8))
     self.assertEqual(data["target"].shape, (32, 8))
