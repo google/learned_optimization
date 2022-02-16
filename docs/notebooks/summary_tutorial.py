@@ -79,9 +79,9 @@ def loss(parameters):
 value_grad_fn = jax.jit(jax.value_and_grad(loss))
 value_grad_fn(1.0)
 
+
 # + [markdown] id="9WzMuzf44j0L"
 # With the summary module we can first annotate this value with `summary.summary`
-
 
 # + id="K7N39btX4jUe"
 def forward(params):
@@ -122,6 +122,7 @@ summary.aggregate_metric_list([metrics])
 result, metrics = jax.jit(summary.with_summary_output_reduced(loss))(1.)
 summary.aggregate_metric_list([metrics])
 
+
 # + [markdown] id="ZeriYYoTJvKd"
 # At this point `aggregate_metric_list` cannot be jit. In practice this is fine as it performs very little computation.
 
@@ -131,7 +132,6 @@ summary.aggregate_metric_list([metrics])
 # Consider the following fake function which calls a `layer` function twice.
 # This `layer` function creates a summary and thus two summary are created.
 # When running the transformed function we see not one, but two values returned.
-
 
 # + colab={"base_uri": "https://localhost:8080/"} id="SDToo5ZH-8kP" outputId="1a6956f1-7968-4e36-e5bf-de05334ca58e"
 def layer(params):
@@ -155,9 +155,9 @@ result, metrics
 # + colab={"base_uri": "https://localhost:8080/"} id="TW4wQ-kB-cCQ" outputId="824fd411-5cad-4368-9698-d1a04e309981"
 summary.aggregate_metric_list([metrics])
 
+
 # + [markdown] id="ZXtFMhmqANGJ"
 # Another useful aggregation mode is "sample". As jax's random numbers are stateless, an additional RNG key must be passed in for this to work.
-
 
 # + colab={"base_uri": "https://localhost:8080/"} id="hvfgKVZhAeRW" outputId="fc44541a-82b5-4a2d-f103-e3b8f929aa56"
 def layer(params):
@@ -177,9 +177,9 @@ result, metrics = summary.with_summary_output_reduced(loss)(
     1., sample_rng_key=key)
 summary.aggregate_metric_list([metrics])
 
+
 # + [markdown] id="0Q98mny6AyNH"
 # Finally, there is `"collect"` which concatenates all the values together into one long tensor after first raveling all the inputs. This is useful for extracting distributions of quantities.
-
 
 # + colab={"base_uri": "https://localhost:8080/"} id="SzVbsqZIA2O9" outputId="9fec7c59-f8bf-4aa1-fa67-3e4bc75153d2"
 def layer(params):
@@ -200,10 +200,10 @@ result, metrics = summary.with_summary_output_reduced(loss)(
     1., sample_rng_key=key)
 summary.aggregate_metric_list([metrics])
 
+
 # + [markdown] id="nCN3ET9IQd7A"
 # ## Summary Scope
 # Sometimes it is useful to be able to group all summaries from a function inside some code block with some common name. This can be done with the `summary_scope` context.
-
 
 # + colab={"base_uri": "https://localhost:8080/"} id="1SM-Ab-CQgWw" outputId="b9dbd717-006d-465e-c4af-b10445b08d2c"
 @jax.jit
@@ -226,12 +226,12 @@ summary.aggregate_metric_list([metrics])
 
 # + id="pOEJJw2EQd2h"
 
+
 # + [markdown] id="4pzFDb3FBfi-"
 # ## Usage with function transforms.
 # Thanks to `oryx`, all of this functionality works well across a variety of function transformations.
 # Here is an example with a scan, vmap, and jit.
 # The aggregation modes will aggregate across all timesteps, and all batched dimensions.
-
 
 # + colab={"base_uri": "https://localhost:8080/"} id="FFW4l5RPBn7I" outputId="d621048f-921c-4d40-f6ae-9b516c12078a"
 @jax.jit
@@ -285,6 +285,7 @@ print("No metrics", summary.aggregate_metric_list([metrics]))
 res, metrics = loss(1., with_summary=True)
 print("With metrics", summary.aggregate_metric_list([metrics]))
 
+
 # + [markdown] id="SnRKsVLbHA1t"
 # ## Limitations and Gotchas
 
@@ -294,7 +295,6 @@ print("With metrics", summary.aggregate_metric_list([metrics]))
 # At the moment summary.summary MUST be called with a descendant of whatever input is passed into the function wrapped by `with_summary_output_reduced`. In practice this is almost always the case as we seek to monitor changing values rather than constants.
 #
 # To demonstrate this, note how the constant value is NOT logged out, but if add it to `a*0` it does become logged out.
-
 
 # + colab={"base_uri": "https://localhost:8080/"} id="iIbrjrJ4HEd-" outputId="b1ccd1db-5615-45b9-b52c-0ae78ea9369f"
 def monitor(a):
@@ -306,6 +306,7 @@ def monitor(a):
 
 result, metrics = summary.with_summary_output_reduced(monitor)(1.)
 summary.aggregate_metric_list([metrics])
+
 
 # + [markdown] id="yvEW6XfTH5_N"
 # The rational for why this is a bit of a rabbit hole, but it is related to how tracing in jax work and is beyond the scope of this notebook.
@@ -329,7 +330,6 @@ summary.aggregate_metric_list([metrics])
 # One way to extract data from a function is to simply return the things we want to look at. As functions become more complex and nested this can become quite a pain as each one of these functions must pass out metric values. This process of spreading data throughout a bunch of functions is called "threading".
 #
 # Threading also requires all pieces of code to be involved -- as one must thread these metrics everywhere.
-
 
 # + colab={"base_uri": "https://localhost:8080/"} id="q78BOx1X1uiN" outputId="4bb8807f-4345-4e8a-c231-9bb482222352"
 def lossb(p):

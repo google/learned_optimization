@@ -51,7 +51,7 @@ This update rule is simple, effective, and widely used. Can we do better?
 
 Framed in this way, this algorithm is simply a function. One idea to improve training is to switch out this hand designed function with a learned function parameterized by some set of weights, $\theta$:
 
-$$U(x, \nabla l; \theta) = \text{NN}(x, \nabla l; \theta)$$.
+$$U(x, \nabla l; \theta) = \text{NN}(x, \nabla l; \theta)$$
 
 We call the weights of the optimizer, $\theta$, the meta-parameters, or outer-parameters. The weights this optimizer is optimizing we refer to as the inner-parameters, or simply parameters.
 

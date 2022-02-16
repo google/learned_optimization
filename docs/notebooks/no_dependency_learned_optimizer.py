@@ -61,7 +61,7 @@ import os
 #
 # Framed in this way, this algorithm is simply a function. One idea to improve training is to switch out this hand designed function with a learned function parameterized by some set of weights, $\theta$:
 #
-# $$U(x, \nabla l; \theta) = \text{NN}(x, \nabla l; \theta)$$.
+# $$U(x, \nabla l; \theta) = \text{NN}(x, \nabla l; \theta)$$
 #
 # We call the weights of the optimizer, $\theta$, the meta-parameters, or outer-parameters. The weights this optimizer is optimizing we refer to as the inner-parameters, or simply parameters.
 #
@@ -103,6 +103,7 @@ for ai, a in enumerate(axs.ravel()):
 
 input_size = onp.prod(batch["image"].shape[1:])
 
+
 # + [markdown] id="ruw2lKT1I0Ez"
 # ### Inner problem loss function & initialization
 #
@@ -110,7 +111,6 @@ input_size = onp.prod(batch["image"].shape[1:])
 # One important note here is no parameters are stored in the task itself! See [this](https://jax.readthedocs.io/en/latest/jax-101/07-state.html) jax tutorial for more information on this.
 #
 # Our task will have 2 methods -- an init which constructs the initial values of the weights, and a loss which applies the MLP, and returns the average cross entropy loss.
-
 
 # + executionInfo={"elapsed": 145, "status": "ok", "timestamp": 1643851271245, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="SNUAeWO65TzL" outputId="ec453b0b-bdb9-4896-d24f-c405e57b374a"
 class MLPTask:
@@ -158,12 +158,12 @@ for i in range(num_steps):
   losses.append(loss)
 plt.plot(losses)
 
+
 # + [markdown] id="jddnOrHu8WCb"
 # ## Optimizers
 # SGD is all fine and good, but it is often useful to abstract away the specific update rule. This abstraction has two methods: An init, which setups up the initial optimizer state, and an update which uses this state and gradients to produce some new state.
 #
 # In the case of SGD, this state is just the parameter values.
-
 
 # + id="WX6fbsYu8Xmy"
 class SGD:
@@ -194,9 +194,9 @@ for i in range(num_steps):
   losses.append(loss)
 plt.plot(losses)
 
+
 # + [markdown] id="uCOBWVkeq2qD"
 # Now, let's define some other optimizers. Momentum makes use of an additional accumulator variable. We can define it as follows.
-
 
 # + id="h70Uo7TB89zk"
 class Momentum:
@@ -233,9 +233,9 @@ for i in range(num_steps):
   losses.append(loss)
 plt.plot(losses)
 
+
 # + [markdown] id="RrwIMhObH29t"
 # And finally, we can implement Adam.
-
 
 # + id="L7gd-MqEH2da"
 class Adam:
@@ -284,7 +284,6 @@ class Adam:
 # We use this formulation, as opposed to simply outputting a direct value, as empirically it is easier to meta-train.
 #
 # Choosing input parameterizations, and output parameterizations varies across learned optimizer architecture and paper.
-
 
 # + id="ymF3QnR0-UdM"
 class LOpt:
@@ -411,6 +410,7 @@ meta_loss(meta_params, key, get_batch_seq(10))
 
 # + id="NGHImLJ9FcjO"
 
+
 # + [markdown] id="EFeC6wiTtYPu"
 # ## Meta-training with Gradients
 # Meta-training means training the weights of the learned optimizer to perform well in some setting. There are a lot of ways to do this optimization problem. We will run through a few different examples here.
@@ -472,6 +472,7 @@ for j in range(10):
 plt.xlabel("inner-iteration")
 plt.ylabel("loss")
 
+
 # + [markdown] id="9hMBooBKTxy5"
 # We can see our optimizer works, and is able to optimize for these first 10 steps.
 
@@ -483,7 +484,6 @@ plt.ylabel("loss")
 # We will define a vectorized meta-loss, which computes the original `meta_loss` function in parallel, then averages the losses. We can then call `jax.value_and_grad` on this function to compute meta-gradients which are the average of these samples.
 #
 # One big advantage to vectorizing in this way is to make better use of hardware accelerators. When training learned optimizers, we often apply them to small problems for speedy meta-training. These small problems can be a poor fit for the underlying hardware which often consists of big matrix multiplication units. What vectorization does compute multiple of these small problems *at the same time*, which, depending on the details, can be considerably faster.
-
 
 # + id="8qud5EuWniIF"
 def get_vec_batch_seq(vec_size, seq_len):
@@ -529,6 +529,7 @@ for i in range(num_steps):
 # + colab={"height": 282} executionInfo={"elapsed": 188, "status": "ok", "timestamp": 1643859354616, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="vLBEKi6WuTcx" outputId="4675e4d9-8f2b-4709-82b3-4bfac3d1c493"
 plt.plot(meta_losses)
 
+
 # + [markdown] id="W9Ao4iSNnl16"
 # ## Evolutionary Strategies (ES): Meta-training without meta-gradients
 # Computing gradients through long optimization procedures can sometimes lead to chaotic dynamics, and result in exploding gradients. See [https://arxiv.org/abs/1810.10180](https://arxiv.org/abs/1810.10180) and [https://arxiv.org/abs/2111.05803](https://arxiv.org/abs/2111.05803) for more info.
@@ -540,7 +541,6 @@ plt.plot(meta_losses)
 # where $L$ is the meta-loss.
 #
 # As before, we will construct a vectorized version of these estimators to average over a number of different random directions.
-
 
 # + id="KHd6Sf0mu_CZ"
 def antithetic_es_estimate(meta_params, key, seq_of_batches):
@@ -601,6 +601,7 @@ for i in range(num_steps):
 # + colab={"height": 282} executionInfo={"elapsed": 189, "status": "ok", "timestamp": 1643859637431, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="X_fqy1t-xzJ_" outputId="993064d0-d28a-431a-fd1c-4c445f5452d3"
 plt.plot(meta_losses)
 
+
 # + [markdown] id="64YicoxfJtZG"
 # ## Meta-training with Truncations
 # In the previous meta-training examples, in the meta-loss we always initialized the inner-problem and apply the optimizer for some fixed number of steps.
@@ -610,7 +611,6 @@ plt.plot(meta_losses)
 #
 # The code for this is a bit more involved. First, we need to keep track of each inner problem. In our case, this means keeping track of the inner problems optimizer state, as well as the current training iteration. Next, we must check if we are at the end of an inner-training. We fix the length of the inner training to be 100 for this example. We can then define a function (`short_segment_unroll`) which both progresses training by some number of steps,
 # and return the loss from that segment.
-
 
 # + executionInfo={"elapsed": 936, "status": "ok", "timestamp": 1643851546422, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="ri9wWMPizb-G" outputId="9704ab4f-6831-4ace-a9bb-37f11fa18ea6"
 def short_segment_unroll(meta_params, key, inner_opt_state, on_iteration,
@@ -650,11 +650,11 @@ loss, inner_opt_state, on_iteration = short_segment_unroll(
     meta_params, key, inner_opt_state, 0, batch)
 on_iteration
 
+
 # + [markdown] id="EBYgsPmn0-6E"
 # Now with this function, we are free to estimate gradients over just this one short unroll rather than the full inner-training. We can use whatever gradient estimator we want -- either ES, or with backprop gradients -- but for now I will show an example with backprop gradients.
 #
 # As before, we construct a vectorized version of this unroll function, and compute gradients with `jax.value_and_grad`.
-
 
 # + id="xJRkyAX_1Oge"
 def vec_short_segment_unroll(meta_params, keys, inner_opt_states, on_iterations,

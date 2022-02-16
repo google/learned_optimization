@@ -166,7 +166,7 @@ opt.get_params(new_opt_state)
 
 +++ {"id": "xzGRP13ZN4rJ"}
 
-# Per Parameter learned optimizer
+## Per Parameter learned optimizer
 Per parameter learned optimizers involves computing some learned function on
 each parameter of the inner-model. Because these calculations are done on
 every parameter, the computational cost of applying the optimizer grows linearly
@@ -365,7 +365,7 @@ print(new_opt_state.momentums)
 
 +++ {"id": "WB7LuabVRim_"}
 
-### Meta-learned RNN Controllers
+## Meta-learned RNN Controllers
 
 Another kind of learned optimizer architecture consists of a recurrent "controller" which modifies and sets the hyper parameters of some base model.
 These optimizers often have low overhead as computing hparams to use is often much cheaper than computing the underlying gradients. These optimizers also don't require complex computations to be done at each parameter like the per parameter optimizers above.

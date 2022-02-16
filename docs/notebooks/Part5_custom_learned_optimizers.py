@@ -40,13 +40,13 @@ import jax
 from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.optimizers import base as opt_base
 
+
 # + [markdown] id="0fgVMtdVLuC0"
 # ## Meta-Learnable hyper parameters
 # Let's first start by defining a learned optimizer with meta-learned hyper parameters. For this, we will choose SGD as the base optimizer, and meta-learn a learning rate and weight decay.
 #
 #
 # First, we define the state of the learned optimizer. This state is used to keep track of the learned optimizer weights. It contains the inner parameters (`params`), the inner `model_state` which is None unless there are non-gradient updated parameters in the inner problem (such as batchnorm statistics), and `iteration` which contains the inner-training step.
-
 
 # + executionInfo={"elapsed": 3, "status": "ok", "timestamp": 1644472718443, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="tmkJTQNSLvjj"
 @flax.struct.dataclass
@@ -63,9 +63,7 @@ class LOptState:
 # + executionInfo={"elapsed": 2, "status": "ok", "timestamp": 1644472737722, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="feQ6ZWlmNUWI"
 MetaParams = Any  # typing definition to label some types below
 
-
 class MetaSGDWD(lopt_base.LearnedOptimizer):
-
   def __init__(self, initial_lr=1e-3, initial_wd=1e-2):
     self._initial_lr = initial_lr
     self._initial_wd = initial_wd
@@ -86,7 +84,6 @@ class MetaSGDWD(lopt_base.LearnedOptimizer):
     # this captures over the meta-parameters, theta.
 
     class _Opt(opt_base.Optimizer):
-
       def init(self, params, model_state=None, **kwargs) -> LOptState:
         # For our inital inner-opt state we pack the params, model state,
         # and iteration into the LOptState dataclass.
@@ -116,7 +113,6 @@ class MetaSGDWD(lopt_base.LearnedOptimizer):
             params=next_params,
             model_state=model_state,
             iteration=opt_state.iteration + 1)
-
     return _Opt()
 
 
@@ -135,8 +131,9 @@ new_opt_state = opt.update(opt_state, fake_grads)
 
 opt.get_params(new_opt_state)
 
+
 # + [markdown] id="xzGRP13ZN4rJ"
-# # Per Parameter learned optimizer
+# ## Per Parameter learned optimizer
 # Per parameter learned optimizers involves computing some learned function on
 # each parameter of the inner-model. Because these calculations are done on
 # every parameter, the computational cost of applying the optimizer grows linearly
@@ -148,7 +145,6 @@ opt.get_params(new_opt_state)
 # scalar inputs (the gradient, momentum, and parameter value), and produces two
 # outputs which are combined to form a single scalar.
 # The same MLP is then applied to every weight.
-
 
 # + executionInfo={"elapsed": 60, "status": "ok", "timestamp": 1644473371311, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="WZY4cds2PUA1"
 @flax.struct.dataclass
@@ -162,9 +158,7 @@ class PerParamState:
 # + executionInfo={"elapsed": 55, "status": "ok", "timestamp": 1644473578782, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="RUCGENb7N6D9"
 import haiku as hk
 
-
 class PerParamMLP(lopt_base.LearnedOptimizer):
-
   def __init__(self, decay=0.9, hidden_size=64):
     self.decay = decay
     self.hidden_size = hidden_size
@@ -185,6 +179,8 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
 
     self.net = hk.without_apply_rng(hk.transform(forward))
 
+
+
   def init(self, key) -> MetaParams:
     """Initialize the weights of the learned optimizer."""
     # to initialize our neural network, we must pass in a batch that looks like
@@ -201,7 +197,6 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
     parent = self
 
     class _Opt(opt_base.Optimizer):
-
       def init(self, params, model_state=None, **kwargs) -> LOptState:
         # In addition to params, model state, and iteration, we also need the
         # initial momentum values.
@@ -242,9 +237,7 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
             model_state=model_state,
             iteration=opt_state.iteration + 1,
             momentums=next_moms)
-
     return _Opt()
-
 
 # + [markdown] id="EjiNPZSnQ4Ab"
 # Now let's look at what these meta-parameters look like.
@@ -274,8 +267,9 @@ new_opt_state = opt.update(opt_state, fake_grads)
 print(opt.get_params(new_opt_state))
 print(new_opt_state.momentums)
 
+
 # + [markdown] id="WB7LuabVRim_"
-# ### Meta-learned RNN Controllers
+# ## Meta-learned RNN Controllers
 #
 # Another kind of learned optimizer architecture consists of a recurrent "controller" which modifies and sets the hyper parameters of some base model.
 # These optimizers often have low overhead as computing hparams to use is often much cheaper than computing the underlying gradients. These optimizers also don't require complex computations to be done at each parameter like the per parameter optimizers above.
@@ -289,7 +283,6 @@ print(new_opt_state.momentums)
 # For this RNN, we use haiku for no particularly strong reason (Flax, or any other neural network library which allows for creating purely functional NN would work.)
 #
 # This optimizer will additionally have a meta-learnable initial RNN State. We desire this state to be meta-learned and thus it must be constructed by `LearnedOptimizer.init`. This state needs to be updated while applying the optimizer, so when we construct the inner-optimizer state.
-
 
 # + executionInfo={"elapsed": 2, "status": "ok", "timestamp": 1644474159670, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="Y5qEGiPGTCAP"
 @flax.struct.dataclass
@@ -306,16 +299,13 @@ class HParamControllerInnerOptState:
 # + id="VWjvA9AETb94"
 import haiku as hk
 
-
 def rnn_mod():
   return hk.LSTM(128)
-
 
 @hk.transform
 def initial_state_fn():
   rnn_hidden_state = rnn_mod().initial_state(batch_size=1)
   return rnn_hidden_state
-
 
 @hk.transform
 def forward_fn(hidden_state, input):
@@ -328,10 +318,8 @@ def forward_fn(hidden_state, input):
 # + [markdown] id="sKVF8_UhTgH6"
 # Now for the full optimizer
 
-
 # + executionInfo={"elapsed": 2, "status": "ok", "timestamp": 1644474352955, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="CNNjLi7Dm7Wz"
 class HParamControllerLOPT(lopt_base.LearnedOptimizer):
-
   def init(self, key):
     """Initialize weights of learned optimizer."""
     # Only one input -- just the loss.
@@ -344,9 +332,7 @@ class HParamControllerLOPT(lopt_base.LearnedOptimizer):
     return {"rnn_params": rnn_params, "initial_rnn_hidden_state": initial_state}
 
   def opt_fn(self, theta):
-
     class _Opt(opt_base.Optimizer):
-
       def init(self, params, model_state=None, **kwargs):
         # Copy the initial, meta-learned rnn state into the inner-parameters
         # so that it can be updated by the RNN.
@@ -373,7 +359,6 @@ class HParamControllerLOPT(lopt_base.LearnedOptimizer):
         # use the results of the RNN to update the parameters.
         def update_one(p, g):
           return p - g * lr
-
         next_params = jax.tree_multimap(update_one, opt_state.params, grads)
 
         return HParamControllerInnerOptState(
