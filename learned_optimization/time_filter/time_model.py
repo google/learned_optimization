@@ -177,8 +177,8 @@ def features_to_hidden(key_feats: jnp.ndarray,
   float_feats = (float_feats - new_min) / (1e-15 + (new_max - new_min))
   float_feats = (float_feats - 0.5) * 2
 
-  new_min = jax.ops.index_update(min_state, flat_keys_feats, new_min)
-  new_max = jax.ops.index_update(max_state, flat_keys_feats, new_max)
+  new_min = min_state.at[flat_keys_feats].set(new_min)
+  new_max = max_state.at[flat_keys_feats].set(new_max)
 
   hk.set_state("min", new_min)
   hk.set_state("max", new_max)
