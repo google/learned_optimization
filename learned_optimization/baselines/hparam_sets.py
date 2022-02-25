@@ -76,3 +76,19 @@ def SGDMLR_2000_R5(task_name):  # pylint: disable=invalid-name
   cfgs = _lr_cfgs(task_name, "SGDM", 2000)
   paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
   return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def AdamLR_10000_R5(task_name):  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "Adam", 10000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def AdamLR_10000_R1(task_name):  # pylint: disable=invalid-name
+  reps = 1
+  cfgs = _lr_cfgs(task_name, "Adam", 10000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
