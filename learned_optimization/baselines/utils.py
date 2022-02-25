@@ -39,6 +39,13 @@ def get_root_baseline_dir() -> str:
   return os.path.expanduser(baseline_dir)
 
 
+def get_baseline_archive_rootdir():
+  default_dir = "~/lopt_baselines_archives"
+  baseline_dir = os.environ.get("LOPT_BASELINE_ARCHIVES_DIR", default_dir)
+
+  return baseline_dir
+
+
 def get_baseline_archive_path(task_name: str, hparam_set_name: str) -> str:
   """Get the path to save a given archive too.
 
@@ -53,8 +60,7 @@ def get_baseline_archive_path(task_name: str, hparam_set_name: str) -> str:
   Returns:
     The path of the archive to be loaded or created.
   """
-  default_dir = "~/lopt_baselines_archives"
-  baseline_dir = os.environ.get("LOPT_BASELINE_ARCHIVES_DIR", default_dir)
+  baseline_dir = get_baseline_archive_rootdir()
   root_dir = os.path.expanduser(baseline_dir)
 
   return os.path.join(root_dir, task_name, f"{hparam_set_name}.npz")
@@ -78,7 +84,7 @@ def read_npz(path: str) -> Mapping[str, Any]:
   with filesystem.file_open(path, "rb") as f:
     content = f.read()
   io_buffer = io.BytesIO(content)
-  return {k: v for k, v in onp.load(io_buffer).items()}
+  return {k: v for k, v in onp.load(io_buffer, allow_pickle=True).items()}
 
 
 def write_archive(task_name: str, hparam_set_name: str, data: Mapping[str,
@@ -92,6 +98,16 @@ def load_archive(task_name: str, hparam_set_name: str):
   """Load a precomputed archive file for `task_name` and `hparam_set_name`."""
   path = get_baseline_archive_path(task_name, hparam_set_name)
   return read_npz(path)
+
+
+def delete_saved_task_data(task_name):
+  p = os.path.join(get_root_baseline_dir(), task_name)
+  if filesystem.exists(p):
+    filesystem.remove(p)
+
+  p = os.path.join(get_baseline_archive_rootdir(), task_name)
+  if filesystem.exists(p):
+    filesystem.remove(p)
 
 
 def get_save_dir(task_name: str, opt_name: str, num_steps: int, eval_every: int,
