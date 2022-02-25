@@ -96,7 +96,10 @@ def _make_datasets(tfds_datasetname: str, vocab: seqio.vocabularies.Vocabulary,
       inner_valid=inner_valid,
       outer_valid=outer_valid,
       test=test,
-      extra_info={'vocab_size': vocab.vocab_size},
+      extra_info={
+          'vocab_size': vocab.vocab_size,
+          'vocab': vocab
+      },
       abstract_batch=abstract_batch)
 
 
