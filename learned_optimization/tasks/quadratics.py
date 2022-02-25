@@ -105,7 +105,7 @@ class SumQuadraticTask(base.Task):
 class FixedDimQuadraticFamily(base.TaskFamily):
   """A simple TaskFamily with a fixed dimensionality but sampled target."""
 
-  def __init__(self, dim: int):
+  def __init__(self, dim: int = 10):
     super().__init__()
     self._dim = dim
 
