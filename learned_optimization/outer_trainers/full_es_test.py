@@ -67,7 +67,7 @@ class FullEsTest(parameterized.TestCase):
     test_utils.trainer_smoketest(trainer)
 
   @parameterized.product(
-      train_and_meta=(True, False), loss_type=("avg", "last_recompute"))
+      train_and_meta=(True, False), loss_type=("avg", "last_recompute", "min"))
   def test_full_es_trainer_with_data(self, train_and_meta, loss_type):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)

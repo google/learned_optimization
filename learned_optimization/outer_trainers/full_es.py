@@ -196,9 +196,9 @@ def unroll_next_state(
       function evaluation (e.g. for validation based meta-losses).
     stack_antithetic_samples: If using stacked antithetic samples, rng's are
       split to be shared.
-    meta_loss_with_aux_key: Use some value from the given task's aux returns
-      for meta-training. This is useful for, say, meta-training against
-      accuracy rather than the loss.
+    meta_loss_with_aux_key: Use some value from the given task's aux returns for
+      meta-training. This is useful for, say, meta-training against accuracy
+      rather than the loss.
     theta: Parameters of the learned optimizer
     key: Jax RNG (this is vectorized)
     state: State of the inner problems being trained.
@@ -268,21 +268,24 @@ def unroll_next_state(
   return state, ys  # pytype: disable=bad-return-type
 
 
-@functools.partial(jax.jit, static_argnames=("std", "clip_loss_diff"))
-def avg_loss_antithetic_es(
+@functools.partial(
+    jax.jit, static_argnames=("std", "clip_loss_diff", "loss_type"))
+def traj_loss_antithetic_es(
     p_yses: Sequence[FullWorkerOut],
     n_yses: Sequence[FullWorkerOut],
     vec_pos: lopt_base.MetaParams,
     std: float,
-    clip_loss_diff: Optional[float] = None
+    loss_type: str,
+    clip_loss_diff: Optional[float] = None,
 ) -> Tuple[jnp.ndarray, lopt_base.MetaParams, FullWorkerOut]:
-  """Compute an ES based gradient estimate based on average loss of the unroll.
+  """Compute an ES based gradient estimate based on losses of the unroll.
 
   Args:
     p_yses: Sequence of outputs from each unroll for the positive ES direction.
     n_yses: Sequence of outputs from each unroll for the negative ES direction.
     vec_pos: The positive direction of the ES perturbations.
     std: Standard deviation of noise used.
+    loss_type: type of loss to use. Either "avg" or "min".
     clip_loss_diff: Term used to clip the max contribution of each sample.
 
   Returns:
@@ -298,8 +301,15 @@ def avg_loss_antithetic_es(
   n_ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(n_yses))
 
   # mean over the num steps axis.
-  pos_loss = jnp.mean(p_ys.loss, axis=0)
-  neg_loss = jnp.mean(n_ys.loss, axis=0)
+  if loss_type == "avg":
+    pos_loss = jnp.mean(p_ys.loss, axis=0)
+    neg_loss = jnp.mean(n_ys.loss, axis=0)
+  elif loss_type == "min":
+    pos_loss = jnp.min(p_ys.loss, axis=0)
+    neg_loss = jnp.min(n_ys.loss, axis=0)
+  else:
+    raise ValueError(f"Unsupported loss type {loss_type}.")
+
   delta_loss = (pos_loss - neg_loss)
 
   delta_loss = jnp.nan_to_num(delta_loss, posinf=0., neginf=0.)
@@ -357,9 +367,9 @@ def last_recompute_antithetic_es(
     std: standard deviation of the perturbation.
     recompute_samples: number of samples to compute the loss over.
     clip_loss_diff: clipping applied to each task loss.
-    meta_loss_with_aux_key: Use some value from the given task's aux returns
-      for meta-training. This is useful for, say, meta-training against
-      accuracy rather than the loss.
+    meta_loss_with_aux_key: Use some value from the given task's aux returns for
+      meta-training. This is useful for, say, meta-training against accuracy
+      rather than the loss.
 
   Returns:
     mean_loss: mean loss between positive and negative perturbations
@@ -425,8 +435,8 @@ class FullES(gradient_learner.GradientEstimator):
   `num_tasks` samples.
 
   The loss for a given unroll is computed either with the average loss over a
-  trajectory (loss_type="avg"), or with a computation at the end of training
-  (loss_type="last").
+  trajectory (loss_type="avg"), the min loss (loss_type="min") or with a
+  computation at the end of training (loss_type="last_recompute").
   """
 
   def __init__(
@@ -457,8 +467,8 @@ class FullES(gradient_learner.GradientEstimator):
         unroll_length.
       train_and_meta: Use just training data, or use both training data and
         validation data for the meta-objective.
-      loss_type: either "avg" or "last_recompute". How to compute the loss for
-        ES.
+      loss_type: either "avg", "min", or "last_recompute". How to compute the
+        loss for ES.
       recompute_samples: If loss_type="last_recompute", this determines the
         number of samples to estimate the final loss with.
       recompute_split: If loss_type="last_recompute", which split of data to
@@ -586,12 +596,13 @@ class FullES(gradient_learner.GradientEstimator):
         n_yses.append(n_ys)
 
     with profile.Profile("computing_loss_and_update"):
-      if self.loss_type == "avg":
-        mean_loss, es_grad, p_ys = avg_loss_antithetic_es(
+      if self.loss_type in ["avg", "min"]:
+        mean_loss, es_grad, p_ys = traj_loss_antithetic_es(
             p_yses,
             n_yses,
             vec_pos,
             self.std,
+            loss_type=self.loss_type,
             clip_loss_diff=self.clip_loss_diff)
 
         unroll_info = gradient_learner.UnrollInfo(
