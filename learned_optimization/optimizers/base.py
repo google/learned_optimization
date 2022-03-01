@@ -268,6 +268,9 @@ class GradientClipOptimizer(Optimizer):
   """Clip gradients by value before passing into an optimizer."""
 
   def __init__(self, opt: Optimizer, grad_clip: float = 3.0):
+    if not isinstance(opt, Optimizer):
+      raise ValueError("Must instance of Optimizer. Maybe you are passing the"
+                       f" class and not an instance? Received {opt}.")
     self.opt = opt
     self.grad_clip = grad_clip
 

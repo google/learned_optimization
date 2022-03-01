@@ -36,6 +36,8 @@ class BaseTest(absltest.TestCase):
   def test_sgdm(self):
     test_utils.smoketest_optimizer(base.SGDM(1e-4))
 
+  def test_gradient_clip_adam(self):
+    test_utils.smoketest_optimizer(base.GradientClipOptimizer(base.Adam(1e-4)))
 
 if __name__ == '__main__':
   absltest.main()
