@@ -53,7 +53,9 @@ class _MLPImageTask(base.Task):
     self._mod = hk.transform(_forward)
 
   def init(self, key: PRNGKey) -> Any:
-    return self._mod.init(key, next(self.datasets.train)["image"])
+    batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                         self.datasets.abstract_batch)
+    return self._mod.init(key, batch["image"])
 
   def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
     num_classes = self.datasets.extra_info["num_classes"]
@@ -112,6 +114,12 @@ def ImageMLP_Cifar10_128x128x128_Tanh_bs128():
 def ImageMLP_Cifar10_128x128x128_Tanh_bs256():
   datasets = image.cifar10_datasets(batch_size=256)
   return _MLPImageTask(datasets, [128, 128, 128], act_fn=jnp.tanh)
+
+
+@gin.configurable
+def ImageMLP_Mnist_128x128x128_Relu():
+  datasets = image.mnist_datasets(batch_size=128)
+  return _MLPImageTask(datasets, [128, 128, 128])
 
 
 class _MLPImageTaskMSE(_MLPImageTask):
@@ -190,7 +198,9 @@ class _MLPImageTaskNorm(base.Task):
     self._mod = hk.transform_with_state(_forward)
 
   def init_with_state(self, key: PRNGKey) -> Any:
-    params, state = self._mod.init(key, next(self.datasets.train)["image"])
+    batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                         self.datasets.abstract_batch)
+    params, state = self._mod.init(key, batch["image"])
     return params, state
 
   def loss_with_state(self, params: Params, state: ModelState, key: PRNGKey,
