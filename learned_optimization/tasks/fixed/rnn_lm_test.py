@@ -21,8 +21,20 @@ from learned_optimization.tasks import test_utils
 from learned_optimization.tasks.fixed import rnn_lm
 
 tasks = [
-    "RNNLM_LM1BByte_Patch32_IRNN128_Embed64",
-    "RNNLM_LM1BByte_Patch32_LSTM128_Embed64",
+    'RNNLM_lm1b32k_Patch32_IRNN256_Embed128',
+    'RNNLM_lm1b32k_Patch32_LSTM256_Embed128',
+    'RNNLM_lm1b32k_Patch32_VanillaRNN256_Embed128',
+    'RNNLM_lm1bbytes_Patch128_LSTM128_Embed64',
+    'RNNLM_lm1bbytes_Patch32_GRU128_Embed64',
+    'RNNLM_lm1bbytes_Patch32_GRU256_Embed128',
+    'RNNLM_lm1bbytes_Patch32_IRNN128_Embed64',
+    'RNNLM_lm1bbytes_Patch32_LSTM128_Embed64',
+    'RNNLM_lm1bbytes_Patch32_LSTM256_Embed128',
+    'RNNLM_lm1bbytes_Patch32_VanillaRNN128_Embed64',
+    'RNNLM_wikipediaen32k_Patch32_GRU256_Embed128',
+    'RNNLM_wikipediaen32k_Patch32_LSTM256_Embed128',
+    'RNNLM_wikipediaenbytes_Patch32_GRU256_Embed128',
+    'RNNLM_wikipediaenbytes_Patch32_LSTM256_Embed128',
 ]
 
 
@@ -34,5 +46,5 @@ class RNNLM(parameterized.TestCase):
     test_utils.smoketest_task(task)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   absltest.main()

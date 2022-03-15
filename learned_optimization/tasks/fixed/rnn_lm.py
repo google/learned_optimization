@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Language modeling done with recurrent neural networks."""
+import functools
 from typing import Any, Callable
 
 import gin
@@ -42,6 +43,9 @@ class TeacherForcedRNNLM(base.Task):
   def __init__(self, rnn_core_fn: Callable[[], hk.RNNCore], embedding_dim: int,
                vocab_size: int, datasets: datasets_base.Datasets):
     super().__init__()
+
+    if vocab_size is None:
+      vocab_size = datasets.extra_info["vocab_size"]
 
     def _forward(inp):
 
@@ -73,15 +77,22 @@ class TeacherForcedRNNLM(base.Task):
     self._vocab_size = vocab_size
 
   def init(self, key: PRNGKey) -> base.Params:
-    return self._mod.init(key, next(self.datasets.train)["obs"])
+    batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                         self.datasets.abstract_batch)
+    return self._mod.init(key, batch["obs"])
 
   def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
     obs = data["obs"]
     target = data["target"]
 
-    # prevent out of vocab tokens.
-    obs = jnp.minimum(obs, self._vocab_size - 1)
-    target = jnp.minimum(target, self._vocab_size - 1)
+    max_vocab_size = self.datasets.extra_info["vocab_size"]
+    vocab_size = self._vocab_size
+    if vocab_size < max_vocab_size:
+      # if the target vocab is smaller, we use a mod to keep all
+      # in the same range. We shift by 1 to prevent using padding tokens.
+      obs = jnp.where(obs > vocab_size, 1 + obs % (vocab_size - 1), obs)
+      target = jnp.where(target > vocab_size, 1 + target % (vocab_size - 1),
+                         target)
 
     logits = self._mod.apply(params, key, data["obs"])
     vec_loss = softmax_cross_entropy(logits=logits, labels=target)
@@ -91,23 +102,61 @@ class TeacherForcedRNNLM(base.Task):
     return jnp.sum(vec_loss * mask) / jnp.sum(mask)
 
 
-@gin.configurable
-def RNNLM_LM1BByte_Patch32_IRNN128_Embed64():  # pylint: disable=invalid-name
-  datasets = language.lm1b_bytes_datasets(128, 32)
-  vocab_size = datasets.extra_info["vocab_size"]
-  return TeacherForcedRNNLM(
-      lambda: rnn.IRNN(128),
-      embedding_dim=64,
-      vocab_size=vocab_size,
-      datasets=datasets)
+def _delay_fn(klass, *args):
+  return functools.partial(klass, *args), klass.__name__, args
 
 
-@gin.configurable
-def RNNLM_LM1BByte_Patch32_LSTM128_Embed64():  # pylint: disable=invalid-name
-  datasets = language.lm1b_bytes_datasets(128, 32)
-  vocab_size = datasets.extra_info["vocab_size"]
-  return TeacherForcedRNNLM(
-      lambda: hk.LSTM(128),
-      embedding_dim=64,
-      vocab_size=vocab_size,
-      datasets=datasets)
+def _delay(klass, *args):
+  return klass(*args), klass.__name__, args
+
+
+# pyformat: disable
+cfgs = [
+    (_delay_fn(language.lm1b_bytes_datasets, 128, 32), None, _delay_fn(rnn.IRNN, 128), 64),
+    (_delay_fn(language.lm1b_bytes_datasets, 128, 32), None, _delay_fn(hk.LSTM, 128), 64),
+    (_delay_fn(language.lm1b_bytes_datasets, 128, 32), None, _delay_fn(hk.GRU, 128), 64),
+    (_delay_fn(language.lm1b_bytes_datasets, 128, 32), None, _delay_fn(hk.VanillaRNN, 128), 64),
+
+    (_delay_fn(language.lm1b_bytes_datasets, 128, 128), None, _delay_fn(hk.LSTM, 128), 64),
+
+    (_delay_fn(language.lm1b_bytes_datasets, 128, 32), None, _delay_fn(hk.LSTM, 256), 128),
+    (_delay_fn(language.lm1b_bytes_datasets, 128, 32), None, _delay_fn(hk.GRU, 256), 128),
+
+    (_delay_fn(language.lm1b_32k_datasets, 128, 32), None, _delay_fn(hk.VanillaRNN, 256), 128),
+    (_delay_fn(language.lm1b_32k_datasets, 128, 32), None, _delay_fn(hk.LSTM, 256), 128),
+    (_delay_fn(language.lm1b_32k_datasets, 128, 32), None, _delay_fn(rnn.IRNN, 256), 128),
+
+    (_delay_fn(language.wikipedia_en_32k_datasets, 128, 32), None, _delay_fn(hk.LSTM, 256), 128),
+    (_delay_fn(language.wikipedia_en_32k_datasets, 128, 32), None, _delay_fn(hk.GRU, 256), 128),
+
+    (_delay_fn(language.wikipedia_en_bytes_datasets, 128, 32), None, _delay_fn(hk.LSTM, 256), 128),
+    (_delay_fn(language.wikipedia_en_bytes_datasets, 128, 32), None, _delay_fn(hk.GRU, 256), 128),
+]
+# pyformat: enable
+
+
+def _partial(rnn_fn, embedding_dim, vocab_size, datasets):
+
+  def tmp_fn():
+    return TeacherForcedRNNLM(
+        rnn_fn,
+        embedding_dim=embedding_dim,
+        vocab_size=vocab_size,
+        datasets=datasets())
+
+  return tmp_fn
+
+
+for _datasets, _vocab_size, (_rnn_fn, _rnn_name, _rnn_arg), _emb_dim in cfgs:
+  (_datasets, _dataset_name, (_bs, _seqlen)) = _datasets
+  _dataset_name = _dataset_name.replace("_datasets", "").replace("_", "")
+  _rnn_name = _rnn_name + str(_rnn_arg[0])
+  _name = f"RNNLM_{_dataset_name}_Patch{_seqlen}_{_rnn_name}_Embed{_emb_dim}"
+  _fn = _partial(
+      _rnn_fn,
+      embedding_dim=_emb_dim,
+      vocab_size=_vocab_size,
+      datasets=_datasets)
+  _fn.__name__ = _name
+  gin.external_configurable(_fn, _name)
+  locals()[_name] = _fn
