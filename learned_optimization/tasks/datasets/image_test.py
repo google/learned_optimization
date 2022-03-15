@@ -43,11 +43,29 @@ class ImageTest(absltest.TestCase):
     self.assertEqual(datasets.abstract_batch["image"].shape, (128, 28, 28, 3))
     self.assertEqual(data["image"].shape, (128, 28, 28, 3))
 
+  def test_food101(self):
+    datasets = image.food101_datasets(128)
+    data = next(datasets.train)
+    self.assertEqual(datasets.abstract_batch["image"].shape, (128, 32, 32, 3))
+    self.assertEqual(data["image"].shape, (128, 32, 32, 3))
+
   def test_imagenet16(self):
     datasets = image.imagenet16_datasets(128)
-    data = next(datasets.train)
+    data = next(datasets.test)
     self.assertEqual(datasets.abstract_batch["image"].shape, (128, 16, 16, 3))
     self.assertEqual(data["image"].shape, (128, 16, 16, 3))
+
+  def test_imagenet32(self):
+    datasets = image.imagenet32_datasets(8)
+    data = next(datasets.test)
+    self.assertEqual(datasets.abstract_batch["image"].shape, (8, 32, 32, 3))
+    self.assertEqual(data["image"].shape, (8, 32, 32, 3))
+
+  def test_imagenet64(self):
+    datasets = image.imagenet64_datasets(8)
+    data = next(datasets.test)
+    self.assertEqual(datasets.abstract_batch["image"].shape, (8, 64, 64, 3))
+    self.assertEqual(data["image"].shape, (8, 64, 64, 3))
 
 
 if __name__ == "__main__":

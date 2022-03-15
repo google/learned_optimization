@@ -73,6 +73,17 @@ def cifar100_datasets(
 
 @base.dataset_lru_cache
 @gin.configurable
+def food101_datasets(
+    batch_size: int,
+    image_size: Tuple[int, int] = (32, 32),
+) -> base.Datasets:
+  splits = ("train[0:80%]", "train[80%:90%]", "train[90%:]", "test")
+  return base.preload_tfds_image_classification_datasets(
+      "food101", splits, batch_size=batch_size, image_size=image_size)
+
+
+@base.dataset_lru_cache
+@gin.configurable
 def imagenet16_datasets(
     batch_size: int,
     image_size: Tuple[int, int] = (16, 16),
@@ -84,3 +95,33 @@ def imagenet16_datasets(
       batch_size=batch_size,
       image_size=image_size,
       decode_image_shape=(16, 16, 3))
+
+
+@base.dataset_lru_cache
+@gin.configurable
+def imagenet32_datasets(
+    batch_size: int,
+    image_size: Tuple[int, int] = (32, 32),
+) -> base.Datasets:
+  splits = ("train", "inner_valid", "outer_valid", "test")
+  return base.tfrecord_image_classification_datasets(
+      "imagenet2012_32",
+      splits,
+      batch_size=batch_size,
+      image_size=image_size,
+      decode_image_shape=(32, 32, 3))
+
+
+@base.dataset_lru_cache
+@gin.configurable
+def imagenet64_datasets(
+    batch_size: int,
+    image_size: Tuple[int, int] = (64, 64),
+) -> base.Datasets:
+  splits = ("train", "inner_valid", "outer_valid", "test")
+  return base.tfrecord_image_classification_datasets(
+      "imagenet2012_64",
+      splits,
+      batch_size=batch_size,
+      image_size=image_size,
+      decode_image_shape=(64, 64, 3))

@@ -120,4 +120,5 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
+  flags.mark_flag_as_required("prefix")
   app.run(main)
