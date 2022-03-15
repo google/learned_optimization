@@ -326,8 +326,16 @@ def tfrecord_image_classification_datasets(
     A Datasets object containing data iterators.
   """
 
-  num_classes_map = {"imagenet2012_16": 1000}
-  image_shapes_map = {"imagenet2012_16": (16, 16, 3)}
+  num_classes_map = {
+      "imagenet2012_16": 1000,
+      "imagenet2012_32": 1000,
+      "imagenet2012_64": 1000,
+  }
+  image_shapes_map = {
+      "imagenet2012_16": (16, 16, 3),
+      "imagenet2012_32": (32, 32, 3),
+      "imagenet2012_64": (64, 64, 3),
+  }
   if datasetname not in num_classes_map:
     raise ValueError(f"Trying to access an unsupported dataset: {datasetname}?")
 

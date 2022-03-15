@@ -67,7 +67,7 @@ class _TransformerTask(base.Task):
 
 # These configs are chosen based on a large hparam search over architecture.
 # Each subsequent config both performs better, and is more expensive to compute
-# per step. In general these models are still
+# per step. In general these models are still quite small.
 
 # pyformat: disable, pylint: disable=bad-continuation
 for _i, _cfg in enumerate([

@@ -13,30 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for learned_optimizers.tasks.fixed.conv."""
+"""Tests for learned_optimizers.tasks.fixed.transformer_lm."""
 
 from absl.testing import absltest
 from absl.testing import parameterized
 from learned_optimization.tasks import test_utils
-from learned_optimization.tasks.fixed import conv
-
+from learned_optimization.tasks.fixed import resnet
 
 tasks = [
-    "Conv_Cifar10_32x64x64",
-    "Conv_Cifar10_16_32x64x64",
-    "Conv_Cifar10_32x64x64_Tanh",
-    "Conv_imagenet32_16_32x64x64",
-    "Conv_imagenet16_16_64x128x128x128",
-    "Conv_Cifar10_32x64x64_batchnorm",
-    "Conv_Cifar10_32x64x64_layernorm",
+    "Resnet_MultiRuntime_0",
+    "Resnet_MultiRuntime_1",
+    "Resnet_MultiRuntime_2",
+    "Resnet_MultiRuntime_3",
 ]
 
 
-class ConvTest(parameterized.TestCase):
+class ResnetLM(parameterized.TestCase):
 
   @parameterized.parameters(tasks)
   def test_tasks(self, task_name):
-    task = getattr(conv, task_name)()
+    task = getattr(resnet, task_name)()
     test_utils.smoketest_task(task)
 
 
