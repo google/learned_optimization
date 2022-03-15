@@ -65,7 +65,7 @@ class ParametricLMRNN(base.TaskFamily):
     self.vocab_size = vocab_size
 
   def sample(self, key: PRNGKey) -> cfgobject.CFGNamed:
-    return cfgobject.CFGNamed("ParametricImageMLP", {
+    return cfgobject.CFGNamed("ParametricLMRNN", {
         "initializer": parametric_utils.SampleInitializer.sample(key),
     })
 
@@ -117,7 +117,9 @@ class ParametricLMRNN(base.TaskFamily):
       def init(self, rng: PRNGKey) -> Params:
         init_net, unused_apply_net = hk.without_apply_rng(
             hk.transform(_forward))
-        seq = next(self.datasets.train)["obs"]
+        batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                             self.datasets.abstract_batch)
+        seq = batch["obs"]
         return init_net(rng, seq)
 
       def loss(self, params: Params, rng: PRNGKey, data: Batch) -> jnp.ndarray:
