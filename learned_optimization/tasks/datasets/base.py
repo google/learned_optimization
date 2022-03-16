@@ -196,6 +196,73 @@ def _image_map_fn(cfg: Mapping[str, Any], batch: Batch) -> Batch:
   })
 
 
+def tfds_image_classification_datasets(
+    datasetname: str,
+    splits: Tuple[str, str, str, str],
+    batch_size: int,
+    image_size: Tuple[int, int],
+    stack_channels: int = 1,
+    prefetch_batches: int = 300,
+    shuffle_buffer_size: int = 10000,
+    normalize_mean: Optional[Tuple[int, int, int]] = None,
+    normalize_std: Optional[Tuple[int, int, int]] = None) -> Datasets:
+  """Load an image dataset with tfds in a streaming fashion.
+
+  Args:
+    datasetname: name of the dataset to be loaded with tfds.
+    splits: tfds style splits for different subsets of data. (train,
+      inner-valid, outer-valid, and test set)
+    batch_size: batch size of iterators
+    image_size: target size to resize images to.
+    stack_channels: stack the channels in case of 1d outputs (e.g. mnist)
+    prefetch_batches: number of batches to prefetch
+    shuffle_buffer_size: size of shuffle buffer.
+    normalize_mean: mean RGB value to subtract off of images to normalize imgs
+    normalize_std: std RGB of dataset to normalize imgs
+
+  Returns:
+    A Datasets object containing data iterators.
+  """
+  cfg = {
+      "batch_size": batch_size,
+      "image_size": image_size,
+      "stack_channels": stack_channels,
+      "prefetch_batches": prefetch_batches,
+      "aug_flip_left_right": False,
+      "aug_flip_up_down": False,
+      "normalize_mean": normalize_mean,
+      "normalize_std": normalize_std
+  }
+
+  def make_iter(split: str) -> Iterator[Batch]:
+    ds = tfds.load(datasetname, split=split)
+    ds = ds.map(functools.partial(_image_map_fn, cfg))
+    ds = ds.shuffle(shuffle_buffer_size)
+    ds = ds.batch(batch_size, drop_remainder=True)
+    ds = ds.prefetch(128)
+    return ThreadSafeIterator(LazyIterator(ds.as_numpy_iterator))
+
+  builder = tfds.builder(datasetname)
+  num_classes = builder.info.features["label"].num_classes
+
+  if stack_channels == 1:
+    output_channel = builder.info.features["image"].shape[-1:]
+  else:
+    output_channel = (stack_channels,)
+
+  abstract_batch = {
+      "image":
+          jax.ShapedArray(
+              (batch_size,) + image_size + output_channel, dtype=jnp.float32),
+      "label":
+          jax.ShapedArray((batch_size,), dtype=jnp.int32)
+  }
+  return Datasets(
+      *[make_iter(split) for split in splits],
+      extra_info={"num_classes": num_classes},
+      abstract_batch=abstract_batch)
+
+
 def preload_tfds_image_classification_datasets(
     datasetname: str,
     splits: Tuple[str, str, str, str],
@@ -205,7 +272,7 @@ def preload_tfds_image_classification_datasets(
     prefetch_batches: int = 300,
     normalize_mean: Optional[Tuple[int, int, int]] = None,
     normalize_std: Optional[Tuple[int, int, int]] = None) -> Datasets:
-  """Load an image dataset with tfds.
+  """Load an image dataset with tfds by first loading into host ram.
 
   Args:
     datasetname: name of the dataset to be loaded with tfds.
@@ -302,6 +369,7 @@ def tfrecord_image_classification_datasets(
     decode_image_shape: Sequence[int],
     stack_channels: int = 1,
     prefetch_batches: int = 300,
+    shuffle_buffer_size: int = 10000,
     aug_flip_left_right: bool = False,
     aug_flip_up_down: bool = False,
     normalize_mean: Optional[Tuple[int, int, int]] = None,
@@ -317,6 +385,7 @@ def tfrecord_image_classification_datasets(
     decode_image_shape: shape of image to reshape parsed raw bytes.
     stack_channels: stack the channels in case of 1d outputs (e.g. mnist)
     prefetch_batches: number of batches to prefetch
+    shuffle_buffer_size: size of shuffle buffer.
     aug_flip_left_right: randomly flip left/right
     aug_flip_up_down: randomly flip up/down
     normalize_mean: mean RGB value to subtract off of images to normalize imgs
@@ -326,8 +395,16 @@ def tfrecord_image_classification_datasets(
     A Datasets object containing data iterators.
   """
 
-  num_classes_map = {"imagenet2012_16": 1000}
-  image_shapes_map = {"imagenet2012_16": (16, 16, 3)}
+  num_classes_map = {
+      "imagenet2012_16": 1000,
+      "imagenet2012_32": 1000,
+      "imagenet2012_64": 1000,
+  }
+  image_shapes_map = {
+      "imagenet2012_16": (16, 16, 3),
+      "imagenet2012_32": (32, 32, 3),
+      "imagenet2012_64": (64, 64, 3),
+  }
   if datasetname not in num_classes_map:
     raise ValueError(f"Trying to access an unsupported dataset: {datasetname}?")
 
@@ -366,9 +443,9 @@ def tfrecord_image_classification_datasets(
       return feats
 
     ds = ds.map(parse).map(functools.partial(_image_map_fn, cfg))
-    ds = ds.shuffle(10000)
+    ds = ds.shuffle(shuffle_buffer_size)
     ds = ds.batch(batch_size, drop_remainder=True)
-    ds = ds.prefetch(128)
+    ds = ds.prefetch(prefetch_batches)
     return ThreadSafeIterator(LazyIterator(ds.as_numpy_iterator))
 
   if stack_channels == 1:

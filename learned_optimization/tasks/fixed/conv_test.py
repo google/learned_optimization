@@ -24,6 +24,11 @@ from learned_optimization.tasks.fixed import conv
 tasks = [
     "Conv_Cifar10_32x64x64",
     "Conv_Cifar10_16_32x64x64",
+    "Conv_Cifar10_32x64x64_Tanh",
+    "Conv_imagenet32_16_32x64x64",
+    "Conv_imagenet16_16_64x128x128x128",
+    "Conv_Cifar10_32x64x64_batchnorm",
+    "Conv_Cifar10_32x64x64_layernorm",
 ]
 
 
