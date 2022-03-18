@@ -83,7 +83,7 @@ class ParametricLMRNN(base.TaskFamily):
           task_params.values["initializer"])
 
       embed = hk.Embed(vocab_size, self.embed_size, w_init=w_init)(inp)
-      rnn_core = self.rnn_core_fn(self.rnn_size)
+      rnn_core = self.rnn_core_fn(self.rnn_size)  # pytype: disable=wrong-arg-count  # trace-all-classes
 
       # Make learnable initial states.
       template_state = rnn_core.initial_state(1)
