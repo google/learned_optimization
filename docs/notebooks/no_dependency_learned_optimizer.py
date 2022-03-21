@@ -35,7 +35,7 @@
 #
 # The design ideas and patterns are the same as that used by [`learned_optimization`](https://github.com/google/learned_optimization), but greatly stripped down and simplified.
 
-# + id="AdcD2g_d5Gw4"
+# + executionInfo={"elapsed": 4826, "status": "ok", "timestamp": 1647716615044, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="AdcD2g_d5Gw4"
 import jax
 import jax.numpy as jnp
 import tensorflow_datasets as tfds
@@ -82,7 +82,7 @@ import os
 #
 # To keep meta-training fast, we will be working with with images resized to 8x8.
 
-# + colab={"height": 592} executionInfo={"elapsed": 1568, "status": "ok", "timestamp": 1643862266957, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="UM2Yg-HP6LhO" outputId="9f650077-1cad-4edd-bbe2-4b47c9b38631"
+# + colab={"height": 592} executionInfo={"elapsed": 7501, "status": "ok", "timestamp": 1647716622662, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="UM2Yg-HP6LhO" outputId="56efd60d-6fc6-4f25-e820-99a375d0121d"
 import tensorflow as tf
 
 ds = tfds.load("fashion_mnist", split="train")
@@ -112,7 +112,8 @@ input_size = onp.prod(batch["image"].shape[1:])
 #
 # Our task will have 2 methods -- an init which constructs the initial values of the weights, and a loss which applies the MLP, and returns the average cross entropy loss.
 
-# + executionInfo={"elapsed": 145, "status": "ok", "timestamp": 1643851271245, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="SNUAeWO65TzL" outputId="ec453b0b-bdb9-4896-d24f-c405e57b374a"
+
+# + executionInfo={"elapsed": 1547, "status": "ok", "timestamp": 1647716624386, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="SNUAeWO65TzL" outputId="69ff87c8-4b39-4cd3-c16c-b42edf249113"
 class MLPTask:
 
   def init(self, key):
@@ -143,7 +144,7 @@ task.loss(params, batch)
 #
 # With our newly defined model, let's train it with SGD.
 
-# + colab={"height": 282} executionInfo={"elapsed": 2267, "status": "ok", "timestamp": 1643851275630, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="wTMYdlvO5RVC" outputId="5fbac9f5-58bf-4237-d69d-7dccc23d3ee6"
+# + colab={"height": 282} executionInfo={"elapsed": 2351, "status": "ok", "timestamp": 1647716626848, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="wTMYdlvO5RVC" outputId="9c39fa33-cf66-4a6b-84de-81478deeb2c3"
 value_grad_fn = jax.jit(jax.value_and_grad(task.loss))
 lr = 0.1
 
@@ -165,7 +166,8 @@ plt.plot(losses)
 #
 # In the case of SGD, this state is just the parameter values.
 
-# + id="WX6fbsYu8Xmy"
+
+# + executionInfo={"elapsed": 54, "status": "ok", "timestamp": 1647716627049, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="WX6fbsYu8Xmy"
 class SGD:
 
   def __init__(self, lr):
@@ -181,7 +183,7 @@ class SGD:
 # + [markdown] id="ah5U6H1_qzpv"
 # Instead of inlining SGD, we can now use our optimizer class.
 
-# + colab={"height": 282} executionInfo={"elapsed": 894, "status": "ok", "timestamp": 1643851278460, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="Ul52LhQc8x3w" outputId="78c0dcd7-dca2-44d6-f51f-e32be83fa075"
+# + colab={"height": 282} executionInfo={"elapsed": 904, "status": "ok", "timestamp": 1647716628067, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="Ul52LhQc8x3w" outputId="755da128-a07c-48af-d15e-c43495229ffd"
 losses = []
 opt = SGD(0.1)
 opt_state = opt.init(task.init(key))
@@ -198,7 +200,8 @@ plt.plot(losses)
 # + [markdown] id="uCOBWVkeq2qD"
 # Now, let's define some other optimizers. Momentum makes use of an additional accumulator variable. We can define it as follows.
 
-# + id="h70Uo7TB89zk"
+
+# + executionInfo={"elapsed": 52, "status": "ok", "timestamp": 1647716628264, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="h70Uo7TB89zk"
 class Momentum:
 
   def __init__(self, lr, decay=0.9):
@@ -218,7 +221,7 @@ class Momentum:
 # + [markdown] id="UuLD7NdxrHC_"
 # We can use this in our same training loop again. Here, the parameters are stored in the 0th entry of opt_state.
 
-# + colab={"height": 282} executionInfo={"elapsed": 1239, "status": "ok", "timestamp": 1643851316042, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="-suAcnqC9QpH" outputId="da1c8405-f144-4c96-bcc8-ab237e8b10b2"
+# + colab={"height": 282} executionInfo={"elapsed": 1342, "status": "ok", "timestamp": 1647716629720, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="-suAcnqC9QpH" outputId="892958ae-bf4f-4083-800e-a32a7d82f2b8"
 opt = Momentum(0.01)
 params = task.init(key)
 opt_state = opt.init(params)
@@ -237,7 +240,8 @@ plt.plot(losses)
 # + [markdown] id="RrwIMhObH29t"
 # And finally, we can implement Adam.
 
-# + id="L7gd-MqEH2da"
+
+# + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647716629923, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="L7gd-MqEH2da"
 class Adam:
 
   def __init__(self, lr, beta1=0.9, beta2=0.999, epsilon=1e-8):
@@ -247,25 +251,26 @@ class Adam:
     self.epsilon = epsilon
 
   def init(self, params):
-    return (params, jnp.asarray(0), [jnp.zeros_like(p) for p in params],
-            [jnp.zeros_like(p) for p in params])
+    return (tuple(params), jnp.asarray(0),
+            tuple([jnp.zeros_like(p) for p in params]),
+            tuple([jnp.zeros_like(p) for p in params]))
 
   @functools.partial(jax.jit, static_argnums=(0,))
   def update(self, state, grads):
     params, iteration, momentum, rms = state
     iteration += 1
-    momentum = [
+    momentum = tuple([
         m * self.beta1 + (1 - self.beta1) * g for m, g in zip(momentum, grads)
-    ]
-    rms = [
+    ])
+    rms = tuple([
         v * self.beta2 + (1 - self.beta2) * (g**2) for v, g in zip(rms, grads)
-    ]
+    ])
     mhat = [m / (1 - self.beta1**iteration) for m in momentum]
     vhat = [v / (1 - self.beta2**iteration) for v in rms]
-    params = [
+    params = tuple([
         p - self.lr * m / (jnp.sqrt(v) + self.epsilon)
         for p, m, v in zip(params, mhat, vhat)
-    ]
+    ])
     return (params, iteration, momentum, rms)
 
 
@@ -285,7 +290,8 @@ class Adam:
 #
 # Choosing input parameterizations, and output parameterizations varies across learned optimizer architecture and paper.
 
-# + id="ymF3QnR0-UdM"
+
+# + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647716630098, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="ymF3QnR0-UdM"
 class LOpt:
 
   def __init__(self, decay=0.9):
@@ -352,7 +358,7 @@ class LOpt:
 #
 # Unsurprisingly, our randomly initialized learned optimizer doesn't do all that well at training our target problem. Many of them even diverge / nan.
 
-# + colab={"height": 265} executionInfo={"elapsed": 929, "status": "ok", "timestamp": 1643853149863, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="iJ_uf9uwDASS" outputId="ce941956-a1a4-4974-9fb4-9cace09c5d78"
+# + colab={"height": 300} executionInfo={"elapsed": 2701, "status": "ok", "timestamp": 1647716865746, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="iJ_uf9uwDASS" outputId="08ef3727-489c-4b2c-eee4-7532dbf6392d"
 lopt = LOpt()
 for i in range(5):
   losses = []
@@ -370,13 +376,16 @@ for i in range(5):
     opt_state = lopt.update_inner_opt_state(meta_params, opt_state, grads)
     losses.append(loss)
   plt.plot(losses)
+plt.ylim(0, 4)
+plt.xlabel("inner step")
+plt.ylabel("inner loss")
 
 # + [markdown] id="FH1b4PfrDFcH"
 # ## Meta-loss: Measuring the performance of the learned optimizer.
 #
 # Now we must define our measurement of performance for our learned optimizers. For this, we will define a meta_loss function. This function takes in as inputs the weights of the meta-parameters, initializes the weights of the inner-problem, and performs some number of steps of inner-training using a learned optimizer and the passed in meta-parameters. Each step we return the training loss, and use this average loss as the meta-loss. Depending on what we use, e.g. different unroll lengths, or different objectives (such as returning just loss at the end of training, or validation loss) we will get different behaving optimizers.
 
-# + executionInfo={"elapsed": 598, "status": "ok", "timestamp": 1643853442528, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="D_7V3TQHD5Ju" outputId="5e1a71f3-9ca5-4b73-cc59-17c2a3eb46d7"
+# + executionInfo={"elapsed": 699, "status": "ok", "timestamp": 1647716634001, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="D_7V3TQHD5Ju" outputId="73b63800-2b6b-4f4c-f507-1b1ef8105b4b"
 lopt = LOpt()
 
 
@@ -408,7 +417,7 @@ def meta_loss(meta_params, key, sequence_of_batches):
 key = jax.random.PRNGKey(0)
 meta_loss(meta_params, key, get_batch_seq(10))
 
-# + id="NGHImLJ9FcjO"
+# + executionInfo={"elapsed": 2, "status": "ok", "timestamp": 1647716634110, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="NGHImLJ9FcjO"
 
 
 # + [markdown] id="EFeC6wiTtYPu"
@@ -420,7 +429,7 @@ meta_loss(meta_params, key, get_batch_seq(10))
 #
 # Te will use our meta-loss and `jax.value_and_grad` to compute gradients. For this simple example, we will use the average training loss over 10 applications of the learned optimizer as our meta-loss.
 
-# + id="hQtTvMmnFAFb"
+# + executionInfo={"elapsed": 2555, "status": "ok", "timestamp": 1647716636790, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="hQtTvMmnFAFb"
 key = jax.random.PRNGKey(0)
 meta_value_grad_fn = jax.jit(jax.value_and_grad(meta_loss))
 loss, meta_grad = meta_value_grad_fn(meta_params, key, get_batch_seq(10))
@@ -428,7 +437,7 @@ loss, meta_grad = meta_value_grad_fn(meta_params, key, get_batch_seq(10))
 # + [markdown] id="rgY-bMy1I-p_"
 # We can use this meta-gradient, with Adam to update the weights of our learned optimizer.
 
-# + executionInfo={"elapsed": 5419, "status": "ok", "timestamp": 1643853450728, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="Bh0v3tZcFSeJ" outputId="a9b73e9b-897e-419a-b192-27cce5d9cca5"
+# + executionInfo={"elapsed": 2078, "status": "ok", "timestamp": 1647716638983, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="Bh0v3tZcFSeJ" outputId="8a214403-0cb8-446a-953d-e13e9f337217"
 meta_opt = Adam(0.001)
 key = jax.random.PRNGKey(0)
 meta_params = lopt.init_meta_params(key)
@@ -445,7 +454,7 @@ for i in range(num_steps):
     print(onp.mean(meta_losses[-20:]))
   meta_opt_state = meta_opt.update(meta_opt_state, meta_grad)
 
-# + colab={"height": 296} executionInfo={"elapsed": 225, "status": "ok", "timestamp": 1643853558014, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="r8-fAIqGI6X2" outputId="b9aefef7-1ad4-478e-ed4c-dca04194822f"
+# + colab={"height": 296} executionInfo={"elapsed": 147, "status": "ok", "timestamp": 1647716639240, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="r8-fAIqGI6X2" outputId="94ea45b3-7199-4ef8-97a4-13cf5d0e6cd3"
 plt.plot(meta_losses)
 plt.xlabel("meta-iteration")
 plt.ylabel("meta-loss")
@@ -453,7 +462,7 @@ plt.ylabel("meta-loss")
 # + [markdown] id="D5hgIM4STRQ3"
 # Our meta-loss is decreasing which means our learned optimizer is learning to perform well on the meta-loss which means it is able to optimize our inner problem. Let's see what it learned to do by applying it to some target problem.
 
-# + colab={"height": 296} executionInfo={"elapsed": 443, "status": "ok", "timestamp": 1643859238283, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="hpkbGP89JH45" outputId="5b3f6089-fad5-4529-ee28-2b15fe4c2e2c"
+# + colab={"height": 296} executionInfo={"elapsed": 436, "status": "ok", "timestamp": 1647716639849, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="hpkbGP89JH45" outputId="17dfb41c-c701-4e7d-ae2b-0e05841df9c1"
 meta_params = meta_opt_state[0]
 
 for j in range(10):
@@ -485,7 +494,8 @@ plt.ylabel("loss")
 #
 # One big advantage to vectorizing in this way is to make better use of hardware accelerators. When training learned optimizers, we often apply them to small problems for speedy meta-training. These small problems can be a poor fit for the underlying hardware which often consists of big matrix multiplication units. What vectorization does compute multiple of these small problems *at the same time*, which, depending on the details, can be considerably faster.
 
-# + id="8qud5EuWniIF"
+
+# + executionInfo={"elapsed": 3598, "status": "ok", "timestamp": 1647716643584, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="8qud5EuWniIF"
 def get_vec_batch_seq(vec_size, seq_len):
   batches = [get_batch_seq(seq_len) for _ in range(vec_size)]
   # stack them
@@ -509,7 +519,7 @@ loses, meta_grad = vec_meta_loss_grad(meta_params, keys, vec_sec_batch)
 # + [markdown] id="C2cz28gppua9"
 # And now we can meta-train with this vectorized loss similarly to before.
 
-# + executionInfo={"elapsed": 7319, "status": "ok", "timestamp": 1643859354240, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="TfZvfCJ_uGTp" outputId="4f6506c8-42ef-4388-b1d2-b51ccf3c0bed"
+# + executionInfo={"elapsed": 8431, "status": "ok", "timestamp": 1647716652129, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="TfZvfCJ_uGTp" outputId="a8156fa1-4d03-40cc-a961-d570f425ec54"
 meta_opt = Adam(0.001)
 key = jax.random.PRNGKey(0)
 meta_params = lopt.init_meta_params(key)
@@ -526,7 +536,7 @@ for i in range(num_steps):
     print(onp.mean(meta_losses[-20:]))
   meta_opt_state = meta_opt.update(meta_opt_state, meta_grad)
 
-# + colab={"height": 282} executionInfo={"elapsed": 188, "status": "ok", "timestamp": 1643859354616, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="vLBEKi6WuTcx" outputId="4675e4d9-8f2b-4709-82b3-4bfac3d1c493"
+# + colab={"height": 282} executionInfo={"elapsed": 189, "status": "ok", "timestamp": 1647716652440, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="vLBEKi6WuTcx" outputId="215a253b-831a-4f2e-d477-e27e530ba220"
 plt.plot(meta_losses)
 
 
@@ -542,7 +552,8 @@ plt.plot(meta_losses)
 #
 # As before, we will construct a vectorized version of these estimators to average over a number of different random directions.
 
-# + id="KHd6Sf0mu_CZ"
+
+# + executionInfo={"elapsed": 2115, "status": "ok", "timestamp": 1647716654716, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="KHd6Sf0mu_CZ"
 def antithetic_es_estimate(meta_params, key, seq_of_batches):
   """Compute a ES estimated gradient along a single direction."""
   std = 0.001
@@ -578,7 +589,7 @@ loss, es_grads = vec_antithetic_es_estimate(meta_params, keys, vec_sec_batch)
 # + [markdown] id="nXqXfO1QquBY"
 # We can use a similar meta-training procedure as before now with this new gradient estimator.
 
-# + executionInfo={"elapsed": 20572, "status": "ok", "timestamp": 1643859637020, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="QAte_Dm3wg-9" outputId="0d76bc8a-629c-4230-b82f-7791f8094150"
+# + executionInfo={"elapsed": 18328, "status": "ok", "timestamp": 1647716673161, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="QAte_Dm3wg-9" outputId="cefff89b-82db-406f-f961-5041d1dfe8d1"
 meta_opt = Adam(0.003)
 key = jax.random.PRNGKey(0)
 meta_params = lopt.init_meta_params(key)
@@ -598,12 +609,12 @@ for i in range(num_steps):
 
   meta_opt_state = meta_opt.update(meta_opt_state, meta_grad)
 
-# + colab={"height": 282} executionInfo={"elapsed": 189, "status": "ok", "timestamp": 1643859637431, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="X_fqy1t-xzJ_" outputId="993064d0-d28a-431a-fd1c-4c445f5452d3"
+# + colab={"height": 282} executionInfo={"elapsed": 137, "status": "ok", "timestamp": 1647716673416, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="X_fqy1t-xzJ_" outputId="dcbdd3d6-77d1-44fc-d806-9b15e2eedca1"
 plt.plot(meta_losses)
 
 
 # + [markdown] id="64YicoxfJtZG"
-# ## Meta-training with Truncations
+# ## Meta-training with Truncated backprop through time
 # In the previous meta-training examples, in the meta-loss we always initialized the inner-problem and apply the optimizer for some fixed number of steps.
 #
 # This is fine for short inner-problem training times, it becomes costly for longer numbers of inner-iterations.
@@ -612,9 +623,14 @@ plt.plot(meta_losses)
 # The code for this is a bit more involved. First, we need to keep track of each inner problem. In our case, this means keeping track of the inner problems optimizer state, as well as the current training iteration. Next, we must check if we are at the end of an inner-training. We fix the length of the inner training to be 100 for this example. We can then define a function (`short_segment_unroll`) which both progresses training by some number of steps,
 # and return the loss from that segment.
 
-# + executionInfo={"elapsed": 936, "status": "ok", "timestamp": 1643851546422, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="ri9wWMPizb-G" outputId="9704ab4f-6831-4ace-a9bb-37f11fa18ea6"
-def short_segment_unroll(meta_params, key, inner_opt_state, on_iteration,
-                         seq_of_batches):
+
+# + executionInfo={"elapsed": 693, "status": "ok", "timestamp": 1647716674268, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="ri9wWMPizb-G" outputId="6025ce7a-98e5-459a-e1a7-6e19792056d0"
+def short_segment_unroll(meta_params,
+                         key,
+                         inner_opt_state,
+                         on_iteration,
+                         seq_of_batches,
+                         inner_problem_length=100):
 
   def step(scan_state, batch):
     opt_state, i, key = scan_state
@@ -622,7 +638,7 @@ def short_segment_unroll(meta_params, key, inner_opt_state, on_iteration,
     # If we have trained more than 100 steps, reset the inner problem.
     key1, key = jax.random.split(key)
     opt_state, i = jax.lax.cond(
-        i >= 100, lambda k:
+        i >= inner_problem_length, lambda k:
         (lopt.initial_inner_opt_state(meta_params, task.init(k)), 0), lambda k:
         (opt_state, i + 1), key)
 
@@ -640,7 +656,7 @@ def short_segment_unroll(meta_params, key, inner_opt_state, on_iteration,
    _), losses = jax.lax.scan(step, (inner_opt_state, on_iteration, key),
                              seq_of_batches)
 
-  return jnp.mean(losses), inner_opt_state, on_iteration
+  return losses, inner_opt_state, on_iteration
 
 
 inner_opt_state = lopt.initial_inner_opt_state(meta_params, task.init(key))
@@ -656,13 +672,19 @@ on_iteration
 #
 # As before, we construct a vectorized version of this unroll function, and compute gradients with `jax.value_and_grad`.
 
-# + id="xJRkyAX_1Oge"
-def vec_short_segment_unroll(meta_params, keys, inner_opt_states, on_iterations,
-                             vec_seq_of_batches):
+
+# + executionInfo={"elapsed": 3, "status": "ok", "timestamp": 1647716674380, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="xJRkyAX_1Oge"
+def vec_short_segment_unroll(meta_params,
+                             keys,
+                             inner_opt_states,
+                             on_iterations,
+                             vec_seq_of_batches,
+                             inner_problem_length=100):
   losses, inner_opt_states, on_iterations = jax.vmap(
       short_segment_unroll,
-      in_axes=(None, 0, 0, 0, 0))(meta_params, keys, inner_opt_states,
-                                  on_iterations, vec_seq_of_batches)
+      in_axes=(None, 0, 0, 0, 0, None))(meta_params, keys, inner_opt_states,
+                                        on_iterations, vec_seq_of_batches,
+                                        inner_problem_length)
   return jnp.mean(losses), (inner_opt_states, on_iterations)
 
 
@@ -672,8 +694,9 @@ vec_short_segment_grad = jax.jit(
 # + [markdown] id="QYrO5_ik1vbm"
 # We can then use this function to compute meta-gradients. Before doing that though, we must setup the initial state (parameter values and optimizer state) of the problems being trained.
 
-# + id="iw2i_2kLsFRf"
-num_tasks = 32
+# + executionInfo={"elapsed": 826, "status": "ok", "timestamp": 1647716675325, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="iw2i_2kLsFRf"
+#num_tasks = 32
+num_tasks = 16
 
 key = jax.random.PRNGKey(1)
 meta_params = lopt.init_meta_params(key)
@@ -689,7 +712,7 @@ inner_opt_states = jax.vmap(init_single_inner_opt_state)(keys)
 # Randomly set the initial iteration to prevent the tasks from running in lock step.
 on_iterations = jax.random.randint(key, [num_tasks], 0, 100)
 
-# + executionInfo={"elapsed": 44977, "status": "ok", "timestamp": 1643860076522, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="Kgltlb7b1n1M" outputId="77acabdc-3c1a-4ce3-e6b8-7b5a0a654e1a"
+# + executionInfo={"elapsed": 24333, "status": "ok", "timestamp": 1647716699782, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="Kgltlb7b1n1M" outputId="9cf9de7b-5171-4d8b-cea1-a4df07b61075"
 meta_opt = Adam(0.0001)
 meta_opt_state = meta_opt.init(meta_params)
 
@@ -707,7 +730,7 @@ for i in range(num_steps):
     print(i, onp.mean(meta_losses[-20:]))
   meta_opt_state = meta_opt.update(meta_opt_state, meta_grad)
 
-# + colab={"height": 282} executionInfo={"elapsed": 242, "status": "ok", "timestamp": 1643860080261, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="6Br4uOBt66yf" outputId="f3813cac-32c1-459d-cf41-c8fad2e1b0c1"
+# + colab={"height": 296} executionInfo={"elapsed": 191, "status": "ok", "timestamp": 1647716700105, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="6Br4uOBt66yf" outputId="c4f6530f-42b9-4910-aa24-b6ca56f830c3"
 plt.plot(meta_losses)
 plt.xlabel("meta-iterations")
 plt.ylabel("meta-loss")
@@ -719,7 +742,7 @@ plt.ylabel("meta-loss")
 #
 # We can now apply our optimizer for 100 steps. We can see that the resulting optimizer optimizes for ~50 steps, and then diverages. This is an indication that meta-training could have been more successful. One can improve this by meta-training for longer, or with different hparams to improve this!
 
-# + colab={"height": 269} executionInfo={"elapsed": 766, "status": "ok", "timestamp": 1643860087456, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="np2hiv0m4S1F" outputId="c6fe56cc-d7d2-4a1c-f691-0adebacaceaa"
+# + colab={"height": 269} executionInfo={"elapsed": 713, "status": "ok", "timestamp": 1647716700957, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="np2hiv0m4S1F" outputId="871d47a3-ec57-4acd-cdcd-f1a5eeacdfeb"
 meta_params = meta_opt_state[0]
 
 for j in range(10):
@@ -737,12 +760,247 @@ for j in range(10):
   plt.plot(losses)
   plt.ylim(0.0, 2.5)
 
+
+# + [markdown] id="tCyfmmax2_rp"
+# ## Meta-training truncated ES
+# Next, instead of meta-training with truncated gradients, we will meta-train with truncated evolution strategies.
+
+
+# + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647716701170, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="rxQbMHDf3Rfn"
+@jax.jit
+def vec_short_segment_es(meta_param,
+                         keys,
+                         inner_opt_state,
+                         on_iterations,
+                         vec_seq_of_batches,
+                         std=0.01):
+  # Compute an es estimate on a single inner-problem
+  def do_one(meta_param, key, inner_opt_state, on_iteration, seq_of_batches):
+    # Sample random noise of the same shape as meta-parameters
+    flat_params, struct = jax.tree_flatten(meta_param)
+    keys = [jax.random.fold_in(key, i) for i in range(len(flat_params))]
+    keys = jax.tree_unflatten(struct, keys)
+    perturbs = jax.tree_map(lambda k, v: jax.random.normal(k, v.shape) * std,
+                            keys, meta_param)
+
+    # compute positive and negative antithetic samples
+    pos_theta = jax.tree_map(lambda eps, v: v + eps, perturbs, meta_param)
+    neg_theta = jax.tree_map(lambda eps, v: v - eps, perturbs, meta_param)
+
+    # Apply both of the antithetic samples
+    p_losses, p_opt_state, p_on_iteration = short_segment_unroll(
+        pos_theta,
+        key,
+        inner_opt_state,
+        on_iteration,
+        seq_of_batches,
+        inner_problem_length=30)
+    n_losses, n_opt_state, n_on_iteration = short_segment_unroll(
+        neg_theta,
+        key,
+        inner_opt_state,
+        on_iteration,
+        seq_of_batches,
+        inner_problem_length=30)
+    p_loss = jnp.mean(p_losses)
+    n_loss = jnp.mean(n_losses)
+
+    # estimate gradient
+    es_grad = jax.tree_map(lambda p: (p_loss - n_loss) * 1 / (2. * std) * p,
+                           perturbs)
+
+    return ((p_loss + n_loss) / 2.0, (p_opt_state, p_on_iteration)), es_grad
+
+  (loss, inner_opt_state), es_grad = jax.vmap(
+      do_one, in_axes=(None, 0, 0, 0, 0))(meta_param, keys, inner_opt_state,
+                                          on_iterations, vec_seq_of_batches)
+
+  # Gradient has an extra batch dimension here from the vmap -- reduce over this.
+  return (jnp.mean(loss),
+          inner_opt_state), jax.tree_map(lambda x: jnp.mean(x, axis=0), es_grad)
+
+
+# + executionInfo={"elapsed": 686, "status": "ok", "timestamp": 1647716701983, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="Hn1LFTrV3Rfo"
+num_tasks = 32
+
+key = jax.random.PRNGKey(1)
+inner_opt_state = lopt.initial_inner_opt_state(meta_params, task.init(key))
+batch = get_batch_seq(10)
+
+meta_params = lopt.init_meta_params(key)
+
+
+def init_single_inner_opt_state(key):
+  return lopt.initial_inner_opt_state(meta_params, task.init(key))
+
+
+keys = jax.random.split(key, num_tasks)
+inner_opt_states = jax.vmap(init_single_inner_opt_state)(keys)
+
+# Randomly set the initial iteration to prevent the tasks from running in lock step.
+on_iterations = jax.random.randint(key, [num_tasks], 0, 30)
+
+# + executionInfo={"elapsed": 32729, "status": "ok", "timestamp": 1647716734817, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="YmdqBmi83Rfo" outputId="a420fdd1-8d5d-4eab-f64e-aa0f99051eb9"
+meta_opt = Adam(0.001)
+meta_opt_state = meta_opt.init(meta_params)
+
+meta_losses = []
+
+num_steps = int(os.environ.get("LOPT_TRAIN_LENGTH", 400))
+for i in range(num_steps):
+  data = get_vec_batch_seq(num_tasks, 10)
+  key1, key = jax.random.split(key)
+  keys = jax.random.split(key1, num_tasks)
+  (loss, (inner_opt_states, on_iterations)), meta_grad = vec_short_segment_es(
+      meta_opt_state[0], keys, inner_opt_states, on_iterations, data)
+  meta_losses.append(loss)
+  if i % 20 == 0:
+    print(i, onp.mean(meta_losses[-20:]))
+  meta_opt_state = meta_opt.update(meta_opt_state, meta_grad)
+
+# + colab={"height": 296} executionInfo={"elapsed": 203, "status": "ok", "timestamp": 1647716735126, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="3ZxRdgKg3Rfo" outputId="cd1e4eb0-8eed-4c6f-f778-52e517a1e60f"
+plt.plot(meta_losses)
+plt.xlabel("meta-iterations")
+plt.ylabel("meta-loss")
+
+# + [markdown] id="D-8DhN_o2R7L"
+# ## Meta-training with truncations with less bias: Persistent Evolution Strategies (PES)
+# When training with truncated evolutionary strategies, as well as truncated backprop through time and truncated evolutionary strategies one cannot compute the effect of one truncated segment, on other truncated segments. This introduces bias when working with longer sequences.
+#
+# PES is one ES based algorithm to prevent such bias.
+
+
+# + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647716735333, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="WEfssK2R9-Gs"
+@jax.jit
+def vec_short_segment_pes(meta_param,
+                          keys,
+                          pes_state,
+                          vec_seq_of_batches,
+                          std=0.01):
+  # Compute a pes estimate on a single inner-problem
+  def do_one(meta_param, key, pes_state, seq_of_batches):
+    accumulator, pos_opt_state, neg_opt_state, on_iteration = pes_state
+
+    # Sample random noise of the same shape as meta-parameters
+    flat_params, struct = jax.tree_flatten(meta_param)
+    keys = [jax.random.fold_in(key, i) for i in range(len(flat_params))]
+    keys = jax.tree_unflatten(struct, keys)
+    perturbs = jax.tree_map(lambda k, v: jax.random.normal(k, v.shape) * std,
+                            keys, meta_param)
+
+    # compute positive and negative antithetic samples
+    pos_theta = jax.tree_map(lambda eps, v: v + eps, perturbs, meta_param)
+    neg_theta = jax.tree_map(lambda eps, v: v - eps, perturbs, meta_param)
+
+    # Apply both of the antithetic samples
+    p_losses, pos_opt_state, _ = short_segment_unroll(
+        pos_theta,
+        key,
+        pos_opt_state,
+        on_iteration,
+        seq_of_batches,
+        inner_problem_length=30)
+    n_losses, neg_opt_state, next_on_iteration = short_segment_unroll(
+        neg_theta,
+        key,
+        neg_opt_state,
+        on_iteration,
+        seq_of_batches,
+        inner_problem_length=30)
+
+    # estimate gradient. PES works by multipliying loss difference by the sum
+    # of previous perturbations.
+    new_accum = jax.tree_map(lambda a, b: a + b, accumulator, perturbs)
+    delta_losses = p_losses - n_losses
+    unroll_length = p_losses.shape[0]
+
+    # one unroll could span 2 problems, so we compute 2 different gradients --
+    # one as if it was the previous trajectory, and one as if it was a previous
+    # unroll and sum them.
+    has_finished = (jnp.arange(unroll_length) + on_iteration) > 30
+
+    last_unroll_losses = jnp.mean(delta_losses * (1.0 - has_finished), axis=0)
+    new_unroll = jnp.mean(delta_losses * has_finished)
+
+    es_grad_from_accum = jax.tree_map(
+        lambda p: last_unroll_losses * 1 / (2. * std) * p, new_accum)
+    es_grad_from_new_perturb = jax.tree_map(
+        lambda p: new_unroll * 1 / (2. * std) * p, perturbs)
+    es_grad = jax.tree_map(lambda a, b: a + b, es_grad_from_accum,
+                           es_grad_from_new_perturb)
+
+    # finally, we potentially reset the accumulator to the current perturbation
+    # if we finished one trajectory.
+    def _switch_one_accum(a, b):
+      return jnp.where(has_finished[-1], a, b)
+
+    new_accum = jax.tree_multimap(_switch_one_accum, perturbs, new_accum)
+
+    next_pes_state = (new_accum, pos_opt_state, neg_opt_state,
+                      next_on_iteration)
+
+    return ((jnp.mean(p_losses) + jnp.mean(n_losses)) / 2.0,
+            next_pes_state), es_grad
+
+  (loss, pes_state), es_grad = jax.vmap(
+      do_one, in_axes=(None, 0, 0, 0))(meta_param, keys, pes_state,
+                                       vec_seq_of_batches)
+
+  # Gradient has an extra batch dimension here from the vmap -- reduce over this.
+  return (jnp.mean(loss),
+          pes_state), jax.tree_map(lambda x: jnp.mean(x, axis=0), es_grad)
+
+
+# + executionInfo={"elapsed": 60, "status": "ok", "timestamp": 1647716735518, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="f-DFEv7vbNjQ"
+num_tasks = 32
+
+key = jax.random.PRNGKey(1)
+inner_opt_state = lopt.initial_inner_opt_state(meta_params, task.init(key))
+batch = get_batch_seq(10)
+
+meta_params = lopt.init_meta_params(key)
+
+
+# construct the initial PES state which is passed from iteration to iteration
+def init_single_inner_opt_state(key):
+  return lopt.initial_inner_opt_state(meta_params, task.init(key))
+
+
+keys = jax.random.split(key, num_tasks)
+inner_opt_states = jax.vmap(init_single_inner_opt_state)(keys)
+accumulator = jax.tree_map(lambda x: jnp.zeros([num_tasks] + list(x.shape)),
+                           meta_params)
+# Randomly set the initial iteration to prevent the tasks from running in lock step.
+on_iterations = jax.random.randint(key, [num_tasks], 0, 30)
+pes_state = (accumulator, inner_opt_states, inner_opt_states, on_iterations)
+
+# + executionInfo={"elapsed": 34013, "status": "ok", "timestamp": 1647716769658, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="BRdSQI6dbNjQ" outputId="1dbf6073-f748-4aa7-de21-2fce80c0e188"
+meta_opt = Adam(0.0003)
+meta_opt_state = meta_opt.init(meta_params)
+
+meta_losses = []
+
+num_steps = int(os.environ.get("LOPT_TRAIN_LENGTH", 400))
+for i in range(num_steps):
+  data = get_vec_batch_seq(num_tasks, 10)
+  key1, key = jax.random.split(key)
+  keys = jax.random.split(key1, num_tasks)
+  (loss, pes_state), meta_grad = vec_short_segment_pes(meta_opt_state[0], keys,
+                                                       pes_state, data)
+  meta_losses.append(loss)
+  if i % 20 == 0:
+    print(i, onp.mean(meta_losses[-20:]))
+  meta_opt_state = meta_opt.update(meta_opt_state, meta_grad)
+
+# + colab={"height": 296} executionInfo={"elapsed": 226, "status": "ok", "timestamp": 1647716770004, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="noPvV56CjOrd" outputId="526cd7cf-1962-45b3-dcdb-1d956e9ace64"
+plt.plot(meta_losses)
+plt.xlabel("meta-iterations")
+plt.ylabel("meta-loss")
+
 # + [markdown] id="-kz0dpBfJi5r"
 # ## Exercises
 # For those curious in getting their feet wet, fork this notebook and try to implement any of the following!
 #
-# * Implement truncated ES and see how it performs.
-# * Modify the truncated ES to use [PES](https://arxiv.org/abs/2112.13835).
 # * Modify the meta-loss to meta-train targeting some validation loss rather than train loss.
 # * Add other features to the learned optimizer such as rolling second moment features (such as adam) or momentums at different timescales.
 # * Make the per parameter MLP a per parameter RNN.
@@ -777,5 +1035,3 @@ for j in range(10):
 # This is the biggest divergence. Meta-training algorithms are implemented as subclasses of `GradientEstimator`. These operate internally like the truncated training in that they store state which is passed from iteration to iteration, but are much more general.
 # They implement 2 functions, one to initialize the state of the inner-problems, and the second to perform updates. This mirrors the 2 functions we needed to write for truncated training.
 # When applying the meta-gradient updates we make use of a `GradientLearner` class which can be either run on a single or multiple machines.
-
-# + id="z_jO5T4d2-ir"
