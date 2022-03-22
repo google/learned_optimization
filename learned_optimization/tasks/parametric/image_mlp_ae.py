@@ -155,8 +155,10 @@ def sample_image_mlp_ae(key: PRNGKey) -> cfgobject.CFGObject:
   })
 
 
+model_path = "sample_image_mlp_ae/time/tpu_TPUv4/20220315_185727.weights"
+
+
 @gin.configurable()
 def timed_sample_image_mlp_ae(key: PRNGKey, max_time=1e-5):
-  model_path = "sample_image_mlp_ae/time/tpu_TPUv4/20220315_185727.weights"
   return time_model.rejection_sample(sample_image_mlp_ae, model_path, key,
                                      max_time)

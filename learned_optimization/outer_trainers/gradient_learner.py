@@ -451,7 +451,7 @@ class SingleMachineGradientLearner:
     """Initializer.
 
     Args:
-      truncated_step: Class containing functions related to inner-training.
+      meta_init: Class containing an init function to construct outer params.
       gradient_estimators: Sequence of gradient estimators used to calculate
         gradients.
       theta_opt: The optimizer used to train the weights of the learned opt.

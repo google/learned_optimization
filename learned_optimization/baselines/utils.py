@@ -100,6 +100,14 @@ def load_archive(task_name: str, hparam_set_name: str):
   return read_npz(path)
 
 
+def list_hparam_sets_for_task(task_name: str):
+  baseline_dir = get_baseline_archive_rootdir()
+  root_dir = os.path.expanduser(baseline_dir)
+
+  files = filesystem.glob(os.path.join(root_dir, task_name, "*"))
+  return [os.path.basename(f) for f in files]
+
+
 def delete_saved_task_data(task_name):
   p = os.path.join(get_root_baseline_dir(), task_name)
   if filesystem.exists(p):

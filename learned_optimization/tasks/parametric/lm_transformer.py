@@ -156,10 +156,12 @@ def sample_lm_transformer(key: chex.PRNGKey) -> cfgobject.CFGObject:
       })
 
 
+model_path = "sample_lm_transformer/time/tpu_TPUv4/20220315_185911.weights"
+valid_path = "sample_lm_transformer/valid/tpu_TPUv4/20220315_130331.weights"
+
+
 @gin.configurable()
 def timed_sample_lm_transformer(key: chex.PRNGKey, max_time: float = 1e-4):
-  model_path = "sample_lm_transformer/time/tpu_TPUv4/20220315_185911.weights"
-  valid_path = "sample_lm_transformer/valid/tpu_TPUv4/20220315_130331.weights"
   return time_model.rejection_sample(
       sample_lm_transformer,
       model_path,

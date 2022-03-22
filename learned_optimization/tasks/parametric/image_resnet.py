@@ -156,8 +156,10 @@ def sample_image_resnet(key: PRNGKey) -> cfgobject.CFGObject:
   return cfgobject.CFGObject("ParametricImageResNet", kwargs)
 
 
+model_path = "sample_image_resnet/time/tpu_TPUv4/20220315_190328.weights"
+
+
 @gin.configurable()
 def timed_sample_image_resnet(key: PRNGKey, max_time=1e-4):
-  model_path = "sample_image_resnet/time/tpu_TPUv4/20220315_190328.weights"
   return time_model.rejection_sample(sample_image_resnet, model_path, key,
                                      max_time)

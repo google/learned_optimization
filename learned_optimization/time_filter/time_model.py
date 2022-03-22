@@ -123,6 +123,7 @@ import haiku as hk
 import jax
 import jax.numpy as jnp
 from learned_optimization import checkpoints
+from learned_optimization import profile
 from learned_optimization.tasks.parametric import cfgobject
 import numpy as onp
 
@@ -337,10 +338,12 @@ def get_model_dir(sample_fn_name: str, hardware_name: str,
   path = os.path.join(root_dir, sample_fn_name, model_type, hardware_name)
   return os.path.expanduser(path)
 
+
 Feats = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]
 PredictionFN = Callable[[Feats], Tuple[jnp.ndarray, jnp.ndarray]]
 
 
+@profile.wrap()
 @functools.lru_cache(None)
 def load_model(model_path_suffix: str, model_type: str) -> PredictionFN:
   """Load and construct inference function for a timing model.
@@ -383,6 +386,7 @@ def load_model(model_path_suffix: str, model_type: str) -> PredictionFN:
   return apply_model
 
 
+@profile.wrap()
 def rejection_sample(
     sampler: Callable[[PRNGKey], cfgobject.CFGObject],
     model_path_suffix: str,

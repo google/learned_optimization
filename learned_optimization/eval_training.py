@@ -379,11 +379,17 @@ def multi_task_training_curves(
     key = jax.random.PRNGKey(seed)
 
   keys = jax.random.split(key, n_devices)
-  keys = jax.vmap(lambda k: jax.random.split(k, n_tasks // n_devices))(keys)
+  if n_tasks % n_devices != 0:
+    raise ValueError("Must specify n_tasks to be a multiple of n_devices."
+                     f" Got n_tasks={n_tasks} and n_devices={n_devices}")
+
+  n_tasks_per_device = n_tasks // n_devices
+  keys = jax.vmap(lambda k: jax.random.split(k, n_tasks_per_device))(keys)
 
   logging.info(f"Running _cached_vectorize_train_fns with: "  # pylint: disable=logging-fstring-interpolation
                f"{task_family} ({id(task_family)}), "
-               f"{learned_opt} ({id(learned_opt)}).")
+               f"{learned_opt} ({id(learned_opt)})."
+               f"Found n_devices {n_devices} and n_tasks {n_tasks}.")
 
   train_fns = _cached_vectorize_train_fns(
       task_family,
@@ -402,7 +408,7 @@ def multi_task_training_curves(
   def get_datas(batches, split="train"):
     # TODO(lmetz) move axis?
     return training.get_batches(
-        task_family, [n_devices, n_tasks, batches], split=split)
+        task_family, [n_devices, n_tasks_per_device, batches], split=split)
 
   def eval_loop(theta, task_params, opt_states, keys, n_eval_batches):
 
@@ -424,7 +430,7 @@ def multi_task_training_curves(
         with profile.Profile("eval_agg_blocked"):
           # mean over the n_eval_batches sample
           return (onp.mean(sub_l, axis=0), onp.mean(sub_norm_l, axis=0),
-                  {k: onp.mean(l, axis=0) for k, v in sub_auxs.items()})
+                  {k: onp.mean(v, axis=0) for k, v in sub_auxs.items()})
 
       all_losses = {}
       for s in splits:

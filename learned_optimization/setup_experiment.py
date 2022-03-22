@@ -22,6 +22,7 @@ from typing import Optional
 from absl import flags
 from absl import logging
 import gin
+import jax
 from learned_optimization import filesystem
 
 flags.DEFINE_multi_string("gin_bindings", None,
@@ -105,6 +106,8 @@ def setup_experiment(gin_finalize: bool = True,
     train_log_dir: string
       root training directory where all logs should be stored
   """
+
+  jax.config.update("jax_log_compiles", True)
 
   parse_and_set_gin_config(gin_finalize, gin_skip_unknown)
 

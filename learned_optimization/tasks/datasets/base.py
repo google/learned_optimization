@@ -27,6 +27,7 @@ import haiku as hk
 import jax
 import jax.numpy as jnp
 from learned_optimization import filesystem
+from learned_optimization import profile
 import numpy as onp
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -301,7 +302,8 @@ def preload_tfds_image_classification_datasets(
 
   def make_python_iter(split: str) -> Iterator[Batch]:
     # load the entire dataset into memory
-    dataset = tfds.load(datasetname, split=split, batch_size=-1)
+    with profile.Profile(f"tfds.load({datasetname})"):
+      dataset = tfds.load(datasetname, split=split, batch_size=-1)
     data = tfds.as_numpy(_image_map_fn(cfg, dataset))
 
     # use a python iterator as this is faster than TFDS.

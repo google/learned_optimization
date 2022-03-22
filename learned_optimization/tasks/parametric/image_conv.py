@@ -145,8 +145,10 @@ def sample_image_conv(key: PRNGKey) -> cfgobject.CFGObject:
       })
 
 
+model_path = "sample_image_conv/time/tpu_TPUv4/20220315_185946.weights"
+
+
 @gin.configurable()
 def timed_sample_image_conv(key: PRNGKey, max_time=1e-5):
-  model_path = "sample_image_conv/time/tpu_TPUv4/20220315_185946.weights"
   return time_model.rejection_sample(sample_image_conv, model_path, key,
                                      max_time)
