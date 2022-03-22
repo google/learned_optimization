@@ -42,6 +42,11 @@ class ImageMlpAETest(absltest.TestCase):
     obj = cfgobject.object_from_config(cfg1)
     self.assertIsInstance(obj, image_mlp_ae.ParametricImageMLPAE)
 
+  def test_timed_sample_image_mlp_ae(self):
+    key = jax.random.PRNGKey(0)
+    sampled_task = image_mlp_ae.timed_sample_image_mlp_ae(key)
+    self.assertIsInstance(sampled_task, cfgobject.CFGObject)
+
 
 if __name__ == '__main__':
   absltest.main()

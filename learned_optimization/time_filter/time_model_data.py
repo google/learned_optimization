@@ -122,9 +122,14 @@ def train_test_iterators(
 
   def iterator(cfgs) -> Iterator[DataBatch]:
     for cfg, results in cfgs:
+      # We define a model not running or failing with a onp.nan
+      if results and "unroll_8x10" in results and results["unroll_8x10"]:
+        t = results["unroll_8x10"][0]
+      else:
+        t = onp.nan
       yield {
           "feats": tuple([onp.asarray(x) for x in cfgobject.featurize(cfg)]),
-          "time": results["unroll_8x10"][0],
+          "time": t,
       }
 
   def make_iterator(cfgs):

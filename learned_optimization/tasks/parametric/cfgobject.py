@@ -69,6 +69,13 @@ import jax.numpy as jnp
 import numpy as onp
 
 
+# TODO(lmetz) consider generalizing to more types of transforms.
+# for now log seems to be the only one used so leaving as this for now.
+@flax.struct.dataclass
+class LogFeature:
+  value: Any
+
+
 @flax.struct.dataclass
 class CFGObject:
   """Base configurable object for the configuration language.
@@ -96,11 +103,14 @@ class CFGNamed:
 
 @gin.configurable
 def object_from_config(cfg: CFGObject) -> Any:
+  """Construct an object from the provided config."""
   if isinstance(cfg, CFGObject):
     r = gin.get_configurable(
         cfg.obj)(**{k: object_from_config(v) for k, v in cfg.kwargs.items()})
     r.cfg = cfg
     return r
+  elif isinstance(cfg, LogFeature):
+    return cfg.value
   else:
     return cfg
 
@@ -120,7 +130,15 @@ def deserialize_cfg(b):
 
 
 def flatten_cfg(cfg: CFGObject) -> Mapping[str, Any]:
-  """Take a potentially nested CFGObject and flatten keys to a single dict."""
+  """Take a potentially nested CFGObject and flatten keys to a single dict.
+
+  This function additionally applies feature transforms.
+  Args:
+    cfg: The config to be flattened
+
+  Returns:
+    The features as a depth 1 dictionary.
+  """
   rets = []
   to_process = [("/", cfg)]
   while to_process:
@@ -132,6 +150,8 @@ def flatten_cfg(cfg: CFGObject) -> Mapping[str, Any]:
       to_process.append((k + "/" + a.obj, a.kwargs))
     elif isinstance(a, CFGNamed):
       to_process.append((k + "/" + a.name, a.values))
+    elif isinstance(a, LogFeature):
+      rets.append((k, onp.log(a.value)))
     else:
       rets.append((k, a))
   return {k: v for k, v in rets}
@@ -150,11 +170,10 @@ def pad(x: jnp.ndarray, length: int = 8) -> jnp.ndarray:
   return r
 
 
-def featurize_value(key: str, val: Any) -> jnp.ndarray:
+def featurize_value(val: Any) -> jnp.ndarray:
   """Convert an arbitrary key, value to a fixed length float and int feature.
 
   Args:
-    key: name of key to be featurized.
     val: value to be featurized.
 
   Returns:
@@ -162,16 +181,6 @@ def featurize_value(key: str, val: Any) -> jnp.ndarray:
     int feats: a single integer containing the int features
   """
   # preprocess some of the tags heuristically.
-  # For now, we will log values which we know are non-negative
-  # TODO(lmetz) remove this infavor of passing hints into the CFGObjects?
-  log_filters = [
-      "batch_size", "image_size", "hidden_layers", "hidden_sizes", "hidden_size"
-  ]
-
-  for l in log_filters:
-    if l in key:
-      val = jnp.log(jnp.asarray(val))
-
   empty = jnp.zeros((8,))
   if isinstance(val, str):
     return empty, jnp.asarray(hash_trick(val))
@@ -230,7 +239,7 @@ def featurize(
 
   for k, v in sorted(flat_cfg.items(), key=lambda x: x[0]):
     kid = featurize_cfg_path(k)
-    v, vid = featurize_value(k, v)
+    v, vid = featurize_value(v)
     outs.append((kid, v, vid))
   ids, float_feats, int_feats = zip(*outs)
   return jnp.asarray(ids), jnp.asarray(float_feats), jnp.asarray(int_feats)

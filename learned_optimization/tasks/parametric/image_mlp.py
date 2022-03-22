@@ -115,15 +115,17 @@ def sample_image_mlp(key: PRNGKey) -> cfgobject.CFGObject:
   batch_size = parametric_utils.log_int(key4, 4, 512)
 
   dataset_name = parametric_utils.SampleImageDataset.sample(key5)
+  lf = cfgobject.LogFeature
+
   dataset = cfgobject.CFGObject(dataset_name, {
-      "image_size": (image_size, image_size),
-      "batch_size": batch_size,
+      "image_size": lf((image_size, image_size)),
+      "batch_size": lf(batch_size),
   })
   num_classes = parametric_utils.SampleImageDataset.num_classes(dataset_name)
 
   return cfgobject.CFGObject(
       "ParametricImageMLP", {
-          "hidden_layers": num_layers * [hidden_size],
+          "hidden_layers": lf(num_layers * [hidden_size]),
           "num_classes": num_classes,
           "datasets": dataset
       })
@@ -131,6 +133,6 @@ def sample_image_mlp(key: PRNGKey) -> cfgobject.CFGObject:
 
 @gin.configurable()
 def timed_sample_image_mlp(key: PRNGKey, max_time=1e-5):
-  model_path = "sample_image_mlp/tpu_TPUv4/20220103_143601.weights"
+  model_path = "sample_image_mlp/time/tpu_TPUv4/20220315_185859.weights"
   return time_model.rejection_sample(sample_image_mlp, model_path, key,
                                      max_time)

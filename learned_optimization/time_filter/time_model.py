@@ -116,7 +116,7 @@ This is the final featurized value and can be used to make predictions.
 
 import functools
 import os
-from typing import Callable, Tuple, Optional
+from typing import Callable, Optional, Tuple
 
 from absl import logging
 import haiku as hk
@@ -248,50 +248,121 @@ def timing_model_forward(feats: Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
   if mask is None:
     mask = jnp.ones((keys.shape[0], floats.shape[1], 1))
   outs = features_to_hidden(keys, floats, ints, mask)
-  output = hk.Linear(1)(outs)[:, 0]
+  time_pred = hk.Linear(1)(outs)[:, 0]
   # shift arbitrarily to roughly center the outputs.
   # TODO(lmetz) ensure this is stable across a variety of models.
-  return jnp.exp(output - 10.)
+  return jnp.exp(time_pred - 10.)
+
+
+def valid_model_forward(feats: Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+                        mask: Optional[jnp.ndarray] = None) -> jnp.ndarray:
+  """A haiku function which converts features to an is valid prediction.
+
+  This must be called with hk.transform!
+
+  Args:
+    feats: [int32[B, N, P1], float32[B, N, P2], int32[B, N]]
+    mask: float32[B, N]
+
+  Returns:
+    The predicted logits for sigmoid with probability that task can run.
+      float32[B]
+  """
+  keys, floats, ints = feats
+  if mask is None:
+    mask = jnp.ones((keys.shape[0], floats.shape[1], 1))
+  outs = features_to_hidden(keys, floats, ints, mask)
+  return hk.Linear(1)(outs)[:, 0]
+
+
+def sigmoid_cross_entropy(logits: jnp.ndarray,
+                          labels: jnp.ndarray) -> jnp.ndarray:
+  """Computes sigmoid cross entropy given logits and multiple class labels."""
+  labels = jnp.asarray(labels, dtype=jnp.float32)
+  log_p = jax.nn.log_sigmoid(logits)
+  # log(1 - sigmoid(x)) = log_sigmoid(-x), the latter is more numerically stable
+  log_not_p = jax.nn.log_sigmoid(-logits)
+  return jnp.asarray(-labels * log_p - (1. - labels) * log_not_p)
 
 
 @hk.transform_with_state
-def loss_fn(feats: Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
-            times: jnp.ndarray) -> jnp.ndarray:
-  out = timing_model_forward(feats)
-  assert out.shape == times.shape
-  return jnp.mean(jnp.square(jnp.log(times) - jnp.log(out)))
+def valid_loss_fn(feats: Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+                  times: jnp.ndarray) -> jnp.ndarray:
+  out_is_valid = valid_model_forward(feats)
+  assert out_is_valid.shape == times.shape
+  is_valid_target = jnp.isfinite(times)
+  vec_loss = sigmoid_cross_entropy(out_is_valid, is_valid_target)
+  return jnp.mean(vec_loss)
 
 
-def get_timing_model_root_dir() -> str:
+@hk.transform_with_state
+def time_loss_fn(feats: Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+                 times: jnp.ndarray) -> jnp.ndarray:
+  """Loss function to train model with.
+
+  First we do a forward pass, then do sigmoid cross entropy loss on if time
+  is non-nan. If time is non-nan, we additionally do MSE to this loss.
+
+  Args:
+    feats: Input features to pass to forward function.
+    times: Runtimes to predict, or jnp.nan if model failed.
+
+  Returns:
+    loss: A scalar loss.
+  """
+  out_time = timing_model_forward(feats)
+  assert out_time.shape == times.shape
+
+  is_valid_target = jnp.isfinite(times)
+
+  large_value = 1e9  # dummy value -- should never be propogated to the loss.
+  # Replace nan here so that gradients are non-nan but large.
+  fake_times = jnp.where(is_valid_target, times,
+                         large_value * jnp.ones_like(times))
+  match_times_loss = jnp.square(jnp.log(fake_times) - jnp.log(out_time))
+  time_loss = jax.lax.select(is_valid_target, match_times_loss,
+                             jnp.zeros_like(match_times_loss))
+  return jnp.sum(time_loss) / jnp.sum(is_valid_target)
+
+
+def get_model_root_dir() -> str:
   root_dir = "~/lopt_model_timings"
   root_dir = os.environ.get("LOPT_TIMING_MODEL_DIR", root_dir)
   return root_dir
 
 
-def get_timing_model_dir(sample_fn_name: str, hardware_name: str) -> str:
-  root_dir = get_timing_model_root_dir()
-  path = os.path.join(root_dir, sample_fn_name, hardware_name)
+def get_model_dir(sample_fn_name: str, hardware_name: str,
+                  model_type: str) -> str:
+  root_dir = get_model_root_dir()
+  path = os.path.join(root_dir, sample_fn_name, model_type, hardware_name)
   return os.path.expanduser(path)
 
-
 Feats = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]
-PredictionFN = Callable[[Feats], jnp.ndarray]
+PredictionFN = Callable[[Feats], Tuple[jnp.ndarray, jnp.ndarray]]
 
 
 @functools.lru_cache(None)
-def load_model(model_path_suffix: str) -> PredictionFN:
+def load_model(model_path_suffix: str, model_type: str) -> PredictionFN:
   """Load and construct inference function for a timing model.
 
   Args:
      model_path_suffix: Path to load. This suffix is appended to
        `get_timing_model_root_dir()` then loaded.
+     model_type: Type of model -- either `time` or `valid`.
 
   Returns:
     A callable which maps from task features to predicted runtime.
   """
-  path = os.path.join(get_timing_model_root_dir(), model_path_suffix)
+  path = os.path.join(get_model_root_dir(), model_path_suffix)
   logging.info(f"Loading timing model from {path}")  # pylint: disable=logging-fstring-interpolation
-  init, apply = hk.transform_with_state(timing_model_forward)
+
+  if model_type == "time":
+    init, apply = hk.transform_with_state(timing_model_forward)
+  elif model_type == "valid":
+    init, apply = hk.transform_with_state(valid_model_forward)
+  else:
+    raise ValueError("Unsupported model type {model_type}.")
+
   key = jax.random.PRNGKey(0)
   feats = (jnp.zeros([1, 1, 8],
                      dtype=jnp.int32), jnp.zeros([1, 1, 8], dtype=jnp.float32),
@@ -304,14 +375,21 @@ def load_model(model_path_suffix: str) -> PredictionFN:
   def apply_model(feats):
     key = jax.random.PRNGKey(0)
     out, unused_next_state = apply_jit(weights, state, key, feats)
-    return out
+    if model_type == "valid":
+      return jax.nn.sigmoid(out)
+    else:
+      return out
 
   return apply_model
 
 
-def rejection_sample(sampler: Callable[[PRNGKey], cfgobject.CFGObject],
-                     model_path_suffix: str, key: PRNGKey,
-                     max_time: float) -> cfgobject.CFGObject:
+def rejection_sample(
+    sampler: Callable[[PRNGKey], cfgobject.CFGObject],
+    model_path_suffix: str,
+    key: PRNGKey,
+    max_time: float,
+    model_path_valid_suffix: Optional[str] = None,
+) -> cfgobject.CFGObject:
   """Perform rejection sampling to sample task cfgs which run in < max_time.
 
   Args:
@@ -321,13 +399,21 @@ def rejection_sample(sampler: Callable[[PRNGKey], cfgobject.CFGObject],
         suffix is appended to `get_timing_model_root_dir()` then loaded.
     key: jax random key.
     max_time: Max amount of time to allow in sampled tasks.
+    model_path_valid_suffix: optional path to a model that predicts if the
+      configuration is valid and can run without running out of ram. If not
+      specified assume all configurations are valid.
 
   Returns:
     CFGObject that represents a TaskFamily which runs in less than `max_time`.
 
   """
   rng = hk.PRNGSequence(key)
-  forward_fn = load_model(model_path_suffix)
+  forward_fn = load_model(model_path_suffix, model_type="time")
+  if model_path_valid_suffix:
+    valid_forward_fn = load_model(model_path_valid_suffix, model_type="valid")
+  else:
+    valid_forward_fn = None
+
   # batchsize to run through the timing model.
   # Most of the time is spent on featurization at the moment, so this number
   # is low.
@@ -340,6 +426,11 @@ def rejection_sample(sampler: Callable[[PRNGKey], cfgobject.CFGObject],
     del feat_mask
     times = forward_fn((key_feat, int_feat, float_feat))
     mask = times < max_time
+
+    if valid_forward_fn:
+      is_valid = forward_fn((key_feat, int_feat, float_feat))
+      mask = jnp.logical_and(mask, is_valid)
+
     if onp.all(onp.logical_not(mask)):
       continue
     else:

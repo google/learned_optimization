@@ -48,6 +48,11 @@ class LmRnnTest(absltest.TestCase):
     obj = cfgobject.object_from_config(cfg1)
     self.assertIsInstance(obj, lm_rnn.ParametricLMRNN)
 
+  def test_timed_sample_lm_rnn(self):
+    key = jax.random.PRNGKey(0)
+    sampled_task = lm_rnn.timed_sample_lm_rnn(key)
+    self.assertIsInstance(sampled_task, cfgobject.CFGObject)
+
 
 if __name__ == '__main__':
   absltest.main()

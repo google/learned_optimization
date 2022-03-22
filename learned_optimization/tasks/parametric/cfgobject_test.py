@@ -96,6 +96,18 @@ class CFGTest(absltest.TestCase):
     test_mask[0, 1] = 0.
     testing.assert_array_equal(mask, test_mask)
 
+  def test_featurize_log_feature(self):
+    static_cfg = cfgobject.CFGObject("DummyObject",
+                                     {"param": cfgobject.LogFeature(123)})
+    dynamic_cfg = cfgobject.CFGObject("DummyObject2",
+                                      {"param": cfgobject.LogFeature(222)})
+
+    ids, float_feats, int_feats = cfgobject.featurize(static_cfg, dynamic_cfg)
+    self.assertEqual(ids.shape, (2, 8))
+    self.assertEqual(float_feats.shape, (2, 8))
+    self.assertEqual(int_feats.shape, (2,))
+    testing.assert_allclose(float_feats[0, 0], onp.log(123))
+    testing.assert_allclose(float_feats[1, 0], onp.log(222))
 
 if __name__ == "__main__":
   absltest.main()

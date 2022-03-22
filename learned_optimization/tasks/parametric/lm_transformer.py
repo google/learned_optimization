@@ -27,6 +27,7 @@ from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.datasets import language  # pylint: disable=unused-import
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import time_model
 import numpy as onp
 
 Batch = Any
@@ -136,18 +137,32 @@ def sample_lm_transformer(key: chex.PRNGKey) -> cfgobject.CFGObject:
   ]
   dataset_name = parametric_utils.choice(next(rng), names)
 
+  lf = cfgobject.LogFeature
+
   dataset = cfgobject.CFGObject(dataset_name, {
-      "sequence_length": sequence_length,
-      "batch_size": batch_size,
+      "sequence_length": lf(sequence_length),
+      "batch_size": lf(batch_size),
   })
 
   vocab_size = parametric_utils.log_int(next(rng), 100, 10000)
 
   return cfgobject.CFGObject(
       "ParametricLMTransformer", {
-          "vocab_size": vocab_size,
-          "d_model": d_model,
-          "num_heads": num_heads,
-          "num_layers": num_layers,
+          "vocab_size": lf(vocab_size),
+          "d_model": lf(d_model),
+          "num_heads": lf(num_heads),
+          "num_layers": lf(num_layers),
           "datasets": dataset,
       })
+
+
+@gin.configurable()
+def timed_sample_lm_transformer(key: chex.PRNGKey, max_time: float = 1e-4):
+  model_path = "sample_lm_transformer/time/tpu_TPUv4/20220315_185911.weights"
+  valid_path = "sample_lm_transformer/valid/tpu_TPUv4/20220315_130331.weights"
+  return time_model.rejection_sample(
+      sample_lm_transformer,
+      model_path,
+      key,
+      max_time,
+      model_path_valid_suffix=valid_path)

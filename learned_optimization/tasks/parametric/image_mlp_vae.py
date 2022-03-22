@@ -26,6 +26,7 @@ from learned_optimization.tasks import generative_model_utils
 from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import time_model
 import numpy as onp
 
 Batch = Any
@@ -55,10 +56,14 @@ class ParametricImageMLPVAE(base.TaskFamily):
     rng = hk.PRNGSequence(key)
     return cfgobject.CFGNamed(
         "ParametricImageMLPVAE", {
-            "initializer": parametric_utils.SampleInitializer.sample(next(rng)),
-            "activation": parametric_utils.SampleActivation.sample(next(rng)),
-            "center_data": parametric_utils.choice(next(rng), [True, False]),
-            "per_dim_loss": parametric_utils.choice(next(rng), [True, False]),
+            "initializer":
+                parametric_utils.SampleInitializer.sample(next(rng)),
+            "activation":
+                parametric_utils.SampleActivation.sample(next(rng)),
+            "center_data":
+                parametric_utils.choice(next(rng), jnp.asarray([True, False])),
+            "per_dim_loss":
+                parametric_utils.choice(next(rng), jnp.asarray([True, False])),
         })
 
   def task_fn(self, cfg) -> base.Task:
@@ -158,15 +163,25 @@ def sample_image_mlp_vae(key: PRNGKey) -> cfgobject.CFGObject:
   n_z = parametric_utils.log_int(next(rng), 2, 128)
 
   dataset_name = parametric_utils.SampleImageDataset.sample(next(rng))
+
+  lf = cfgobject.LogFeature
+
   dataset = cfgobject.CFGObject(dataset_name, {
-      "image_size": (image_size, image_size),
-      "batch_size": batch_size,
+      "image_size": lf((image_size, image_size)),
+      "batch_size": lf(batch_size),
   })
 
   return cfgobject.CFGObject(
       "ParametricImageMLPVAE", {
-          "enc_hidden_sizes": tuple(enc_num_layers * [enc_hidden_size]),
-          "dec_hidden_sizes": tuple(dec_num_layers * [dec_hidden_size]),
-          "n_z": n_z,
+          "enc_hidden_sizes": lf(tuple(enc_num_layers * [enc_hidden_size])),
+          "dec_hidden_sizes": lf(tuple(dec_num_layers * [dec_hidden_size])),
+          "n_z": lf(n_z),
           "datasets": dataset,
       })
+
+
+@gin.configurable()
+def timed_sample_image_mlp_vae(key: PRNGKey, max_time=1e-5):
+  model_path = "sample_image_mlp_vae/time/tpu_TPUv4/20220315_185814.weights"
+  return time_model.rejection_sample(sample_image_mlp_vae, model_path, key,
+                                     max_time)

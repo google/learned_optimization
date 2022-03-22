@@ -26,6 +26,7 @@ from learned_optimization.tasks import resnet
 from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import time_model
 import numpy as onp
 
 Batch = Any
@@ -122,19 +123,25 @@ def sample_image_resnet(key: PRNGKey) -> cfgobject.CFGObject:
 
   kwargs = {}
   max_blocks_per_group = parametric_utils.log_int(next(rng), 1, 10)
-  kwargs["blocks_per_group"] = tuple([
-      parametric_utils.log_int(next(rng), 1, max_blocks_per_group)
-      for _ in range(4)
-  ])
+
+  lf = cfgobject.LogFeature
+
+  kwargs["blocks_per_group"] = lf(
+      tuple([
+          parametric_utils.log_int(next(rng), 1, max_blocks_per_group)
+          for _ in range(4)
+      ]))
 
   size_patterns = [(1, 1, 1, 1), (1, 2, 4, 8), (1, 2, 2, 4), (1, 2, 2, 2),
                    (1, 2, 4, 4)]
   pattern = parametric_utils.choice(next(rng), size_patterns)
   max_layer_size = parametric_utils.log_int(next(rng), 8, 256)
-  kwargs["channels_per_group"] = tuple([max_layer_size * p for p in pattern])
+  kwargs["channels_per_group"] = lf(
+      tuple([max_layer_size * p for p in pattern]))
   kwargs["initial_conv_kernel_size"] = parametric_utils.choice(
       next(rng), [3, 5, 7])
-  kwargs["initial_conv_channels"] = parametric_utils.log_int(next(rng), 8, 64)
+  kwargs["initial_conv_channels"] = lf(
+      parametric_utils.log_int(next(rng), 8, 64))
   kwargs["initial_conv_stride"] = parametric_utils.choice(next(rng), [1, 2])
   kwargs["max_pool"] = parametric_utils.choice(next(rng), [True, False])
 
@@ -142,8 +149,15 @@ def sample_image_resnet(key: PRNGKey) -> cfgobject.CFGObject:
   image_size = parametric_utils.log_int(next(rng), 8, 64)
   batch_size = parametric_utils.log_int(next(rng), 4, 256)
   kwargs["datasets"] = cfgobject.CFGObject(dataset_name, {
-      "image_size": (image_size, image_size),
-      "batch_size": batch_size,
+      "image_size": lf((image_size, image_size)),
+      "batch_size": lf(batch_size),
   })
 
   return cfgobject.CFGObject("ParametricImageResNet", kwargs)
+
+
+@gin.configurable()
+def timed_sample_image_resnet(key: PRNGKey, max_time=1e-4):
+  model_path = "sample_image_resnet/time/tpu_TPUv4/20220315_190328.weights"
+  return time_model.rejection_sample(sample_image_resnet, model_path, key,
+                                     max_time)

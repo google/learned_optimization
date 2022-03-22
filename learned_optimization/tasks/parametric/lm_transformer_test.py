@@ -43,6 +43,10 @@ class LmTransformerTest(absltest.TestCase):
     obj = cfgobject.object_from_config(cfg1)
     self.assertIsInstance(obj, lm_transformer.ParametricLMTransformer)
 
+  def test_timed_sample_lm_transformer(self):
+    key = jax.random.PRNGKey(0)
+    sampled_task = lm_transformer.timed_sample_lm_transformer(key)
+    self.assertIsInstance(sampled_task, cfgobject.CFGObject)
 
 if __name__ == '__main__':
   absltest.main()

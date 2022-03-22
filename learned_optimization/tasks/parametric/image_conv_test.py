@@ -41,6 +41,11 @@ class ImageConvTest(absltest.TestCase):
     task_family = cfgobject.object_from_config(cfg)
     test_utils.smoketest_task_family(task_family)
 
+  def test_timed_sample_image_conv(self):
+    key = jax.random.PRNGKey(0)
+    sampled_task = image_conv.timed_sample_image_conv(key)
+    self.assertIsInstance(sampled_task, cfgobject.CFGObject)
+
 
 if __name__ == '__main__':
   absltest.main()

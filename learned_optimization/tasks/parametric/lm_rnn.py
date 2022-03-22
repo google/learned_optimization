@@ -26,6 +26,7 @@ from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.datasets import language  # pylint: disable=unused-import
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import time_model
 import numpy as onp
 
 Batch = Any
@@ -191,9 +192,11 @@ def sample_lm_rnn(key: PRNGKey) -> cfgobject.CFGObject:
 
   rnn_fns = ["lstm_fn", "vanilla_rnn_fn", "gru_fn"]
 
+  lf = cfgobject.LogFeature
+
   dataset = cfgobject.CFGObject(dataset_name, {
-      "sequence_length": sequence_length,
-      "batch_size": batch_size,
+      "sequence_length": lf(sequence_length),
+      "batch_size": lf(batch_size),
   })
 
   vocab_size = parametric_utils.log_int(next(rng), 100, 10000)
@@ -203,9 +206,15 @@ def sample_lm_rnn(key: PRNGKey) -> cfgobject.CFGObject:
 
   return cfgobject.CFGObject(
       "ParametricLMRNN", {
-          "vocab_size": vocab_size,
-          "rnn_size": rnn_size,
-          "embed_size": embed_size,
+          "vocab_size": lf(vocab_size),
+          "rnn_size": lf(rnn_size),
+          "embed_size": lf(embed_size),
           "datasets": dataset,
           "rnn_core_fn": rnn_core_fn,
       })
+
+
+@gin.configurable()
+def timed_sample_lm_rnn(key: PRNGKey, max_time=1e-4):
+  model_path = "sample_lm_rnn/time/tpu_TPUv4/20220315_190026.weights"
+  return time_model.rejection_sample(sample_lm_rnn, model_path, key, max_time)

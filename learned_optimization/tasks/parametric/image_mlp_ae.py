@@ -25,6 +25,7 @@ from learned_optimization.tasks import base
 from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import time_model
 
 Batch = Any
 Params = Any
@@ -53,11 +54,11 @@ class ParametricImageMLPAE(base.TaskFamily):
             "activation":
                 parametric_utils.SampleActivation.sample(next(rng)),
             "log_loss":
-                parametric_utils.choice(next(rng), [True, False]),
+                parametric_utils.choice(next(rng), jnp.asarray([True, False])),
             "center_data":
-                parametric_utils.choice(next(rng), [True, False]),
+                parametric_utils.choice(next(rng), jnp.asarray([True, False])),
             "constrain_output":
-                parametric_utils.choice(next(rng), [True, False]),
+                parametric_utils.choice(next(rng), jnp.asarray([True, False])),
         })
 
   def task_fn(self, cfg) -> base.Task:
@@ -140,12 +141,22 @@ def sample_image_mlp_ae(key: PRNGKey) -> cfgobject.CFGObject:
   batch_size = parametric_utils.log_int(next(rng), 4, 512)
 
   dataset_name = parametric_utils.SampleImageDataset.sample(next(rng))
+
+  lf = cfgobject.LogFeature
+
   dataset = cfgobject.CFGObject(dataset_name, {
-      "image_size": (image_size, image_size),
-      "batch_size": batch_size,
+      "image_size": lf((image_size, image_size)),
+      "batch_size": lf(batch_size),
   })
 
   return cfgobject.CFGObject("ParametricImageMLPAE", {
-      "hidden_sizes": num_layers * [hidden_size],
+      "hidden_sizes": lf(num_layers * [hidden_size]),
       "datasets": dataset
   })
+
+
+@gin.configurable()
+def timed_sample_image_mlp_ae(key: PRNGKey, max_time=1e-5):
+  model_path = "sample_image_mlp_ae/time/tpu_TPUv4/20220315_185727.weights"
+  return time_model.rejection_sample(sample_image_mlp_ae, model_path, key,
+                                     max_time)

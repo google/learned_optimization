@@ -25,6 +25,7 @@ from learned_optimization.tasks import base
 from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import time_model
 import numpy as onp
 
 Batch = Any
@@ -124,18 +125,28 @@ def sample_image_conv(key: PRNGKey) -> cfgobject.CFGObject:
 
   image_size = parametric_utils.log_int(next(rng), 4, 32)
   dataset_name = parametric_utils.SampleImageDataset.sample(next(rng))
+
+  lf = cfgobject.LogFeature
+
   dataset = cfgobject.CFGObject(
       dataset_name, {
-          "image_size": (image_size, image_size),
-          "batch_size": parametric_utils.log_int(next(rng), 4, 512),
+          "image_size": lf((image_size, image_size)),
+          "batch_size": lf(parametric_utils.log_int(next(rng), 4, 512)),
       })
 
   num_classes = parametric_utils.SampleImageDataset.num_classes(dataset_name)
   return cfgobject.CFGObject(
       "ParametricImageConv", {
-          "hidden_sizes": num_layers * [hidden_size],
+          "hidden_sizes": lf(num_layers * [hidden_size]),
           "strides": strides,
           "kernel_sizes": kernel_sizes,
           "datasets": dataset,
           "num_classes": num_classes,
       })
+
+
+@gin.configurable()
+def timed_sample_image_conv(key: PRNGKey, max_time=1e-5):
+  model_path = "sample_image_conv/time/tpu_TPUv4/20220315_185946.weights"
+  return time_model.rejection_sample(sample_image_conv, model_path, key,
+                                     max_time)

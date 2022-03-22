@@ -15,6 +15,7 @@
 
 """Time many samples out of a task_family sampling function."""
 
+import glob
 import os
 import pickle
 from typing import Callable
@@ -75,7 +76,14 @@ def run_many_eval_and_save(
   save_dir = os.path.join(save_dir, dev_name)
   filesystem.make_dirs(save_dir)
 
-  for _ in range(num_to_run):
+  for i in range(num_to_run):
+    # Exit if enough files have been created.
+    if i % 10 == 0:
+      num_files = len(glob.glob(save_dir + "/*"))
+      if num_files > num_to_run:
+        return
+      logging.info(f"Found {num_files} -- continuing to run.")  # pylint: disable=logging-fstring-interpolation
+
     # TODO(lmetz) this thing will run out of memory due to various caching that
     # learned_optimization does. Figure out a way to clear timings more.
     eval_and_save_one_timing(sample_task_family_cfg_fn, save_dir)
