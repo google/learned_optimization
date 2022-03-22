@@ -34,7 +34,6 @@ from learned_optimization.population.mutators import winner_take_all_genetic
 import numpy as onp
 import optax
 
-flags.DEFINE_string("train_log_dir", None, "Path to save data to")
 
 FLAGS = flags.FLAGS
 
@@ -217,5 +216,6 @@ def main(_):
 
 
 if __name__ == "__main__":
+  flags.DEFINE_string("train_log_dir", None, "Path to save data to")
   flags.mark_flag_as_required("train_log_dir")
   app.run(main)
