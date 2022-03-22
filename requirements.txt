@@ -2,9 +2,7 @@ absl-py==0.12.0
 numpy>=1.18
 jax>=0.2.6
 jaxlib>=0.1.68
-nose
 pytest
-dm-launchpad-nightly==0.3.0.dev20211105
 tqdm>=4.62.3
 flax==0.3.3
 dm-haiku==0.0.5

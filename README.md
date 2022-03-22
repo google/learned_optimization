@@ -32,8 +32,8 @@ We strongly recommend using virtualenv to work with this package.
 
 ```
 pip3 install virtualenv
-git clone git@github.com:google/learned_optimizers.git
-cd learned_optimizers
+git clone git@github.com:google/learned_optimization.git
+cd learned_optimization
 python3 -m venv env
 source env/bin/activate
 pip install -e .
@@ -42,7 +42,9 @@ pip install -e .
 ## Train a learned optimizer example
 To train a learned optimizer on a simple inner-problem, run the following:
 
-`python3 -m learned_optimization.examples.simple_lopt_train --train_log_dir=/tmp/logs_folder`
+`python3 -m learned_optimization.examples.simple_lopt_train --train_log_dir=/tmp/logs_folder --alsologtostderr`
+
+This will first use tfds to download data, then start running. After a few minutes you should see numbers printed.
 
 A tensorboard can be pointed at this directory for visualization of results. Note this will run very slowly without an accelerator.
 
