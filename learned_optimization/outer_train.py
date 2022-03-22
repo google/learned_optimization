@@ -51,6 +51,8 @@ from learned_optimization import summary
 from learned_optimization import tree_utils
 from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.outer_trainers import gradient_learner
+from learned_optimization.outer_trainers import lopt_truncated_step
+from learned_optimization.outer_trainers import truncated_step as truncated_step_mod
 from learned_optimization.population import population as population_mod
 from learned_optimization.tasks import base as tasks_base
 import numpy as onp
@@ -71,10 +73,14 @@ def build_gradient_estimators(
     sample_task_family_fn: Callable[[PRNGKey],
                                     tasks_base.TaskFamily] = gin.REQUIRED,
     gradient_estimator_fn: Callable[
-        [tasks_base.TaskFamily, lopt_base.LearnedOptimizer],
+        [truncated_step_mod.VectorizedTruncatedStep],
         gradient_learner.GradientLearner] = gin.REQUIRED,
+    truncated_step_fn: Callable[
+        [tasks_base.TaskFamily, lopt_base.LearnedOptimizer],
+        truncated_step_mod.VectorizedTruncatedStep] = lopt_truncated_step
+    .VectorizedLOptTruncatedStep,
     key: PRNGKey,
-    num_gradient_estimators: int
+    num_gradient_estimators: int,
 ) -> Sequence[gradient_learner.GradientEstimator]:
   """Build gradient estimators.
 
@@ -86,6 +92,8 @@ def build_gradient_estimators(
       defining the meta-training distribution.
     gradient_estimator_fn: Callable that returns the GradientEstimator to
       estimate gradients with. This function is often just the class of the
+      gradient estimator.
+    truncated_step_fn: Callable that returns a TruncatedStep for use in the
       gradient estimator.
     key: jax rng
     num_gradient_estimators: number of gradient estimators to construct. This is
@@ -99,7 +107,8 @@ def build_gradient_estimators(
   for _ in range(num_gradient_estimators):
     key, key1 = jax.random.split(key)
     task_family = sample_task_family_fn(key1)
-    gradient_estimator = gradient_estimator_fn(task_family, learned_opt)
+    truncated_step = truncated_step_fn(task_family, learned_opt)
+    gradient_estimator = gradient_estimator_fn(truncated_step)
     estimators.append(gradient_estimator)
   return estimators
 
@@ -478,7 +487,7 @@ def train_learner(
       total_inner_steps=int(total_inner_steps))
 
   param_checkpoint_data = gradient_learner.ParameterCheckpoint(
-      outer_learner.get_lopt_params(gradient_learner_state), gen_id,
+      outer_learner.get_meta_params(gradient_learner_state), gen_id,
       gradient_learner_state.theta_opt_state.iteration)
 
   if checkpoints.has_checkpoint(train_log_dir, "checkpoint_"):
@@ -502,7 +511,7 @@ def train_learner(
 
   summary_writer.text(
       "theta_structure",
-      _str_struct(outer_learner.get_lopt_params(gradient_learner_state)),
+      _str_struct(outer_learner.get_meta_params(gradient_learner_state)),
       step=0)
   summary_writer.text(
       "theta_opt_state_structure", _str_struct(gradient_learner_state), step=0)
@@ -585,7 +594,7 @@ def train_learner(
         gradient_learner_state, jnp.asarray(elapsed_time, dtype=jnp.float64),
         total_inner_steps)
     param_checkpoint = gradient_learner.ParameterCheckpoint(
-        outer_learner.get_lopt_params(gradient_learner_state), gen_id, step)
+        outer_learner.get_meta_params(gradient_learner_state), gen_id, step)
     paths = checkpoints.periodically_save_checkpoint(train_log_dir, {
         "checkpoint_": opt_checkpoint,
         "params_": param_checkpoint
@@ -645,7 +654,7 @@ def train_learner(
         metrics=metrics,
         worker_ids=worker_ids,
         with_metrics=with_m,
-        theta=outer_learner.get_lopt_params(gradient_learner_state),
+        theta=outer_learner.get_meta_params(gradient_learner_state),
         delta_time=delta_time,
         total_inner_steps=total_inner_steps,
         delta_inner_steps=applied_inner_steps,
@@ -727,7 +736,7 @@ def local_train(
                                                      "checkpoint_")
   else:
     param_checkpoint_data = gradient_learner.ParameterCheckpoint(
-        outer_learner.get_lopt_params(gradient_learner_state), "not_genid",
+        outer_learner.get_meta_params(gradient_learner_state), "not_genid",
         gradient_learner_state.theta_opt_state.iteration)
 
     checkpoints.save_checkpoint(
@@ -762,7 +771,7 @@ def local_train(
   step = gradient_learner_state.theta_opt_state.iteration
   summary_writer.text(
       "theta_structure",
-      _str_struct(outer_learner.get_lopt_params(gradient_learner_state)),
+      _str_struct(outer_learner.get_meta_params(gradient_learner_state)),
       step=0)
   summary_writer.text(
       "theta_opt_state_structure", _str_struct(gradient_learner_state), step=0)
@@ -780,7 +789,7 @@ def local_train(
                     int(total_inner_steps)),
             "params_":
                 gradient_learner.ParameterCheckpoint(
-                    outer_learner.get_lopt_params(gradient_learner_state),
+                    outer_learner.get_meta_params(gradient_learner_state),
                     "no_gen_id", step)
         })
 
@@ -847,7 +856,7 @@ def local_train(
         metrics=metrics,
         worker_ids=worker_ids,
         with_metrics=with_metrics,
-        theta=outer_learner.get_lopt_params(gradient_learner_state),
+        theta=outer_learner.get_meta_params(gradient_learner_state),
         delta_time=delta_time,
         total_inner_steps=total_inner_steps,
         delta_inner_steps=applied_inner_steps,

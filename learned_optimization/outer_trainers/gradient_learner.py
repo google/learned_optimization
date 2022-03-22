@@ -19,6 +19,7 @@ import functools
 from typing import Any, Mapping, Optional, Sequence, Tuple, Union
 
 from absl import logging
+import chex
 import flax
 import gin
 import jax
@@ -29,11 +30,13 @@ from learned_optimization import summary
 from learned_optimization import tree_utils
 from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.optimizers import base as opt_base
-from learned_optimization.tasks import base as tasks_base
+from learned_optimization.outer_trainers import truncated_step as truncated_step_mod
 import numpy as onp
+from typing_extensions import Protocol
+
 
 PRNGKey = jnp.ndarray
-ThetaParams = Any
+MetaParams = Any
 ThetaModelState = Any
 
 
@@ -49,7 +52,7 @@ class OuterState:
 
 @flax.struct.dataclass
 class WorkerWeights:
-  theta: Any
+  theta: MetaParams
   theta_model_state: Any
   outer_state: OuterState
 
@@ -106,6 +109,13 @@ class OptCheckpoint:
   total_inner_steps: int
 
 
+class MetaInitializer(Protocol):
+  """Protocol for objects which contain a jax init function."""
+
+  def init(self, key: chex.PRNGKey) -> MetaParams:
+    pass
+
+
 @jax.jit
 def _tree_mean(stack):
   return jax.tree_map(lambda x: jnp.mean(x, axis=0), stack)
@@ -116,33 +126,29 @@ class GradientLearner:
   """Learner is responsible for training the weights of the learned opt."""
 
   def __init__(self,
-               lopt: lopt_base.LearnedOptimizer,
+               meta_init: MetaInitializer,
                theta_opt: opt_base.Optimizer,
                init_theta_from_path: Optional[str] = None,
                init_outer_state_from_path: Optional[str] = None,
                num_steps: Optional[int] = None):
     self._theta_opt = theta_opt
     self._theta_opt_update = jax.jit(self._theta_opt.update)
-    self._lopt = lopt
+    self._meta_init = meta_init
     self._init_theta_from_path = init_theta_from_path
     self._init_outer_state_from_path = init_outer_state_from_path
     self._num_steps = num_steps
 
-  @property
-  def learned_optimizer(self):
-    return self._lopt
-
-  def get_lopt_params(self, state: GradientLearnerState) -> ThetaParams:
+  def get_meta_params(self, state: GradientLearnerState) -> MetaParams:
     return self._theta_opt.get_params(state.theta_opt_state)
 
-  def get_lopt_model_state(self,
+  def get_meta_model_state(self,
                            state: GradientLearnerState) -> ThetaModelState:
     return self._theta_opt.get_state(state.theta_opt_state)
 
   def get_state_for_worker(self, state: GradientLearnerState) -> WorkerWeights:
     return WorkerWeights(
-        theta=self.get_lopt_params(state),
-        theta_model_state=self.get_lopt_model_state(state),
+        theta=self.get_meta_params(state),
+        theta_model_state=self.get_meta_model_state(state),
         outer_state=OuterState(state.theta_opt_state.iteration))
 
   def init(self, key: PRNGKey) -> GradientLearnerState:
@@ -157,7 +163,7 @@ class GradientLearner:
       gradient_learner_state: A new initial state of the gradient learner.
     """
 
-    theta_init = self._lopt.init(key)
+    theta_init = self._meta_init.init(key)
     # TODO(lmetz) hook up model state for learned optimizers
     model_state = None
 
@@ -249,8 +255,7 @@ class GradientLearner:
 
 class GradientEstimator(abc.ABC):
   """Base class for classes which estimate grads (via ES, PES, or backprop)."""
-  task_family: tasks_base.TaskFamily
-  learned_opt: lopt_base.LearnedOptimizer
+  truncated_step: truncated_step_mod.TruncatedStep
 
   def init_worker_state(self, worker_weights: WorkerWeights,
                         key: PRNGKey) -> GradientEstimatorState:
@@ -261,6 +266,9 @@ class GradientEstimator(abc.ABC):
       state: GradientEstimatorState, with_summary: Optional[bool]
   ) -> Tuple[GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
     raise NotImplementedError()
+
+  def task_name(self):
+    return "default_task"
 
 
 def _nan_to_num(vals, replace, use_jnp=False):
@@ -349,15 +357,17 @@ def gradient_worker_compute(
         idx = onp.random.randint(0, len(estimator_out.unroll_info.loss))
 
         def extract_one(idx, x):
-          return x[idx]
+          return x[idx] if x is not None else None
 
         fn = functools.partial(extract_one, idx)
         onp_task_params = jax.tree_map(onp.asarray,
                                        estimator_out.unroll_info.task_param)
+        iteration = estimator_out.unroll_info.iteration[
+            idx] if estimator_out.unroll_info.iteration is not None else None
         event_info.append({
             "loss": estimator_out.unroll_info.loss[idx, :],
             "task_param": jax.tree_map(fn, onp_task_params),
-            "iteration": estimator_out.unroll_info.iteration[idx],
+            "iteration": iteration,
             "outer_iteration": worker_weights.outer_state.outer_iteration,
         })
       else:
@@ -370,7 +380,7 @@ def gradient_worker_compute(
         # Metrics don't take into account which task they are comming from.
         # Let's add additional metrics with the task name pulled out.
         with profile.Profile("metric_computation"):
-          family_name = estimator.task_family.name
+          family_name = estimator.task_name()
           keys = list(metrics.keys())
           for k in keys:
             v = metrics[k]
@@ -434,21 +444,21 @@ class SingleMachineGradientLearner:
   """
 
   def __init__(self,
-               learned_opt: lopt_base.LearnedOptimizer,
+               meta_init: MetaInitializer,
                gradient_estimators: Sequence[GradientEstimator],
                theta_opt: opt_base.Optimizer,
                num_steps: Optional[int] = None):
     """Initializer.
 
     Args:
-      learned_opt: Learned optimizer to train
+      truncated_step: Class containing functions related to inner-training.
       gradient_estimators: Sequence of gradient estimators used to calculate
         gradients.
       theta_opt: The optimizer used to train the weights of the learned opt.
       num_steps: Number of meta-training steps used by optimizer for schedules.
     """
     self.gradient_learner = GradientLearner(
-        learned_opt, theta_opt, num_steps=num_steps)
+        meta_init, theta_opt, num_steps=num_steps)
     self.gradient_estimators = gradient_estimators
 
   def init(self, key: PRNGKey) -> SingleMachineState:
@@ -519,6 +529,6 @@ class SingleMachineGradientLearner:
         gradient_estimator_states=next_gradient_estimator_states),
             worker_compute_out.to_put.mean_loss, metrics)
 
-  def get_lopt_params(self, state: SingleMachineState) -> lopt_base.MetaParams:
+  def get_meta_params(self, state: SingleMachineState) -> lopt_base.MetaParams:
     """Get the weights of the learned optimizer."""
-    return self.gradient_learner.get_lopt_params(state.gradient_learner_state)
+    return self.gradient_learner.get_meta_params(state.gradient_learner_state)

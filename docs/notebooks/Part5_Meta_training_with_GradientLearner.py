@@ -28,9 +28,9 @@
 # ---
 
 # + [markdown] id="a7QBk71UMifh"
-# # Part 4: Meta-training with GradientLearner
+# # Part 5: Meta-training with GradientLearner
 
-# + executionInfo={"elapsed": 118, "status": "ok", "timestamp": 1642474445264, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="MimfK6lp0vq9"
+# + id="MimfK6lp0vq9"
 import numpy as np
 import jax.numpy as jnp
 import jax
@@ -40,6 +40,7 @@ from learned_optimization.outer_trainers import full_es
 from learned_optimization.outer_trainers import truncated_pes
 from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import truncation_schedule
+from learned_optimization.outer_trainers import lopt_truncated_step
 
 from learned_optimization.tasks import quadratics
 from learned_optimization.tasks.fixed import image_mlp
@@ -67,7 +68,7 @@ import tqdm
 #
 # The `SingleMachineGradientLearner` provides the functionality to meta-train a learned optimizer with one or more gradient estimator. As an example, let's train a learned optimizer leveraging gradients from 2 different tasks: a quadratic task, and a fashion mnist mlp.
 
-# + executionInfo={"elapsed": 55, "status": "ok", "timestamp": 1642474445452, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="txx2_SmH8NhL"
+# + id="txx2_SmH8NhL"
 theta_opt = opt_base.Adam(1e-3)
 
 lopt = mlp_lopt.MLPLOpt()
@@ -77,13 +78,14 @@ trunc_sched = truncation_schedule.LogUniformLengthSchedule(
 
 
 def grad_est_fn(task_family):
-  return truncated_pes.TruncatedPES(
-      task_family=task_family,
-      learned_opt=lopt,
-      trunc_sched=trunc_sched,
+  truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
+      task_family,
+      lopt,
+      trunc_sched,
       num_tasks=4,
-      trunc_length=50,
       random_initial_iteration_offset=max_length)
+  return truncated_pes.TruncatedPES(
+      truncated_step=truncated_step, trunc_length=50)
 
 
 mlp_task_family = tasks_base.single_task_to_family(
@@ -100,7 +102,7 @@ outer_trainer = gradient_learner.SingleMachineGradientLearner(
 # + [markdown] id="IKmWbqwhkxLp"
 # To use this, we must first construct the initial state which contains a randomly initialized learned optimizer, as well as all the initial state of all the inner-problems (in this case, one set for the quadratics being trained, and the other from the MLP being trained).
 
-# + executionInfo={"elapsed": 1877, "status": "ok", "timestamp": 1642474447458, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="N78WoigVkmUb" outputId="449c35c3-462f-42a8-ec77-7a66529a82cb"
+# + executionInfo={"elapsed": 2924, "status": "ok", "timestamp": 1647562738598, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="N78WoigVkmUb" outputId="9c275261-c03f-4de4-804f-b48efd1ea4ed"
 key = jax.random.PRNGKey(0)
 outer_trainer_state = outer_trainer.init(key)
 jax.tree_map(lambda x: jnp.asarray(x).shape, outer_trainer_state)
@@ -111,19 +113,19 @@ jax.tree_map(lambda x: jnp.asarray(x).shape, outer_trainer_state)
 #
 # We can train a single meta-step as follows. Note this could take a few minutes to compile.
 
-# + executionInfo={"elapsed": 15796, "status": "ok", "timestamp": 1642474463407, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="9lomKFrzkqkd" outputId="ee8eaff5-7920-49a0-bcf3-bfffbd752c93"
+# + executionInfo={"elapsed": 10757, "status": "ok", "timestamp": 1647562749465, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="9lomKFrzkqkd" outputId="cbce9749-bf2e-4abd-d7bd-8822077d587d"
 next_state, loss, metrics = outer_trainer.update(
     outer_trainer_state, key, with_metrics=False)
 
 # + [markdown] id="PZNCltmgmfug"
 # Now let's meta-train a few steps and watch the meta-loss go down.
 
-# + executionInfo={"elapsed": 31861, "status": "ok", "timestamp": 1642474495485, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="6q3_EN5qmle_" outputId="9e25f1b8-b2ec-4a60-e22d-ee3acc99c249"
+# + executionInfo={"elapsed": 38491, "status": "ok", "timestamp": 1647562788069, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="6q3_EN5qmle_" outputId="234b28a7-8d3d-4740-8275-1d75ad7e54bc"
 losses = []
 import tqdm
 
 import os
-# Pulling this from an environment variable so this file can be tested.
+# Pulling this from an environment variable so this file can be run in automated tests faster.
 outer_train_steps = int(os.environ.get("LOPT_META_TRAIN_LENGTH", 500))
 
 for i in tqdm.trange(outer_train_steps):
@@ -131,10 +133,12 @@ for i in tqdm.trange(outer_train_steps):
       outer_trainer_state, key, with_metrics=False)
   losses.append(loss)
 
-# + colab={"height": 282} executionInfo={"elapsed": 120, "status": "ok", "timestamp": 1642474495753, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="cT_iJUTHmfWt" outputId="75cb6800-27c4-481c-938e-fd1b90f7e73e"
+# + colab={"height": 282} executionInfo={"elapsed": 257, "status": "ok", "timestamp": 1647562788441, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="cT_iJUTHmfWt" outputId="436186c8-e7b5-4599-de10-aa7fc3200bc7"
 plt.plot(losses)
+plt.xlabel("outer iteration")
+plt.ylabel("outer loss")
 
-# + executionInfo={"elapsed": 3, "status": "ok", "timestamp": 1642474496032, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="akK_PYCIkwDx" outputId="f86e1542-3e87-4af0-8379-cdf178b40caf"
+# + executionInfo={"elapsed": 3, "status": "ok", "timestamp": 1647562788752, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="akK_PYCIkwDx" outputId="c3ad2258-b9ca-458d-fc52-58423d5dd0cc"
 metrics
 
 # + [markdown] id="kh27tduOwR3E"
@@ -152,11 +156,11 @@ metrics
 # As this demo is in a colab, we will do everything in one process.
 # First, we will create the central learner. This is responsible for taking in gradients, updating the weights of the learned optimizer, and providing new data back to the workers.
 
-# + executionInfo={"elapsed": 2, "status": "ok", "timestamp": 1642475145999, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="SbWqD3pbl3BW"
+# + id="SbWqD3pbl3BW"
 theta_opt = opt_base.Adam(1e-3)
 central_learner = gradient_learner.GradientLearner(lopt, theta_opt)
 
-# + executionInfo={"elapsed": 84, "status": "ok", "timestamp": 1642475146666, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="SuKABLjk3D9R" outputId="c69694a8-11fd-4112-91a4-b0711f1efc7b"
+# + executionInfo={"elapsed": 60, "status": "ok", "timestamp": 1647562789178, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="SuKABLjk3D9R" outputId="de50cad0-aabd-4f71-9a0b-85cb20a94487"
 key = jax.random.PRNGKey(0)
 central_state = central_learner.init(key)
 jax.tree_map(lambda x: jnp.asarray(x).shape, central_state)
@@ -166,26 +170,26 @@ jax.tree_map(lambda x: jnp.asarray(x).shape, central_state)
 #
 # Next, we can compute gradient estimators, but first we must get the required state from the learner.
 
-# + executionInfo={"elapsed": 2, "status": "ok", "timestamp": 1642475147260, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="1MunNqVl4TSH"
+# + id="1MunNqVl4TSH"
 worker_weights = central_learner.get_state_for_worker(central_state)
 
 # + [markdown] id="GrBAGdre4bWI"
 # Next, we can compute gradients on a given worker. As before we need to get a list of gradient estimators. We can use the same set we used before.
 
-# + executionInfo={"elapsed": 140, "status": "ok", "timestamp": 1642475147690, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="D5EfexNg5H6p"
+# + id="D5EfexNg5H6p"
 max_length = 300
 trunc_sched = truncation_schedule.LogUniformLengthSchedule(
     min_length=100, max_length=max_length)
 
 
 def grad_est_fn(task_family):
-  return truncated_pes.TruncatedPES(
-      task_family=task_family,
-      learned_opt=lopt,
-      trunc_sched=trunc_sched,
+  trunc_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
+      task_family,
+      lopt,
+      trunc_sched,
       num_tasks=16,
-      trunc_length=50,
       random_initial_iteration_offset=max_length)
+  return truncated_pes.TruncatedPES(trunc_step, trunc_length=50)
 
 
 mlp_task_family = tasks_base.single_task_to_family(
@@ -199,7 +203,7 @@ gradient_estimators = [
 # + [markdown] id="tmJEzRjw5LSA"
 # Next, we need to kick things off by first computing the initial states for each of the gradient estimators.
 
-# + executionInfo={"elapsed": 2654, "status": "ok", "timestamp": 1642475150735, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="gsPQvD4Y5RQd" outputId="f99121fc-f543-427d-e882-d21819330d75"
+# + executionInfo={"elapsed": 1143, "status": "ok", "timestamp": 1647562879797, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="gsPQvD4Y5RQd" outputId="ee93ac90-fed8-42d5-e376-2aa52b7da2df"
 unroll_states = [
     grad.init_worker_state(worker_weights, key=jax.random.fold_in(key, i))
     for (i, grad) in enumerate(gradient_estimators)
@@ -208,7 +212,7 @@ unroll_states = [
 # + [markdown] id="gE4nf01r6AcB"
 # Next we can use these states to estimate a meta-gradient!
 
-# + executionInfo={"elapsed": 18204, "status": "ok", "timestamp": 1642475169126, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="sd_DuFzS3Gr8" outputId="fb768953-cdcb-4a30-d4fc-8b3243526a5d"
+# + executionInfo={"elapsed": 10255, "status": "ok", "timestamp": 1647562891517, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="sd_DuFzS3Gr8" outputId="b742898c-ecb0-4f43-c9e8-19ac8a484770"
 out = gradient_learner.gradient_worker_compute(
     worker_weights,
     gradient_estimators,
@@ -219,7 +223,7 @@ out = gradient_learner.gradient_worker_compute(
 # + [markdown] id="B01vLh7V5-zu"
 # This produces a couple of different outputs bundled together in a dataclass.
 
-# + executionInfo={"elapsed": 3, "status": "ok", "timestamp": 1642475169475, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="Ax495URy6LSA" outputId="cd669daf-5d28-4868-c046-f0b6d2b0af86"
+# + executionInfo={"elapsed": 83, "status": "ok", "timestamp": 1647562891712, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="Ax495URy6LSA" outputId="d66c3912-719a-4867-c7b4-35ccbf3697b7"
 [x for x in dir(out) if not x.startswith("__") and x != "replace"]
 
 # + [markdown] id="HI-xgDib0c6d"
@@ -228,14 +232,14 @@ out = gradient_learner.gradient_worker_compute(
 # + [markdown] id="VAKMmIRt6e60"
 # Now with more than one worker, we would pass back a list of these gradients. In this demo, we will just use a single one, and pass this directly into the central learner to get the next meta-iteration. With more workers, this would contain a different gradient estimator from each worker.
 
-# + executionInfo={"elapsed": 185, "status": "ok", "timestamp": 1642475170013, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="pne3-Yy147tW"
+# + id="pne3-Yy147tW"
 grads_list = [out.to_put]
 central_state, metrics = central_learner.update(central_state, grads_list)
 
 # + [markdown] id="i0H_re9cVW1b"
 # And we can do this over and over again. This time let's do it with more than one gradient estimate.
 
-# + executionInfo={"elapsed": 62042, "status": "ok", "timestamp": 1642475232310, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="KNIUGUvKVwld" outputId="37709a54-0c73-4210-9eb1-54dbe9fa0575"
+# + executionInfo={"elapsed": 62457, "status": "ok", "timestamp": 1647562954574, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="KNIUGUvKVwld" outputId="997ad5f5-e7a1-4b4c-bdc5-02f322178273"
 losses = []
 
 outer_train_steps = int(os.environ.get("LOPT_META_TRAIN_LENGTH", 500))
@@ -256,5 +260,9 @@ for i in tqdm.trange(outer_train_steps):
   central_state, metrics = central_learner.update(central_state, [out.to_put])
   losses.append(out.to_put.mean_loss)
 
-# + colab={"height": 282} executionInfo={"elapsed": 227, "status": "ok", "timestamp": 1642475232707, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="WszEeLOBJw0x" outputId="64a2a6f2-9032-40d9-c1fc-5af448bcedde"
+# + colab={"height": 296} executionInfo={"elapsed": 177, "status": "ok", "timestamp": 1647563002848, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="WszEeLOBJw0x" outputId="d548cd42-aa08-407b-e65c-a2e3bacb7b91"
 plt.plot(losses)
+plt.xlabel("outer iteration")
+plt.ylabel("outer loss")
+
+# + id="nyqYdAFIaFJh"

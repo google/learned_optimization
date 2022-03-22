@@ -112,7 +112,6 @@ input_size = onp.prod(batch["image"].shape[1:])
 #
 # Our task will have 2 methods -- an init which constructs the initial values of the weights, and a loss which applies the MLP, and returns the average cross entropy loss.
 
-
 # + executionInfo={"elapsed": 1547, "status": "ok", "timestamp": 1647716624386, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="SNUAeWO65TzL" outputId="69ff87c8-4b39-4cd3-c16c-b42edf249113"
 class MLPTask:
 
@@ -166,7 +165,6 @@ plt.plot(losses)
 #
 # In the case of SGD, this state is just the parameter values.
 
-
 # + executionInfo={"elapsed": 54, "status": "ok", "timestamp": 1647716627049, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="WX6fbsYu8Xmy"
 class SGD:
 
@@ -199,7 +197,6 @@ plt.plot(losses)
 
 # + [markdown] id="uCOBWVkeq2qD"
 # Now, let's define some other optimizers. Momentum makes use of an additional accumulator variable. We can define it as follows.
-
 
 # + executionInfo={"elapsed": 52, "status": "ok", "timestamp": 1647716628264, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="h70Uo7TB89zk"
 class Momentum:
@@ -239,7 +236,6 @@ plt.plot(losses)
 
 # + [markdown] id="RrwIMhObH29t"
 # And finally, we can implement Adam.
-
 
 # + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647716629923, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="L7gd-MqEH2da"
 class Adam:
@@ -289,7 +285,6 @@ class Adam:
 # We use this formulation, as opposed to simply outputting a direct value, as empirically it is easier to meta-train.
 #
 # Choosing input parameterizations, and output parameterizations varies across learned optimizer architecture and paper.
-
 
 # + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647716630098, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="ymF3QnR0-UdM"
 class LOpt:
@@ -494,7 +489,6 @@ plt.ylabel("loss")
 #
 # One big advantage to vectorizing in this way is to make better use of hardware accelerators. When training learned optimizers, we often apply them to small problems for speedy meta-training. These small problems can be a poor fit for the underlying hardware which often consists of big matrix multiplication units. What vectorization does compute multiple of these small problems *at the same time*, which, depending on the details, can be considerably faster.
 
-
 # + executionInfo={"elapsed": 3598, "status": "ok", "timestamp": 1647716643584, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="8qud5EuWniIF"
 def get_vec_batch_seq(vec_size, seq_len):
   batches = [get_batch_seq(seq_len) for _ in range(vec_size)]
@@ -551,7 +545,6 @@ plt.plot(meta_losses)
 # where $L$ is the meta-loss.
 #
 # As before, we will construct a vectorized version of these estimators to average over a number of different random directions.
-
 
 # + executionInfo={"elapsed": 2115, "status": "ok", "timestamp": 1647716654716, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="KHd6Sf0mu_CZ"
 def antithetic_es_estimate(meta_params, key, seq_of_batches):
@@ -623,7 +616,6 @@ plt.plot(meta_losses)
 # The code for this is a bit more involved. First, we need to keep track of each inner problem. In our case, this means keeping track of the inner problems optimizer state, as well as the current training iteration. Next, we must check if we are at the end of an inner-training. We fix the length of the inner training to be 100 for this example. We can then define a function (`short_segment_unroll`) which both progresses training by some number of steps,
 # and return the loss from that segment.
 
-
 # + executionInfo={"elapsed": 693, "status": "ok", "timestamp": 1647716674268, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="ri9wWMPizb-G" outputId="6025ce7a-98e5-459a-e1a7-6e19792056d0"
 def short_segment_unroll(meta_params,
                          key,
@@ -671,7 +663,6 @@ on_iteration
 # Now with this function, we are free to estimate gradients over just this one short unroll rather than the full inner-training. We can use whatever gradient estimator we want -- either ES, or with backprop gradients -- but for now I will show an example with backprop gradients.
 #
 # As before, we construct a vectorized version of this unroll function, and compute gradients with `jax.value_and_grad`.
-
 
 # + executionInfo={"elapsed": 3, "status": "ok", "timestamp": 1647716674380, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="xJRkyAX_1Oge"
 def vec_short_segment_unroll(meta_params,
@@ -764,7 +755,6 @@ for j in range(10):
 # + [markdown] id="tCyfmmax2_rp"
 # ## Meta-training truncated ES
 # Next, instead of meta-training with truncated gradients, we will meta-train with truncated evolution strategies.
-
 
 # + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647716701170, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="rxQbMHDf3Rfn"
 @jax.jit
@@ -863,12 +853,12 @@ plt.plot(meta_losses)
 plt.xlabel("meta-iterations")
 plt.ylabel("meta-loss")
 
+
 # + [markdown] id="D-8DhN_o2R7L"
 # ## Meta-training with truncations with less bias: Persistent Evolution Strategies (PES)
 # When training with truncated evolutionary strategies, as well as truncated backprop through time and truncated evolutionary strategies one cannot compute the effect of one truncated segment, on other truncated segments. This introduces bias when working with longer sequences.
 #
 # PES is one ES based algorithm to prevent such bias.
-
 
 # + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647716735333, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="WEfssK2R9-Gs"
 @jax.jit
@@ -933,7 +923,6 @@ def vec_short_segment_pes(meta_param,
     # if we finished one trajectory.
     def _switch_one_accum(a, b):
       return jnp.where(has_finished[-1], a, b)
-
     new_accum = jax.tree_multimap(_switch_one_accum, perturbs, new_accum)
 
     next_pes_state = (new_accum, pos_opt_state, neg_opt_state,
@@ -960,12 +949,9 @@ batch = get_batch_seq(10)
 
 meta_params = lopt.init_meta_params(key)
 
-
 # construct the initial PES state which is passed from iteration to iteration
 def init_single_inner_opt_state(key):
   return lopt.initial_inner_opt_state(meta_params, task.init(key))
-
-
 keys = jax.random.split(key, num_tasks)
 inner_opt_states = jax.vmap(init_single_inner_opt_state)(keys)
 accumulator = jax.tree_map(lambda x: jnp.zeros([num_tasks] + list(x.shape)),

@@ -18,6 +18,7 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 from learned_optimization.learned_optimizers import base
+from learned_optimization.outer_trainers import lopt_truncated_step
 from learned_optimization.outer_trainers import test_utils
 from learned_optimization.outer_trainers import truncated_pes
 from learned_optimization.outer_trainers import truncation_schedule
@@ -30,9 +31,10 @@ class TruncatedPesTest(parameterized.TestCase):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamily(10)
     trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
+        task_family, learned_opt, trunc_sched, num_tasks=5)
 
-    trainer = truncated_pes.TruncatedPES(
-        task_family, learned_opt, trunc_sched, num_tasks=5, steps_per_jit=5)
+    trainer = truncated_pes.TruncatedPES(truncated_step, steps_per_jit=5)
     test_utils.trainer_smoketest(trainer)
 
   @parameterized.product(train_and_meta=(True, False))
@@ -40,14 +42,14 @@ class TruncatedPesTest(parameterized.TestCase):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
     trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
-
-    trainer = truncated_pes.TruncatedPES(
+    truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
         task_family,
         learned_opt,
         trunc_sched,
         num_tasks=5,
-        steps_per_jit=5,
         train_and_meta=train_and_meta)
+
+    trainer = truncated_pes.TruncatedPES(truncated_step, steps_per_jit=5)
 
     test_utils.trainer_smoketest(trainer)
 
@@ -55,13 +57,10 @@ class TruncatedPesTest(parameterized.TestCase):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
     trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
+        task_family, learned_opt, trunc_sched, num_tasks=5)
     trainer = truncated_pes.TruncatedPES(
-        task_family,
-        learned_opt,
-        trunc_sched,
-        num_tasks=5,
-        steps_per_jit=5,
-        stack_antithetic_samples=True)
+        truncated_step, steps_per_jit=5, stack_antithetic_samples=True)
 
     test_utils.trainer_smoketest(trainer)
 

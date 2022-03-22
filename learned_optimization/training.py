@@ -47,7 +47,9 @@ def get_batches(task_family: tasks_base.TaskFamily,
                 numpy: bool = False,
                 split: str = "train") -> Any:
   """Get batches of data with the `batch_shape` leading dimension."""
-  if len(batch_shape) == 2:
+  if len(batch_shape) == 1:
+    return get_batch(task_family, batch_shape[0], train_and_meta, numpy, split)
+  elif len(batch_shape) == 2:
     datas_list = [
         get_batch(task_family, batch_shape[1], train_and_meta, numpy, split)
         for _ in range(batch_shape[0])

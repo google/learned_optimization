@@ -48,6 +48,7 @@ class FakeGradientEstimator(gradient_learner.GradientEstimator):
     return out, {"mean||metric": 1}
 
 
+
 class GradientLearnerTest(absltest.TestCase):
 
   def test_gradient_learner(self):
@@ -113,8 +114,8 @@ class GradientLearnerTest(absltest.TestCase):
     del loss, metrics
 
     # check that the learned optimizer params changed.
-    self.assertEqual(learner.get_lopt_params(state)["log_lr"], 0.0)
-    self.assertEqual(learner.get_lopt_params(state2)["log_lr"], -1.5)
+    self.assertEqual(learner.get_meta_params(state)["log_lr"], 0.0)
+    self.assertEqual(learner.get_meta_params(state2)["log_lr"], -1.5)
 
   def test_init_from_params(self):
     with tempfile.TemporaryDirectory() as d:

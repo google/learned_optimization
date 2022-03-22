@@ -18,7 +18,6 @@
 import functools
 import tempfile
 import threading
-import portpicker
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -28,11 +27,13 @@ from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.optimizers import base as opt_base
 from learned_optimization.outer_trainers import full_es
 from learned_optimization.outer_trainers import gradient_learner
+from learned_optimization.outer_trainers import lopt_truncated_step
 from learned_optimization.outer_trainers import truncated_pes
 from learned_optimization.outer_trainers import truncation_schedule
 from learned_optimization.population import population as population_mod
 from learned_optimization.population.mutators import single_worker_explore
 from learned_optimization.tasks import quadratics
+import portpicker
 
 
 
@@ -60,9 +61,15 @@ class OuterTrainTest(parameterized.TestCase):
       gin.bind_parameter("build_gradient_estimators.sample_task_family_fn",
                          task_family_fn)
 
-      trainer_fn = functools.partial(full_es.FullES, num_tasks=2)
       gin.bind_parameter("build_gradient_estimators.gradient_estimator_fn",
-                         trainer_fn)
+                         full_es.FullES)
+
+      gin.bind_parameter(
+          "build_gradient_estimators.truncated_step_fn",
+          functools.partial(
+              lopt_truncated_step.VectorizedLOptTruncatedStep,
+              num_tasks=2,
+              trunc_sched=truncation_schedule.ConstantTruncationSchedule(10)))
 
       outer_learner = gradient_learner.GradientLearner(lopt, opt_base.Adam())
 
@@ -109,9 +116,15 @@ class OuterTrainTest(parameterized.TestCase):
       gin.bind_parameter("build_gradient_estimators.sample_task_family_fn",
                          task_family_fn)
 
-      trainer_fn = functools.partial(full_es.FullES, num_tasks=2)
       gin.bind_parameter("build_gradient_estimators.gradient_estimator_fn",
-                         trainer_fn)
+                         full_es.FullES)
+
+      gin.bind_parameter(
+          "build_gradient_estimators.truncated_step_fn",
+          functools.partial(
+              lopt_truncated_step.VectorizedLOptTruncatedStep,
+              num_tasks=2,
+              trunc_sched=truncation_schedule.ConstantTruncationSchedule(10)))
 
       outer_learner = gradient_learner.GradientLearner(lopt, opt_base.Adam())
 
@@ -152,11 +165,16 @@ class OuterTrainTest(parameterized.TestCase):
       gin.bind_parameter("build_gradient_estimators.sample_task_family_fn",
                          task_family_fn)
 
-      sched = truncation_schedule.ConstantTruncationSchedule(10)
-      trainer_fn = functools.partial(
-          truncated_pes.TruncatedPES, num_tasks=2, trunc_sched=sched)
       gin.bind_parameter("build_gradient_estimators.gradient_estimator_fn",
-                         trainer_fn)
+                         truncated_pes.TruncatedPES)
+
+      sched = truncation_schedule.ConstantTruncationSchedule(10)
+      gin.bind_parameter(
+          "build_gradient_estimators.truncated_step_fn",
+          functools.partial(
+              lopt_truncated_step.VectorizedLOptTruncatedStep,
+              num_tasks=2,
+              trunc_sched=sched))
 
       outer_learner = gradient_learner.GradientLearner(lopt, opt_base.Adam())
 

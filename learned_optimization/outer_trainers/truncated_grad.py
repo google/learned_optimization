@@ -18,22 +18,20 @@
 See TruncatedGrad for more info.
 """
 
-from typing import Mapping, Tuple
+from typing import Any, Mapping, Tuple
 
 import gin
 import jax
 import jax.numpy as jnp
 from learned_optimization import profile
 from learned_optimization import summary
-from learned_optimization import training
 from learned_optimization import tree_utils
-from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.outer_trainers import common
 from learned_optimization.outer_trainers import gradient_learner
-from learned_optimization.outer_trainers import truncation_schedule
-from learned_optimization.tasks import base as tasks_base
+from learned_optimization.outer_trainers import truncated_step as truncated_step_mod
 
 PRNGKey = jnp.ndarray
+UnrollState = Any
 
 
 @gin.configurable
@@ -61,48 +59,24 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
 
   def __init__(
       self,
-      task_family: tasks_base.TaskFamily,
-      learned_opt: lopt_base.LearnedOptimizer,
-      trunc_sched: truncation_schedule.TruncationSchedule,
-      num_tasks: int,
+      truncated_step: truncated_step_mod.VectorizedTruncatedStep,
       unroll_length: int = 20,
       steps_per_jit: int = 10,
-      train_and_meta: bool = False,
       loss_type: str = "avg",
-      random_initial_iteration_offset: int = 0,
   ):
     """Initializer.
 
     Args:
-      task_family: task family to do unrolls on.
-      learned_opt: learned optimizer instance.
-      trunc_sched: truncation schedule to use.
-      num_tasks: number of tasks to vmap over.
+      truncated_step: Class containing functions to unroll the inner-problem.
       unroll_length: length of the unroll
       steps_per_jit: How many steps to jit together. Needs to be a multiple of
         unroll_length.
-      train_and_meta: Use just training data, or use both training data and
-        validation data for the meta-objective.
       loss_type: either "avg" or "last_recompute". How to compute the loss for
         ES.
-      random_initial_iteration_offset: An initial offset for the inner-steps of
-        each task. This is to prevent all tasks running in lockstep. This should
-        be set to the max number of steps the truncation schedule.
     """
-    self.task_family = task_family
-    self.learned_opt = learned_opt
-    self.trunc_sched = trunc_sched
-    self.num_tasks = num_tasks
+    self.truncated_step = truncated_step
     self.unroll_length = unroll_length
     self.steps_per_jit = steps_per_jit
-    self.train_and_meta = train_and_meta
-    self.random_initial_iteration_offset = random_initial_iteration_offset
-
-    self.data_shape = jax.tree_map(
-        lambda x: jax.ShapedArray(shape=x.shape, dtype=x.dtype),
-        training.vec_get_batch(task_family, num_tasks, numpy=True))
-
-    self.loss_type = loss_type
 
     if self.unroll_length % self.steps_per_jit != 0:
       raise ValueError("Pass a unroll_length and steps_per_jit that are"
@@ -110,61 +84,33 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
 
   @profile.wrap()
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
-                        key: PRNGKey) -> common.TruncatedUnrollState:
-    key1, key2 = jax.random.split(key)
-    theta = worker_weights.theta
-
-    unroll_state = common.init_truncation_state(
-        self.task_family, self.learned_opt, self.trunc_sched, theta,
-        worker_weights.outer_state, jax.random.split(key1, self.num_tasks))
-    # When initializing, we want to keep the trajectories not all in sync.
-    # To do this, we can initialize with a random offset on the inner-step.
-    if self.random_initial_iteration_offset:
-      inner_step = jax.random.randint(
-          key2,
-          unroll_state.inner_step.shape,
-          0,
-          self.random_initial_iteration_offset,
-          dtype=unroll_state.inner_step.dtype)
-
-      unroll_state = unroll_state.replace(inner_step=inner_step)
-
-    return unroll_state
+                        key: PRNGKey) -> UnrollState:
+    return self.truncated_step.init_step_state(
+        worker_weights.theta,
+        worker_weights.outer_state,
+        key,
+        vectorize_theta=False)
 
   @profile.wrap()
   def compute_gradient_estimate(
       self,
       worker_weights,
       key,
-      state,
+      state: UnrollState,
       with_summary=False,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
-
-    def get_batch():
-      return training.get_batches(
-          self.task_family, (self.steps_per_jit, self.num_tasks),
-          self.train_and_meta,
-          numpy=False)
-
     def meta_loss(theta, key, state):
       metrics = []
       outputs = []
       for i in range(self.unroll_length // self.steps_per_jit):
-        datas = get_batch()
-
+        datas = self.truncated_step.get_batch(self.steps_per_jit)
         key_i = jax.random.fold_in(key, i)
         key1, key2 = jax.random.split(key_i)
 
         vectorized_theta = False
-        stack_antithetic_samples = False
         (state, ys), m = common.truncated_unroll(
-            self.task_family,
-            self.learned_opt,
-            self.trunc_sched,
-            self.num_tasks,
+            self.truncated_step,
             self.steps_per_jit,
-            self.train_and_meta,
-            stack_antithetic_samples,
             vectorized_theta,
             theta,
             key1,
@@ -181,7 +127,8 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
 
       ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(outputs))
 
-      assert ys.loss.shape == (self.unroll_length, self.num_tasks)
+      assert ys.loss.shape == (self.unroll_length,
+                               self.truncated_step.num_tasks)
 
       vec_mean_loss = jnp.mean(ys.loss, axis=0)
       return jnp.mean(vec_mean_loss), (state, ys, metrics)

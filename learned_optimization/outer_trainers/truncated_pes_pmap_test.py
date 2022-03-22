@@ -19,6 +19,7 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import jax
 from learned_optimization.learned_optimizers import base
+from learned_optimization.outer_trainers import lopt_truncated_step
 from learned_optimization.outer_trainers import test_utils
 from learned_optimization.outer_trainers import truncated_pes
 from learned_optimization.outer_trainers import truncation_schedule
@@ -32,6 +33,12 @@ class TruncatedPesTest(parameterized.TestCase):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
     trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
+        task_family,
+        learned_opt,
+        trunc_sched,
+        train_and_meta=train_and_meta,
+        num_tasks=8)
 
     num_devices = len(jax.local_devices())
     if num_devices != 8:
@@ -39,13 +46,7 @@ class TruncatedPesTest(parameterized.TestCase):
                     " Please fun this test with exactly 8 accelerators.")
 
     trainer = truncated_pes.TruncatedPESPMAP(
-        num_devices=num_devices,
-        task_family=task_family,
-        learned_opt=learned_opt,
-        trunc_sched=trunc_sched,
-        num_tasks=5,
-        steps_per_jit=5,
-        train_and_meta=train_and_meta)
+        truncated_step=truncated_step, num_devices=num_devices, steps_per_jit=5)
 
     test_utils.trainer_smoketest(trainer)
 

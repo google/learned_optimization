@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Simple learned optimizer training example using gradient estimator APIs."""
-from typing import Sequence, Optional
+from typing import Optional, Sequence
 
 from absl import app
 from absl import flags
@@ -25,6 +25,7 @@ from learned_optimization.learned_optimizers import base as lopt_base  # pylint:
 from learned_optimization.learned_optimizers import mlp_lopt
 from learned_optimization.optimizers import base as opt_base
 from learned_optimization.outer_trainers import gradient_learner
+from learned_optimization.outer_trainers import lopt_truncated_step
 from learned_optimization.outer_trainers import truncated_pes
 from learned_optimization.outer_trainers import truncation_schedule
 from learned_optimization.tasks import base as tasks_base
@@ -70,13 +71,15 @@ def train(train_log_dir: str,
 
   task_family = tasks_base.single_task_to_family(task)
 
-  grad_est = truncated_pes.TruncatedPES(
+  truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
       task_family=task_family,
       learned_opt=lopt,
       trunc_sched=trunc_sched,
       num_tasks=num_tasks,
-      trunc_length=trunc_length,
       random_initial_iteration_offset=max_length)
+
+  grad_est = truncated_pes.TruncatedPES(
+      truncated_step=truncated_step, trunc_length=trunc_length)
 
   gradient_estimators = [grad_est]
 

@@ -27,31 +27,30 @@ from jax import lax
 import jax.numpy as jnp
 from learned_optimization import profile
 from learned_optimization import summary
-from learned_optimization import training
 from learned_optimization import tree_utils
-from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.outer_trainers import common
 from learned_optimization.outer_trainers import gradient_learner
-from learned_optimization.outer_trainers import truncation_schedule
-from learned_optimization.tasks import base as tasks_base
+from learned_optimization.outer_trainers import truncated_step as truncated_step_mod
 
 PRNGKey = jnp.ndarray
+MetaParams = Any
+TruncatedUnrollState = Any
 
 
 @flax.struct.dataclass
 class PESWorkerState(gradient_learner.GradientEstimatorState):
-  pos_state: common.TruncatedUnrollState
-  neg_state: common.TruncatedUnrollState
-  accumulator: Any
+  pos_state: TruncatedUnrollState
+  neg_state: TruncatedUnrollState
+  accumulator: MetaParams
 
 
 @functools.partial(jax.jit, static_argnames=("std",))
 def compute_pes_grad(
-    p_yses: Sequence[common.TruncatedUnrollOut],
-    n_yses: Sequence[common.TruncatedUnrollOut],
-    accumulator: lopt_base.MetaParams, vec_pos: lopt_base.MetaParams, std: float
-) -> Tuple[float, lopt_base.MetaParams, lopt_base.MetaParams,
-           common.TruncatedUnrollOut, float]:
+    p_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
+    n_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
+    accumulator: MetaParams, vec_pos: MetaParams, std: float
+) -> Tuple[float, MetaParams, MetaParams, truncated_step_mod.TruncatedUnrollOut,
+           float]:
   """Compute the PES gradient estimate from the outputs of many unrolls.
 
   Args:
@@ -132,32 +131,18 @@ class TruncatedPES(gradient_learner.GradientEstimator):
 
   def __init__(
       self,
-      task_family: tasks_base.TaskFamily,
-      learned_opt: lopt_base.LearnedOptimizer,
-      trunc_sched: truncation_schedule.TruncationSchedule,
-      num_tasks: int,
+      truncated_step: truncated_step_mod.VectorizedTruncatedStep,
       trunc_length=10,
-      random_initial_iteration_offset: int = 0,
       std=0.01,
       steps_per_jit=10,
-      train_and_meta=False,
       stack_antithetic_samples: bool = False,
   ):
-    self.trunc_sched = trunc_sched
-    self.task_family = task_family
-    self.learned_opt = learned_opt
-    self.num_tasks = num_tasks
-    self.random_initial_iteration_offset = random_initial_iteration_offset
+    self.truncated_step = truncated_step
     self.std = std
 
     self.trunc_length = trunc_length
     self.steps_per_jit = steps_per_jit
-    self.train_and_meta = train_and_meta
     self.stack_antithetic_samples = stack_antithetic_samples
-
-    self.data_shape = jax.tree_map(
-        lambda x: jax.ShapedArray(shape=x.shape, dtype=x.dtype),
-        training.vec_get_batch(task_family, num_tasks, numpy=False))
 
     if self.trunc_length % self.steps_per_jit != 0:
       raise ValueError("Pass a trunc_length and steps_per_jit that are"
@@ -166,32 +151,15 @@ class TruncatedPES(gradient_learner.GradientEstimator):
   @profile.wrap()
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
                         key: PRNGKey) -> PESWorkerState:
-    key1, key2 = jax.random.split(key)
     theta = worker_weights.theta
-    # Note this doesn't use sampled theta for the first init.
-    # I believe this is fine most of the time.
-    # TODO(lmetz) consider init-ing at an is_done state instead.
-    pos_unroll_state = common.init_truncation_state(
-        self.task_family, self.learned_opt, self.trunc_sched, theta,
-        worker_weights.outer_state, jax.random.split(key1, self.num_tasks))
 
+    pos_unroll_state = self.truncated_step.init_step_state(
+        theta, worker_weights.outer_state, key, vectorize_theta=False)
     neg_unroll_state = pos_unroll_state
 
-    # When initializing, we want to keep the trajectories not all in sync.
-    # To do this, we can initialize with a random offset on the inner-step.
-    if self.random_initial_iteration_offset:
-      inner_step = jax.random.randint(
-          key2,
-          pos_unroll_state.inner_step.shape,
-          0,
-          self.random_initial_iteration_offset,
-          dtype=pos_unroll_state.inner_step.dtype)
-
-      pos_unroll_state = pos_unroll_state.replace(inner_step=inner_step)
-      neg_unroll_state = neg_unroll_state.replace(inner_step=inner_step)
-
     accumulator = jax.tree_multimap(
-        lambda x: jnp.zeros([self.num_tasks] + list(x.shape)), theta)
+        lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),
+        theta)
 
     return PESWorkerState(
         pos_state=pos_unroll_state,
@@ -215,20 +183,14 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     theta = worker_weights.theta
 
     vec_pos, vec_p_theta, vec_n_theta = common.vector_sample_perturbations(
-        theta, next(rng), self.std, self.num_tasks)
+        theta, next(rng), self.std, self.truncated_step.num_tasks)
 
     p_yses = []
     n_yses = []
     metrics = []
 
-    def get_batch():
-      return training.get_batches(
-          self.task_family, (self.steps_per_jit, self.num_tasks),
-          self.train_and_meta,
-          numpy=False)
-
     for _ in range(self.trunc_length // self.steps_per_jit):
-      datas = get_batch()
+      datas = self.truncated_step.get_batch(self.steps_per_jit)
 
       # force all to be non weak type. This is for cache hit reasons.
       # TODO(lmetz) consider instead just setting the weak type flag?
@@ -236,50 +198,20 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       n_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), n_state)
 
       key = next(rng)
-      vectorized_theta = True
-      static_args = [
-          self.task_family,
-          self.learned_opt,
-          self.trunc_sched,
-          self.num_tasks,
+
+      p_state, n_state, p_ys, n_ys, m = common.maybe_stacked_es_unroll(
+          self.truncated_step,
           self.steps_per_jit,
-          self.train_and_meta,
           self.stack_antithetic_samples,
-          vectorized_theta,
-      ]
-
-      # we provide 2 ways to compute the antithetic unrolls:
-      # First, we stack the positive and negative states and compute things
-      # in parallel
-      # Second, we do this serially in python.
-      if self.stack_antithetic_samples:
-
-        def stack(a, b, axis=0):
-          return jax.tree_map(lambda x, y: jnp.concatenate([x, y], axis=axis),
-                              a, b)
-
-        (pn_state, pn_ys), m = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
-            *(static_args + [
-                stack(vec_p_theta, vec_n_theta), key,
-                stack(p_state, n_state),
-                stack(datas, datas, axis=1), worker_weights.outer_state
-            ]),
-            with_summary=with_summary,
-            sample_rng_key=next(rng))
-        p_state = jax.tree_map(lambda x: x[0:self.num_tasks], pn_state)
-        n_state = jax.tree_map(lambda x: x[self.num_tasks:], pn_state)
-        p_ys = jax.tree_map(lambda x: x[:, 0:self.num_tasks], pn_ys)
-        n_ys = jax.tree_map(lambda x: x[:, self.num_tasks:], pn_ys)
-      else:
-        (p_state, p_ys), m = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
-            *(static_args +
-              [vec_p_theta, key, p_state, datas, worker_weights.outer_state]),
-            with_summary=with_summary,
-            sample_rng_key=next(rng))
-        (n_state, n_ys), _ = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
-            *(static_args +
-              [vec_n_theta, key, n_state, datas, worker_weights.outer_state]),
-            with_summary=False)
+          vec_p_theta,
+          vec_n_theta,
+          p_state,
+          n_state,
+          key,
+          datas,
+          worker_weights.outer_state,
+          with_summary=with_summary,
+          sample_rng_key=next(rng))
 
       metrics.append(m)
       p_yses.append(p_ys)
@@ -305,20 +237,11 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       metrics["sample||delta_loss_sample"] = summary.sample_value(
           key, jnp.abs(delta_loss))
       metrics["mean||delta_loss_mean"] = jnp.abs(delta_loss)
-      metrics["sample||inner_step"] = p_state.inner_step[0]
-      metrics["sample||end_inner_step"] = p_state.inner_step[0]
+      if hasattr(p_state, "inner_step"):
+        metrics["sample||inner_step"] = p_state.inner_step[0]
+        metrics["sample||end_inner_step"] = p_state.inner_step[0]
 
     return output, metrics
-
-
-# Helper functions for PMAP-ed PES
-@functools.partial(jax.jit, static_argnums=(1, 2))
-def _vectorized_key(key, dim1, dim2):
-
-  def sp(key):
-    return jax.random.split(key, dim2)
-
-  return jax.vmap(sp)(jax.random.split(key, dim1))
 
 
 @functools.partial(jax.pmap, axis_name="dev")
@@ -347,11 +270,8 @@ class TruncatedPESPMAP(TruncatedPES):
                        f" Found: {jax.local_devices()}."
                        f" Expected {num_devices} devices.")
 
-    init_single_partial = functools.partial(common.init_truncation_state,
-                                            self.task_family, self.learned_opt,
-                                            self.trunc_sched)
-    self.pmap_init_single_state = jax.pmap(
-        init_single_partial, in_axes=(None, None, 0))
+    self.pmap_init_step_state = jax.pmap(
+        self.truncated_step.init_step_state, in_axes=(None, None, 0))
 
     self.pmap_compute_pes_grad = jax.pmap(
         functools.partial(compute_pes_grad, std=self.std))
@@ -360,7 +280,7 @@ class TruncatedPESPMAP(TruncatedPES):
         functools.partial(
             common.vector_sample_perturbations,
             std=self.std,
-            num_samples=self.num_tasks),
+            num_samples=self.truncated_step.num_tasks),
         in_axes=(None, 0),
     )
 
@@ -374,19 +294,16 @@ class TruncatedPESPMAP(TruncatedPES):
   def pmap_unroll_next_state(self, vec_theta, key, state, datas, outer_state,
                              with_summary):
     vectorized_theta = True
-    static_args = [
-        self.task_family,
-        self.learned_opt,
-        self.trunc_sched,
-        self.num_tasks,
-        self.steps_per_jit,
-        self.train_and_meta,
-        self.stack_antithetic_samples,
-        vectorized_theta,
-    ]
     key1, key2 = jax.random.split(key)
     (p_state, p_ys), m = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
-        *(static_args + [vec_theta, key1, state, datas, outer_state]),
+        self.truncated_step,
+        self.steps_per_jit,
+        vectorized_theta,
+        vec_theta,
+        key1,
+        state,
+        datas,
+        outer_state,
         with_summary=with_summary,
         sample_rng_key=key2)
     return (p_state, p_ys), m
@@ -394,33 +311,20 @@ class TruncatedPESPMAP(TruncatedPES):
   @profile.wrap()
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
                         key: PRNGKey) -> PESWorkerState:
-    key1, key2 = jax.random.split(key)
     theta = worker_weights.theta
 
-    keys = _vectorized_key(key1, self.num_devices, self.num_tasks)
+    keys = jax.random.split(key, self.num_devices)
     # Note this doesn't use sampled theta for the first init.
     # I believe this is fine most of the time.
     # TODO(lmetz) consider init-ing at an is_done state instead.
-    pos_unroll_state = self.pmap_init_single_state(theta,
-                                                   worker_weights.outer_state,
-                                                   keys)
+    pos_unroll_state = self.pmap_init_step_state(worker_weights.theta,
+                                                 worker_weights.outer_state,
+                                                 keys)
     neg_unroll_state = pos_unroll_state
 
-    # When initializing, we want to keep the trajectories not all in sync.
-    # To do this, we can initialize with a random offset on the inner-step.
-    if self.random_initial_iteration_offset:
-      inner_step = jax.random.randint(
-          key2,
-          pos_unroll_state.inner_step.shape,
-          0,
-          self.random_initial_iteration_offset,
-          dtype=pos_unroll_state.inner_step.dtype)
-      pos_unroll_state = pos_unroll_state.replace(inner_step=inner_step)
-      neg_unroll_state = neg_unroll_state.replace(inner_step=inner_step)
-
-    # TODO(lmetz) check the shape of the the accumulator
     accumulator = jax.tree_multimap(
-        lambda x: jnp.zeros([self.num_tasks] + list(x.shape)), theta)
+        lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),
+        theta)
     accumulator = jax_utils.replicate(accumulator)
 
     return PESWorkerState(
@@ -453,21 +357,16 @@ class TruncatedPESPMAP(TruncatedPES):
 
     def get_batch():
       """Get batch with leading dims [num_devices, steps_per_jit, num_tasks]."""
-
       if self.replicate_data_across_devices:
-        # Use the same data across each device
-        b = training.get_batches(
-            self.task_family, (self.steps_per_jit, self.num_tasks),
-            self.train_and_meta,
-            numpy=False)
+        b = self.truncated_step.get_batch(self.steps_per_jit)
         return jax_utils.replicate(b)
       else:
         # Use different data across the devices
-        return training.get_batches(
-            self.task_family,
-            (self.num_devices, self.steps_per_jit, self.num_tasks),
-            self.train_and_meta,
-            numpy=False)
+        batches = [
+            self.truncated_step.get_batch(self.steps_per_jit)
+            for _ in range(self.num_devices)
+        ]
+        return tree_utils.tree_zip_onp(batches)
 
     for _ in range(self.trunc_length // self.steps_per_jit):
       datas = get_batch()
@@ -510,7 +409,8 @@ class TruncatedPESPMAP(TruncatedPES):
       metrics["sample||delta_loss_sample"] = summary.sample_value(
           key, jnp.abs(delta_loss))
       metrics["mean||delta_loss_mean"] = jnp.abs(delta_loss)
-      metrics["sample||inner_step"] = p_state.inner_step[0]
-      metrics["sample||end_inner_step"] = p_state.inner_step[0]
+      if hasattr(p_state, "inner_step"):
+        metrics["sample||inner_step"] = p_state.inner_step[0]
+        metrics["sample||end_inner_step"] = p_state.inner_step[0]
 
     return output, metrics

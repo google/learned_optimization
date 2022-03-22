@@ -20,7 +20,7 @@ from learned_optimization.outer_trainers import gradient_learner
 
 def trainer_smoketest(trainer):
   key = jax.random.PRNGKey(0)
-  theta = trainer.learned_opt.init(key)
+  theta = trainer.truncated_step.outer_init(key)
   worker_weights = gradient_learner.WorkerWeights(
       theta, None, gradient_learner.OuterState(1))
   state = trainer.init_worker_state(worker_weights, key=key)

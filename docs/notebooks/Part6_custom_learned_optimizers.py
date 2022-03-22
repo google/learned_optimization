@@ -28,7 +28,7 @@
 # ---
 
 # + [markdown] id="uSUkKaMchXQ9"
-# # Part 5: Custom learned optimizer architectures
+# # Part 6: Custom learned optimizer architectures
 # In [Part 1](https://learned-optimization.readthedocs.io/en/latest/notebooks/Part1_Introduction.html) we introduced the `LearnedOptimizer` abstraction. In this notebook we will discuss how to construct one. We will show 3 examples: Meta-learning hyper parameters, a per-parameter optimizer, and a hyper parameter controller.
 
 # + executionInfo={"elapsed": 58, "status": "ok", "timestamp": 1644472716995, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 480} id="LxTj6OcNLswq"
@@ -139,7 +139,7 @@ opt.get_params(new_opt_state)
 # every parameter, the computational cost of applying the optimizer grows linearly
 # with the number of parameters in the inner problem.
 #
-# To demonstrate this kind of optimizer, we implementa small MLP which operates on gradients,
+# To demonstrate this kind of optimizer, we implement a small MLP which operates on gradients,
 # momentum values, and parameters and produces a scalar update.
 # This MLP is applied to each parameter independently. As such, it takes in three
 # scalar inputs (the gradient, momentum, and parameter value), and produces two
@@ -394,5 +394,3 @@ jax.tree_map(lambda x: x.shape, opt_state)
 # * `mlp_lopt` and `adafac_mlp_lopt`: which implement more sophisticated per-parameter learned optimizers.
 #
 # * `rnn_mlp_opt`: Implements a hierarchical learned optimizer. A per tensor RNN is used to compute hidden state which is passed to a per-parameter MLP which does the actual weight updates.
-
-# + id="yZLwEEC7VAmx"

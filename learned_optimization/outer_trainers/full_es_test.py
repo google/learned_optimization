@@ -22,7 +22,9 @@ import jax.numpy as jnp
 from learned_optimization.learned_optimizers import base
 from learned_optimization.outer_trainers import full_es
 from learned_optimization.outer_trainers import gradient_learner
+from learned_optimization.outer_trainers import lopt_truncated_step
 from learned_optimization.outer_trainers import test_utils
+from learned_optimization.outer_trainers import truncation_schedule
 from learned_optimization.tasks import base as tasks_base
 from learned_optimization.tasks import quadratics
 import numpy as np
@@ -44,6 +46,12 @@ class TaskFamilyWithAux(tasks_base.TaskFamily):
       def init(self, key):
         return jnp.asarray(1.)
 
+      def loss_with_state_and_aux(self, params, state, _, data):
+        return 0.0, None, {"aux_name": 1.0}
+
+      def loss_with_state(self, params, state, _, data):
+        return 0.0, None
+
     return _Task()
 
 
@@ -54,15 +62,16 @@ class FullEsTest(parameterized.TestCase):
   def test_full_es_trainer(self, train_and_meta, loss_type):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamily(10)
-
-    trainer = full_es.FullES(
+    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
         task_family,
         learned_opt,
+        trunc_sched,
         num_tasks=5,
-        unroll_length=10,
-        steps_per_jit=5,
-        loss_type=loss_type,
         train_and_meta=train_and_meta)
+
+    trainer = full_es.FullES(
+        truncated_step, unroll_length=10, steps_per_jit=5, loss_type=loss_type)
 
     test_utils.trainer_smoketest(trainer)
 
@@ -71,44 +80,54 @@ class FullEsTest(parameterized.TestCase):
   def test_full_es_trainer_with_data(self, train_and_meta, loss_type):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
-
-    trainer = full_es.FullES(
+    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
         task_family,
         learned_opt,
+        trunc_sched,
         num_tasks=5,
-        unroll_length=10,
-        steps_per_jit=5,
-        loss_type=loss_type,
         train_and_meta=train_and_meta)
+
+    trainer = full_es.FullES(
+        truncated_step, unroll_length=10, steps_per_jit=5, loss_type=loss_type)
 
     test_utils.trainer_smoketest(trainer)
 
   def test_full_es_stacked_antithetic_samples(self):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
+    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
+        task_family, learned_opt, trunc_sched, num_tasks=5)
 
     trainer = full_es.FullES(
-        task_family,
-        learned_opt,
-        num_tasks=5,
+        truncated_step=truncated_step,
         unroll_length=10,
         steps_per_jit=5,
         stack_antithetic_samples=True)
 
     test_utils.trainer_smoketest(trainer)
 
-  @parameterized.product(loss_type=("avg", "last_recompute"))
-  def test_full_es_meta_loss_aux(self, loss_type):
+  @parameterized.product(
+      loss_type=("avg", "last_recompute"), train_and_meta=(True, False))
+  def test_full_es_meta_loss_aux(self, loss_type, train_and_meta):
     learned_opt = base.LearnableSGD()
     task_family = TaskFamilyWithAux()
-    trainer = full_es.FullES(
+    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
         task_family,
         learned_opt,
+        trunc_sched,
         num_tasks=5,
+        meta_loss_with_aux_key="aux_name",
+        train_and_meta=train_and_meta)
+
+    trainer = full_es.FullES(
+        truncated_step,
         unroll_length=10,
         steps_per_jit=5,
         loss_type=loss_type,
-        meta_loss_with_aux_key="aux_name")
+    )
 
     key = jax.random.PRNGKey(0)
     theta = learned_opt.init(key)

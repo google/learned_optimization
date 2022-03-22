@@ -1,6 +1,7 @@
 ---
 jupytext:
   formats: ipynb,md:myst,py
+  main_language: python
   text_representation:
     extension: .md
     format_name: myst
@@ -13,7 +14,7 @@ kernelspec:
 
 +++ {"id": "uSUkKaMchXQ9"}
 
-# Part 5: Custom learned optimizer architectures
+# Part 6: Custom learned optimizer architectures
 In [Part 1](https://learned-optimization.readthedocs.io/en/latest/notebooks/Part1_Introduction.html) we introduced the `LearnedOptimizer` abstraction. In this notebook we will discuss how to construct one. We will show 3 examples: Meta-learning hyper parameters, a per-parameter optimizer, and a hyper parameter controller.
 
 ```{code-cell}
@@ -84,7 +85,7 @@ executionInfo:
   user_tz: 480
 id: feQ6ZWlmNUWI
 ---
-MetaParams = Any # typing definition to label some types below
+MetaParams = Any  # typing definition to label some types below
 
 class MetaSGDWD(lopt_base.LearnedOptimizer):
   def __init__(self, initial_lr=1e-3, initial_wd=1e-2):
@@ -105,16 +106,20 @@ class MetaSGDWD(lopt_base.LearnedOptimizer):
   def opt_fn(self, theta: MetaParams) -> opt_base.Optimizer:
     # define an anonymous class which implements the optimizer.
     # this captures over the meta-parameters, theta.
-    
+
     class _Opt(opt_base.Optimizer):
       def init(self, params, model_state=None, **kwargs) -> LOptState:
         # For our inital inner-opt state we pack the params, model state,
         # and iteration into the LOptState dataclass.
-        return LOptState(params=params,
-                         model_state=model_state,
-                         iteration=jnp.asarray(0, dtype=jnp.int32))
+        return LOptState(
+            params=params,
+            model_state=model_state,
+            iteration=jnp.asarray(0, dtype=jnp.int32))
 
-      def update(self, opt_state: LOptState, grads, model_state=None,
+      def update(self,
+                 opt_state: LOptState,
+                 grads,
+                 model_state=None,
                  **kwargs) -> LOptState:
         """Perform the actual update."""
         # We grab the meta-parameters and transform them back to their original
@@ -125,12 +130,13 @@ class MetaSGDWD(lopt_base.LearnedOptimizer):
         # Next we define the weight update.
         def _update_one(p, g):
           return p - g * lr - p * wd
-        next_params = jax.tree_map(_update_one,
-                                   opt_state.params, grads)
+
+        next_params = jax.tree_map(_update_one, opt_state.params, grads)
         # Pack the new parameters back up
-        return LOptState(params=next_params,
-                         model_state=model_state,
-                         iteration=opt_state.iteration +1)
+        return LOptState(
+            params=next_params,
+            model_state=model_state,
+            iteration=opt_state.iteration + 1)
     return _Opt()
 ```
 
@@ -172,7 +178,7 @@ each parameter of the inner-model. Because these calculations are done on
 every parameter, the computational cost of applying the optimizer grows linearly
 with the number of parameters in the inner problem.
 
-To demonstrate this kind of optimizer, we implementa small MLP which operates on gradients,
+To demonstrate this kind of optimizer, we implement a small MLP which operates on gradients,
 momentum values, and parameters and produces a scalar update.
 This MLP is applied to each parameter independently. As such, it takes in three
 scalar inputs (the gradient, momentum, and parameter value), and produces two
@@ -224,7 +230,8 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
       features = jnp.asarray([params, momentum, grads])
       # transpose to have features dim last. The MLP will operate on this,
       # and treat the leading dimensions as a batch dimension.
-      features = jnp.transpose(features, list(range(1, 1+len(grads.shape))) + [0])
+      features = jnp.transpose(features,
+                               list(range(1, 1 + len(grads.shape))) + [0])
 
       outs = hk.nets.MLP([self.hidden_size, 2])(features)
 
@@ -235,7 +242,7 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
 
     self.net = hk.without_apply_rng(hk.transform(forward))
 
-    
+
 
   def init(self, key) -> MetaParams:
     """Initialize the weights of the learned optimizer."""
@@ -244,16 +251,14 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
     # Because we are operating per parameter, the shape of this batch doesn't
     # matter.
     fake_grads = fake_params = fake_mom = jnp.zeros([10, 10])
-    return {
-        "nn": self.net.init(key, fake_grads, fake_mom, fake_params)
-    }
+    return {"nn": self.net.init(key, fake_grads, fake_mom, fake_params)}
 
   def opt_fn(self, theta: MetaParams) -> opt_base.Optimizer:
     # define an anonymous class which implements the optimizer.
     # this captures over the meta-parameters, theta.
 
     parent = self
-    
+
     class _Opt(opt_base.Optimizer):
       def init(self, params, model_state=None, **kwargs) -> LOptState:
         # In addition to params, model state, and iteration, we also need the
@@ -261,33 +266,40 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
 
         momentums = jax.tree_map(jnp.zeros_like, params)
 
-        return PerParamState(params=params,
-                         model_state=model_state,
-                         iteration=jnp.asarray(0, dtype=jnp.int32),
-                         momentums=momentums)
+        return PerParamState(
+            params=params,
+            model_state=model_state,
+            iteration=jnp.asarray(0, dtype=jnp.int32),
+            momentums=momentums)
 
-      def update(self, opt_state: LOptState, grads, model_state=None,
+      def update(self,
+                 opt_state: LOptState,
+                 grads,
+                 model_state=None,
                  **kwargs) -> LOptState:
         """Perform the actual update."""
-        
+
         # update all the momentums
         def _update_one_momentum(m, g):
-          return m*parent.decay+(g * (1-parent.decay))
-        next_moms = jax.tree_map(_update_one_momentum, opt_state.momentums, grads)
+          return m * parent.decay + (g * (1 - parent.decay))
+
+        next_moms = jax.tree_map(_update_one_momentum, opt_state.momentums,
+                                 grads)
 
         # Update all the params
         def _update_one(g, m, p):
           step = parent.net.apply(theta["nn"], g, m, p)
           return p - step
 
-        next_params = jax.tree_map(_update_one,
-                                   opt_state.params, grads, next_moms)
+        next_params = jax.tree_map(_update_one, opt_state.params, grads,
+                                   next_moms)
 
         # Pack the new parameters back up
-        return PerParamState(params=next_params,
-                         model_state=model_state,
-                         iteration=opt_state.iteration +1,
-                         momentums=next_moms)
+        return PerParamState(
+            params=next_params,
+            model_state=model_state,
+            iteration=opt_state.iteration + 1,
+            momentums=next_moms)
     return _Opt()
 ```
 
@@ -335,9 +347,9 @@ executionInfo:
 id: 9oNudcVgQ72x
 ---
 opt = lopt.opt_fn(theta)
-fake_params = {"a": jnp.ones([2,3]), "b": jnp.ones([1])}
+fake_params = {"a": jnp.ones([2, 3]), "b": jnp.ones([1])}
 opt_state = opt.init(fake_params)
-fake_grads = {"a": -jnp.ones([2,3]), "b": -jnp.ones([1])}
+fake_grads = {"a": -jnp.ones([2, 3]), "b": -jnp.ones([1])}
 new_opt_state = opt.update(opt_state, fake_grads)
 ```
 
@@ -423,7 +435,7 @@ def forward_fn(hidden_state, input):
   mod = rnn_mod()
   output, next_state = mod(input, hidden_state)
   log_lr = hk.Linear(1)(output)
-  return next_state, jnp.exp(log_lr)*0.01
+  return next_state, jnp.exp(log_lr) * 0.01
 ```
 
 +++ {"id": "sKVF8_UhTgH6"}
@@ -449,15 +461,12 @@ class HParamControllerLOPT(lopt_base.LearnedOptimizer):
     # Only one input -- just the loss.
     n_input_features = 1
     # This takes no input parameters -- hence the {}.
-    initial_state = initial_state_fn.apply({},  key)
+    initial_state = initial_state_fn.apply({}, key)
 
     fake_input_data = jnp.zeros([1, n_input_features])
     rnn_params = forward_fn.init(key, initial_state, fake_input_data)
-    return {
-        "rnn_params": rnn_params,
-        "initial_rnn_hidden_state": initial_state
-    }
-    
+    return {"rnn_params": rnn_params, "initial_rnn_hidden_state": initial_state}
+
   def opt_fn(self, theta):
     class _Opt(opt_base.Optimizer):
       def init(self, params, model_state=None, **kwargs):
@@ -473,25 +482,25 @@ class HParamControllerLOPT(lopt_base.LearnedOptimizer):
         # As this loss is not part of the default Optimizer definition, we assert
         # that it is non None
         assert loss is not None
-        
+
         # Add a batch dimension to the loss
-        batched_loss = jnp.reshape(loss, [1,1])
+        batched_loss = jnp.reshape(loss, [1, 1])
 
         # run the RNN
         rnn_forward = hk.without_apply_rng(forward_fn).apply
-        next_rnn_state, lr =rnn_forward(theta["rnn_params"],
-                                        opt_state.rnn_hidden_state,
-                                        batched_loss)
+        next_rnn_state, lr = rnn_forward(theta["rnn_params"],
+                                         opt_state.rnn_hidden_state,
+                                         batched_loss)
 
         # use the results of the RNN to update the parameters.
         def update_one(p, g):
-          return p - g*lr
+          return p - g * lr
         next_params = jax.tree_multimap(update_one, opt_state.params, grads)
 
         return HParamControllerInnerOptState(
             params=next_params,
             model_state=model_state,
-            iteration=opt_state.iteration+1,
+            iteration=opt_state.iteration + 1,
             rnn_hidden_state=next_rnn_state)
 
     return _Opt()
@@ -519,9 +528,9 @@ lopt = HParamControllerLOPT()
 theta = lopt.init(key)
 opt = lopt.opt_fn(theta)
 
-params = {"a": jnp.ones([3,2]), "b": jnp.ones([2,1])}
+params = {"a": jnp.ones([3, 2]), "b": jnp.ones([2, 1])}
 opt_state = opt.init(params)
-fake_grads = {"a": -jnp.ones([3,2]), "b": -jnp.ones([2,1])}
+fake_grads = {"a": -jnp.ones([3, 2]), "b": -jnp.ones([2, 1])}
 opt_state = opt.update(opt_state, fake_grads, loss=1.0)
 jax.tree_map(lambda x: x.shape, opt_state)
 ```
@@ -537,9 +546,3 @@ Many more learned optimizer architectures are implemented inside the [learned_op
 * `mlp_lopt` and `adafac_mlp_lopt`: which implement more sophisticated per-parameter learned optimizers.
 
 * `rnn_mlp_opt`: Implements a hierarchical learned optimizer. A per tensor RNN is used to compute hidden state which is passed to a per-parameter MLP which does the actual weight updates.
-
-```{code-cell}
-:id: yZLwEEC7VAmx
-
-
-```
