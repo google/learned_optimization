@@ -30,14 +30,14 @@ Simple, self-contained, learned optimizer example that does not depend on the *l
 ## Local Installation
 We strongly recommend using virtualenv to work with this package.
 
-```
+``
 pip3 install virtualenv
 git clone git@github.com:google/learned_optimization.git
 cd learned_optimization
 python3 -m venv env
 source env/bin/activate
 pip install -e .
-```
+``
 
 ## Train a learned optimizer example
 To train a learned optimizer on a simple inner-problem, run the following:
