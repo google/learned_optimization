@@ -74,7 +74,7 @@ class Optimizer(abc.ABC):
     lead with the class name, and follow with all parameters used to create
     the object. For example: "<ClassName>_<param1><value>_<param2><value>"
     """
-    raise NotImplementedError()
+    return "UnnamedOptimizer"
 
 
 # Internal-ish states

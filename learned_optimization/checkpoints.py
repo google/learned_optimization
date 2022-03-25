@@ -37,6 +37,7 @@ import gin
 import haiku as hk
 import jax
 from learned_optimization import filesystem
+from learned_optimization import profile
 
 T = TypeVar("T")
 
@@ -60,6 +61,7 @@ serialization.register_serialization_state(
     HKTree, _ty_to_state_dict, _ty_from_state_dict, override=True)
 
 
+@profile.wrap()
 def restore_checkpoint(ckpt_dir: str, value: T, prefix: str) -> T:
   """Restore the last checkpoint.
 
@@ -80,6 +82,7 @@ def restore_checkpoint(ckpt_dir: str, value: T, prefix: str) -> T:
   return checkpoint_state
 
 
+@profile.wrap()
 def save_checkpoint(ckpt_dir: str, prefix: str, value: Any, step: int) -> str:
   """Saves a checkpoint.
 
@@ -158,6 +161,7 @@ def periodically_save_checkpoint(
     return None
 
 
+@profile.wrap()
 def last_checkpoint_idx(ckpt_dir: str, prefix: str) -> Optional[int]:
   """Get the last checkpoint index.
 
@@ -180,12 +184,14 @@ def last_checkpoint_idx(ckpt_dir: str, prefix: str) -> Optional[int]:
   return int(ckpt_path.split(prefix)[-1])
 
 
+@profile.wrap()
 def has_checkpoint(ckpt_dir: str, prefix: str) -> bool:
   """Check if a checkpoint exists."""
   latest_checkpoint = checkpoints.latest_checkpoint(ckpt_dir, prefix)
   return latest_checkpoint is not None
 
 
+@profile.wrap()
 def save_state(path: str, state: Any):
   """Save a pytree state directly to a file.
 
@@ -198,6 +204,7 @@ def save_state(path: str, state: Any):
     fp.write(serialization.to_bytes(state))
 
 
+@profile.wrap()
 def load_state(path: str, state: T) -> T:
   """Load a pytree state directly from a file.
 

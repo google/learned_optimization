@@ -16,7 +16,7 @@
 """Setup the package."""
 
 import os
-from setuptools import setup, find_packages  # pylint: disable=g-multiple-import
+import setuptools
 
 # https://packaging.python.org/guides/making-a-pypi-friendly-readme/
 this_directory = os.path.abspath(os.path.dirname(__file__))
@@ -25,13 +25,13 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 __version__ = '0.0.1'
 
-setup(
+setuptools.setup(
     name='learned_optimization',
     version=__version__,
     description='Train learned optimizers in Jax.',
     author='learned_optimization team',
     author_email='lmetz@google.com',
-    packages=find_packages(exclude=['examples']),
+    packages=setuptools.find_packages(exclude=['examples']),
     package_data={'learned_optimization': ['py.typed']},
     python_requires='>=3.7',
     # TODO(lmetz) don't fix many versions! Sadly a number of these libraries
