@@ -73,10 +73,16 @@ def _load(name, tokenizer, batch_size: int, sequence_length: int,
   return ds
 
 
-def _make_datasets(tfds_datasetname: str, vocab: seqio.vocabularies.Vocabulary,
-                   batch_size: int, sequence_length: int) -> base.Datasets:
+def _make_datasets(tfds_datasetname: str,
+                   vocab: seqio.vocabularies.Vocabulary,
+                   batch_size: int,
+                   sequence_length: int,
+                   has_test: bool = True) -> base.Datasets:
   """Make Datasets object from tokenized tfds dataset."""
-  splits = ['train[2%:100%]', 'train[0%:1%]', 'train[1%:2%]', 'test']
+  if has_test:
+    splits = ['train[2%:100%]', 'train[0%:1%]', 'train[1%:2%]', 'test']
+  else:
+    splits = ['train[3%:100%]', 'train[0%:1%]', 'train[1%:2%]', 'train[2%:3%]']
 
   def make(split):
 
@@ -121,13 +127,21 @@ def lm1b_bytes_datasets(batch_size, sequence_length):
 @base.dataset_lru_cache
 def wikipedia_en_32k_datasets(batch_size, sequence_length):
   vocab = get_32k_sentence_piece_vocab()
-  return _make_datasets('wikipedia/20201201.en', vocab, batch_size,
-                        sequence_length)
+  return _make_datasets(
+      'wikipedia/20201201.en',
+      vocab,
+      batch_size,
+      sequence_length,
+      has_test=False)
 
 
 @gin.configurable
 @base.dataset_lru_cache
 def wikipedia_en_bytes_datasets(batch_size, sequence_length):
   vocab = get_bytes_vocab()
-  return _make_datasets('wikipedia/20201201.en', vocab, batch_size,
-                        sequence_length)
+  return _make_datasets(
+      'wikipedia/20201201.en',
+      vocab,
+      batch_size,
+      sequence_length,
+      has_test=False)

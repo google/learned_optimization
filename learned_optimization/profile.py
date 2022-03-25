@@ -17,6 +17,7 @@
 import functools
 import sys
 import time
+from typing import TypeVar
 
 from absl import flags
 from absl import logging
@@ -25,6 +26,8 @@ flags.DEFINE_bool("profile_log_times", False, "Log out timing information.")
 
 FLAGS = flags.FLAGS
 FLAGS(sys.argv, known_only=True)  # Ensure flags are parsed at this time.
+
+T = TypeVar("T")
 
 
 class Profile:
@@ -50,7 +53,7 @@ class Profile:
 def wrap():
   """Wrap a function in a Profile."""
 
-  def _wrapper(fn):
+  def _wrapper(fn: T) -> T:
 
     @functools.wraps(fn)
     def _fn(*args, **kwargs):

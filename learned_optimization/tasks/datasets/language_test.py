@@ -45,6 +45,9 @@ class ImageTest(absltest.TestCase):
     self.assertEqual(data["target"].shape, (32, 8))
     self.assertTrue(np.all(data["obs"][:, 1:] == data["target"][:, 0:-1]))
 
+    data = next(datasets.test)
+    self.assertEqual(data["obs"].shape, (32, 8))
+
 
 if __name__ == "__main__":
   absltest.main()

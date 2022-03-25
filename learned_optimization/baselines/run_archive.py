@@ -22,7 +22,7 @@ finish at this point.
 """
 from concurrent import futures
 import time
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Callable
 
 from absl import app
 from absl import logging
@@ -34,10 +34,27 @@ from learned_optimization.baselines import utils
 import numpy as onp
 
 
-def maybe_get_hparam_set(task_name,
-                         hparam_set_name) -> Optional[Mapping[str, Any]]:
-  """Attempt to get the data for a given task_name and hparam set."""
-  hparam_set_fn = gin.get_configurable(hparam_set_name)
+@gin.configurable
+def maybe_get_hparam_set(
+    task_name,
+    hparam_set_name,
+    hparam_set_fn: Optional[Callable[[str], hparam_sets.HParamSet]] = None
+) -> Optional[Mapping[str, Any]]:
+  """Attempt to get the data for a given task_name and hparam set.
+
+  Args:
+    task_name: Name of task to get hparam set of.
+    hparam_set_name: Name of the hparam set.
+    hparam_set_fn: Optional function which is called with tak_name to return the
+      values of the hparam set. If not specified we look up the hparam_set_name
+      from gin. This value is designed to be injected with gin.
+
+  Returns:
+    Either None if no values could be obtained, or a stacked dictionary
+      containing the results from inner-training.
+  """
+  if hparam_set_fn is None:
+    hparam_set_fn = gin.get_configurable(hparam_set_name)
   unused_cfgs, paths_reps = hparam_set_fn(task_name)
   paths, unused_reps = zip(*paths_reps)
 

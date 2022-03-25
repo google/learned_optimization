@@ -13,9 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
+"""Utilities for interactively working with data and results in notebooks."""
+
+from concurrent import futures
+from typing import Any, Callable, Sequence
+
 from matplotlib import pylab as plt
+import numpy as np
 import seaborn as sns
+import tqdm
 
 category_10 = [
     "#1f77b4",
@@ -54,14 +60,15 @@ category_20 = [
 ]
 
 
-def colors_for_num(n, rep=1, stride=None, categorical=True):
+def colors_for_num(num, rep=1, stride=None, categorical=True):
+  """Get a list of colors for given number of elements."""
   if categorical:
-    if n <= 10:
+    if num <= 10:
       cc = category_10
-    elif n <= 20:
+    elif num <= 20:
       cc = category_20
     else:
-      cc = sns.hls_palette(n, l=.3, s=.8)
+      cc = sns.hls_palette(num, l=.3, s=.8)
 
     if stride is None:
       cc_out = []
@@ -72,7 +79,7 @@ def colors_for_num(n, rep=1, stride=None, categorical=True):
       return cc[0:stride] * 10
   else:
     cmap = plt.cm.viridis
-    return [cmap(float(i) / n) for i in range(n)]
+    return [cmap(float(i) / num) for i in range(num)]
 
 
 def ema(data, alpha):
@@ -97,3 +104,12 @@ def nan_ema(data, alpha):
   for i, a in enumerate((1 - alpha) * data[1:]):
     x[i + 1] = x[i] if np.isnan(a) else x[i] * m_alpha + a
   return x
+
+
+def threaded_tqdm_map(threads: int, func: Callable[[Any], Any],
+                      data: Sequence[Any]) -> Sequence[Any]:
+  future_list = []
+  with futures.ThreadPoolExecutor(threads) as executor:
+    for l in tqdm.tqdm(data):
+      future_list.append(executor.submit(func, l))
+    return [x.result() for x in tqdm.tqdm(future_list)]

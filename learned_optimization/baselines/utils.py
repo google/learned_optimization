@@ -22,6 +22,7 @@ from typing import Any, Mapping, Sequence
 import uuid
 
 from learned_optimization import filesystem
+from learned_optimization import profile
 import numpy as onp
 
 
@@ -66,6 +67,7 @@ def get_baseline_archive_path(task_name: str, hparam_set_name: str) -> str:
   return os.path.join(root_dir, task_name, f"{hparam_set_name}.npz")
 
 
+@profile.wrap()
 def write_npz(path: str, data: Mapping[str, Any]):
   """Write a compressed numpy file with `data` to `path`."""
   filesystem.make_dirs(os.path.dirname(path))
@@ -79,6 +81,7 @@ def write_npz(path: str, data: Mapping[str, Any]):
     f.write(io_buffer.getvalue())
 
 
+@profile.wrap()
 def read_npz(path: str) -> Mapping[str, Any]:
   """Read a numpyz file from the `path`."""
   with filesystem.file_open(path, "rb") as f:
@@ -87,6 +90,7 @@ def read_npz(path: str) -> Mapping[str, Any]:
   return {k: v for k, v in onp.load(io_buffer, allow_pickle=True).items()}
 
 
+@profile.wrap()
 def write_archive(task_name: str, hparam_set_name: str, data: Mapping[str,
                                                                       Any]):
   """Write the an archive npz to a file with the provided baseline results."""
@@ -94,20 +98,23 @@ def write_archive(task_name: str, hparam_set_name: str, data: Mapping[str,
   write_npz(path, data)
 
 
+@profile.wrap()
 def load_archive(task_name: str, hparam_set_name: str):
   """Load a precomputed archive file for `task_name` and `hparam_set_name`."""
   path = get_baseline_archive_path(task_name, hparam_set_name)
   return read_npz(path)
 
 
+@profile.wrap()
 def list_hparam_sets_for_task(task_name: str):
   baseline_dir = get_baseline_archive_rootdir()
   root_dir = os.path.expanduser(baseline_dir)
 
   files = filesystem.glob(os.path.join(root_dir, task_name, "*"))
-  return [os.path.basename(f) for f in files]
+  return [os.path.basename(f).replace(".npz", "") for f in files]
 
 
+@profile.wrap()
 def delete_saved_task_data(task_name):
   p = os.path.join(get_root_baseline_dir(), task_name)
   if filesystem.exists(p):
@@ -118,19 +125,30 @@ def delete_saved_task_data(task_name):
     filesystem.remove(p)
 
 
-def get_save_dir(task_name: str, opt_name: str, num_steps: int, eval_every: int,
-                 eval_batches: int, last_eval_batches: int) -> str:
+def get_save_dir(task_name: str,
+                 opt_name: str,
+                 num_steps: int,
+                 eval_every: int,
+                 eval_batches: int,
+                 last_eval_batches: int,
+                 save_dir_suffix: str = "") -> str:
   """Get directory to save training curves too."""
   save_dir = os.path.join(
-      get_root_baseline_dir(), task_name, opt_name,
+      get_root_baseline_dir() + save_dir_suffix, task_name, opt_name,
       f"{num_steps}_{eval_every}_{eval_batches}_{last_eval_batches}")
   return save_dir
 
 
-def write_baseline_result(data: Mapping[str,
-                                        Any], task_name: str, opt_name: str,
-                          num_steps: int, eval_every: int, eval_batches: int,
-                          last_eval_batches: int, output_type: str):
+@profile.wrap()
+def write_baseline_result(data: Mapping[str, Any],
+                          task_name: str,
+                          opt_name: str,
+                          num_steps: int,
+                          eval_every: int,
+                          eval_batches: int,
+                          last_eval_batches: int,
+                          output_type: str,
+                          save_dir_suffix=""):
   """Save results out to the database stored in the filesystem.
 
   Data is stored in files that look like:
@@ -147,6 +165,7 @@ def write_baseline_result(data: Mapping[str,
     last_eval_batches: How many batches last eval was done with.
     output_type: Suffix of saved file. The label of the type of content stored
       in data.
+    save_dir_suffix: String appended to the root location of `get_save_dir`.
   """
   prefix = str(uuid.uuid4())[0:10]
 
@@ -159,12 +178,14 @@ def write_baseline_result(data: Mapping[str,
       num_steps=num_steps,
       eval_every=eval_every,
       eval_batches=eval_batches,
-      last_eval_batches=last_eval_batches)
+      last_eval_batches=last_eval_batches,
+      save_dir_suffix=save_dir_suffix)
   output_path = os.path.join(save_dir, file_name)
 
   write_npz(output_path, data)
 
 
+@profile.wrap()
 def load_baseline_results_from_dir(
     save_dir: str,
     output_type: str,
@@ -179,6 +200,7 @@ def load_baseline_results_from_dir(
     return list(map(read_npz, paths))
 
 
+@profile.wrap()
 def load_baseline_results(task_name: str,
                           opt_name: str,
                           num_steps: int,

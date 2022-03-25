@@ -14,6 +14,8 @@
 # limitations under the License.
 
 """Sets of configurations representating baseline hparam searches."""
+from typing import Any, Mapping, Sequence, Tuple
+
 import gin
 from learned_optimization.baselines import utils
 
@@ -22,8 +24,12 @@ _LRS = [
     1e-1, 3e-1, 1
 ]
 
+HParamList = Sequence[Mapping[str, Any]]
+PathsList = Sequence[Tuple[str, int]]
+HParamSet = Tuple[HParamList, PathsList]
 
-def _lr_cfgs(task_name: str, opt_name: str, num_steps: int):
+
+def _lr_cfgs(task_name: str, opt_name: str, num_steps: int) -> HParamList:
   """Configurations with different learning rates."""
   cfgs = []
 
@@ -43,7 +49,7 @@ def _lr_cfgs(task_name: str, opt_name: str, num_steps: int):
   return cfgs
 
 
-def _save_dir_from_cfg(cfg):
+def _save_dir_from_cfg(cfg: Mapping[str, Any]) -> str:
   trim = lambda x: x.replace("@", "").replace("()", "")
   return utils.get_save_dir(
       task_name=trim(cfg["inner_train_task.task_name"]),
@@ -55,7 +61,7 @@ def _save_dir_from_cfg(cfg):
 
 
 @gin.configurable
-def AdamLR_2000_R5(task_name):  # pylint: disable=invalid-name
+def AdamLR_2000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
   reps = 5
   cfgs = _lr_cfgs(task_name, "Adam", 2000)
   paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
@@ -63,7 +69,7 @@ def AdamLR_2000_R5(task_name):  # pylint: disable=invalid-name
 
 
 @gin.configurable
-def SGDLR_2000_R5(task_name):  # pylint: disable=invalid-name
+def SGDLR_2000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
   reps = 5
   cfgs = _lr_cfgs(task_name, "SGD", 2000)
   paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
@@ -71,7 +77,7 @@ def SGDLR_2000_R5(task_name):  # pylint: disable=invalid-name
 
 
 @gin.configurable
-def SGDMLR_2000_R5(task_name):  # pylint: disable=invalid-name
+def SGDMLR_2000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
   reps = 5
   cfgs = _lr_cfgs(task_name, "SGDM", 2000)
   paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
@@ -79,7 +85,7 @@ def SGDMLR_2000_R5(task_name):  # pylint: disable=invalid-name
 
 
 @gin.configurable
-def AdamLR_10000_R5(task_name):  # pylint: disable=invalid-name
+def AdamLR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
   reps = 5
   cfgs = _lr_cfgs(task_name, "Adam", 10000)
   paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
@@ -87,8 +93,43 @@ def AdamLR_10000_R5(task_name):  # pylint: disable=invalid-name
 
 
 @gin.configurable
-def AdamLR_10000_R1(task_name):  # pylint: disable=invalid-name
+def AdamLR_10000_R1(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
   reps = 1
   cfgs = _lr_cfgs(task_name, "Adam", 10000)
   paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
   return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def LOpt_10000_R5(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  # pylint: disable=invalid-name
+  """Hparam set and output path for a learned optimizer."""
+  reps = 5
+
+  cfg = {
+      "inner_train_task.task": f"@{task_name}()",
+      "inner_train_task.opt": "@opt_from_checkpoint()",
+      "opt_from_checkpoint.checkpoint_path": opt_path,
+      "inner_train_task.opt_name": f"{opt_name}",
+      "inner_train_task.task_name": task_name,
+      "inner_train_task.num_steps": 10000,
+      "inner_train_task.eval_every": 10,
+      "inner_train_task.eval_batches": 5,
+      "inner_train_task.last_eval_batches": 10,
+  }
+  return [cfg] * reps, [(_save_dir_from_cfg(cfg), reps)]
+
+
+def _no_hparam_cfg(task_name: str, opt_name: str, num_steps: int) -> HParamList:
+  """Configurations with different learning rates."""
+  return [{
+      "inner_train_task.task": f"@{task_name}()",
+      "inner_train_task.opt": f"@{opt_name}()",
+      "inner_train_task.opt_name": f"{opt_name}",
+      "inner_train_task.task_name": task_name,
+      "inner_train_task.num_steps": num_steps,
+      "inner_train_task.eval_every": 10,
+      "inner_train_task.eval_batches": 5,
+      "inner_train_task.last_eval_batches": 10,
+  }]
+
+

@@ -23,6 +23,7 @@ from absl import app
 import gin
 import jax
 from learned_optimization import eval_training
+from learned_optimization import profile
 from learned_optimization import setup_experiment
 from learned_optimization.baselines import utils
 from learned_optimization.optimizers import base as opt_base
@@ -53,6 +54,7 @@ def _get_gin_name(gin_arg_name: str, fallback: str) -> str:
     return fallback
 
 
+@profile.wrap()
 @gin.configurable
 def inner_train_task(task: tasks_base.Task = gin.REQUIRED,
                      opt: opt_base.Optimizer = gin.REQUIRED,
