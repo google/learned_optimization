@@ -62,7 +62,7 @@ class FullEsTest(parameterized.TestCase):
   def test_full_es_trainer(self, train_and_meta, loss_type):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamily(10)
-    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    trunc_sched = truncation_schedule.NeverEndingTruncationSchedule()
     truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
         task_family,
         learned_opt,
@@ -70,8 +70,12 @@ class FullEsTest(parameterized.TestCase):
         num_tasks=5,
         train_and_meta=train_and_meta)
 
+    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
     trainer = full_es.FullES(
-        truncated_step, unroll_length=10, steps_per_jit=5, loss_type=loss_type)
+        truncated_step,
+        truncation_schedule=trunc_sched,
+        steps_per_jit=5,
+        loss_type=loss_type)
 
     test_utils.trainer_smoketest(trainer)
 
@@ -80,7 +84,7 @@ class FullEsTest(parameterized.TestCase):
   def test_full_es_trainer_with_data(self, train_and_meta, loss_type):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
-    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    trunc_sched = truncation_schedule.NeverEndingTruncationSchedule()
     truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
         task_family,
         learned_opt,
@@ -88,21 +92,26 @@ class FullEsTest(parameterized.TestCase):
         num_tasks=5,
         train_and_meta=train_and_meta)
 
+    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
     trainer = full_es.FullES(
-        truncated_step, unroll_length=10, steps_per_jit=5, loss_type=loss_type)
+        truncated_step,
+        steps_per_jit=5,
+        loss_type=loss_type,
+        truncation_schedule=trunc_sched)
 
     test_utils.trainer_smoketest(trainer)
 
   def test_full_es_stacked_antithetic_samples(self):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
-    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    trunc_sched = truncation_schedule.NeverEndingTruncationSchedule()
     truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
         task_family, learned_opt, trunc_sched, num_tasks=5)
 
+    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
     trainer = full_es.FullES(
         truncated_step=truncated_step,
-        unroll_length=10,
+        truncation_schedule=trunc_sched,
         steps_per_jit=5,
         stack_antithetic_samples=True)
 
@@ -113,7 +122,7 @@ class FullEsTest(parameterized.TestCase):
   def test_full_es_meta_loss_aux(self, loss_type, train_and_meta):
     learned_opt = base.LearnableSGD()
     task_family = TaskFamilyWithAux()
-    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+    trunc_sched = truncation_schedule.NeverEndingTruncationSchedule()
     truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
         task_family,
         learned_opt,
@@ -122,9 +131,10 @@ class FullEsTest(parameterized.TestCase):
         meta_loss_with_aux_key="aux_name",
         train_and_meta=train_and_meta)
 
+    trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
     trainer = full_es.FullES(
         truncated_step,
-        unroll_length=10,
+        truncation_schedule=trunc_sched,
         steps_per_jit=5,
         loss_type=loss_type,
     )
@@ -138,6 +148,21 @@ class FullEsTest(parameterized.TestCase):
         worker_weights, key, state, with_summary=True)
 
     np.testing.assert_allclose(out.mean_loss, 1.0)
+
+  def test_full_es_throws_exception_when_truncated_step_misconfigured(self):
+    with self.assertRaises(ValueError):
+      trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+
+      learned_opt = base.LearnableSGD()
+      task_family = quadratics.FixedDimQuadraticFamily(10)
+      truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
+          task_family,
+          learned_opt,
+          trunc_sched,  # This should be never-ending!
+          num_tasks=5)
+
+      full_es.FullES(
+          truncated_step, truncation_schedule=trunc_sched, steps_per_jit=5)
 
 
 if __name__ == "__main__":

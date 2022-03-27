@@ -295,6 +295,7 @@ class TruncatedPESPMAP(TruncatedPES):
                              with_summary):
     vectorized_theta = True
     key1, key2 = jax.random.split(key)
+    override_num_steps = None
     (p_state, p_ys), m = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
         self.truncated_step,
         self.steps_per_jit,
@@ -304,6 +305,7 @@ class TruncatedPESPMAP(TruncatedPES):
         state,
         datas,
         outer_state,
+        override_num_steps,
         with_summary=with_summary,
         sample_rng_key=key2)
     return (p_state, p_ys), m

@@ -107,6 +107,7 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
         key_i = jax.random.fold_in(key, i)
         key1, key2 = jax.random.split(key_i)
 
+        override_num_steps = None
         vectorized_theta = False
         (state, ys), m = common.truncated_unroll(
             self.truncated_step,
@@ -117,6 +118,7 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
             state,
             datas,
             worker_weights.outer_state,
+            override_num_steps,
             with_summary=with_summary,
             sample_rng_key=key2)
         metrics.append(m)

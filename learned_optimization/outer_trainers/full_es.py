@@ -29,9 +29,42 @@ from learned_optimization import tree_utils
 from learned_optimization.outer_trainers import common
 from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import truncated_step as truncated_step_mod
+from learned_optimization.outer_trainers import truncation_schedule as truncation_schedule_mod
+import typing_extensions
+from typing_extensions import Protocol
 
 PRNGKey = jnp.ndarray
 MetaParams = Any
+
+
+@typing_extensions.runtime_checkable
+class OverrideStepVectorizedTruncatedStep(Protocol):
+  """Required protocol that TruncatedStep must implement for FullES.
+
+  FullES requires us to be able to inject the length of the truncation into the
+  truncated step. This is nto possible with the naive VectorizedTruncatedStep.
+  If you seek to use FullES with a truncated step, ensure it implements this by
+  adding an `override_num_steps` argument to `unroll_step` and
+  `init_step_state`.
+  """
+
+  def unroll_step(self,
+                  theta,
+                  unroll_state,
+                  key,
+                  data,
+                  outer_state,
+                  vectorized_theta=False,
+                  override_num_steps: Optional[int] = None):
+    pass
+
+  def init_step_state(self,
+                      theta,
+                      outer_state,
+                      key,
+                      vectorize_theta=False,
+                      num_steps_override=None):
+    pass
 
 
 @flax.struct.dataclass
@@ -187,12 +220,17 @@ class FullES(gradient_learner.GradientEstimator):
   The loss for a given unroll is computed either with the average loss over a
   trajectory (loss_type="avg"), the min loss (loss_type="min") or with a
   computation at the end of training (loss_type="last_recompute").
+
+  This gradient estimator manages it's own truncations and thus you should
+  ensure the passed in truncated_step doesn't do any resetting of the unroll.
+  If using the VectorizedLOptTruncatedStep this means passing an instance of
+  `NeverEndingTruncationSchedule` as the trunc_sched.
   """
 
   def __init__(
       self,
       truncated_step: truncated_step_mod.VectorizedTruncatedStep,
-      unroll_length: int = 20,
+      truncation_schedule: truncation_schedule_mod.TruncationSchedule,
       std: float = 0.01,
       steps_per_jit: int = 10,
       loss_type: str = "avg",
@@ -206,7 +244,9 @@ class FullES(gradient_learner.GradientEstimator):
     Args:
       truncated_step: class containing functions representing a single inner
         step.
-      unroll_length: length of the unroll.
+      truncation_schedule: Truncation schedule to use for a batch of
+        inner-problems. When using this gradient estimator, all particles share
+        the same inner-length.
       std: standard deviation of ES noise
       steps_per_jit: How many steps to jit together. Needs to be a multiple of
         unroll_length.
@@ -225,7 +265,7 @@ class FullES(gradient_learner.GradientEstimator):
     self.truncated_step = truncated_step
 
     self.std = std
-    self.unroll_length = unroll_length
+    self.truncation_schedule = truncation_schedule
 
     self.steps_per_jit = steps_per_jit
 
@@ -236,9 +276,23 @@ class FullES(gradient_learner.GradientEstimator):
     self.recompute_samples = recompute_samples
     self.recompute_split = recompute_split
 
-    if self.unroll_length % self.steps_per_jit != 0:
-      raise ValueError("Pass a unroll_length and steps_per_jit that are"
-                       " multiples of each other.")
+    # Some truncated step also have truncation_schedule. This will be ignored
+    # by this class. Here we do a sanity check to try to prevent this mistake if
+    # users accidentally misconfigure things. This is not a bullet proof check,
+    # but should capture the VectorizedLOptTruncatedStep usecase.
+    if hasattr(self.truncated_step, "trunc_sched"):
+      if not isinstance(self.truncated_step.trunc_sched,
+                        truncation_schedule_mod.NeverEndingTruncationSchedule):
+        raise ValueError(
+            "When using FullES do not use a non-infinite"
+            " truncation schedule inside the TruncatedStep. FullES manages it's"
+            " own truncation schedule and using two will likely result in "
+            "confusion. Set your TruncatedStep schedule to"
+            " `NeverEndingTruncationSchedule()`")
+    if not isinstance(self.truncated_step, OverrideStepVectorizedTruncatedStep):
+      raise ValueError(
+          "TruncatedStep must implement"
+          " `OverrideStepVectorizedTruncatedStep` when used with FulES.")
 
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
                         key: PRNGKey) -> UnrollState:
@@ -265,12 +319,31 @@ class FullES(gradient_learner.GradientEstimator):
     key = next(rng)
 
     # use the same key here for antithetic sampling.
-    p_state = self.truncated_step.init_step_state(
-        vec_p_theta, worker_weights.outer_state, key, vectorize_theta=True)
-    n_state = self.truncated_step.init_step_state(
-        vec_n_theta, worker_weights.outer_state, key, vectorize_theta=True)
+    trunc_state = self.truncation_schedule.init(key, worker_weights.outer_state)
 
-    for _ in range(self.unroll_length // self.steps_per_jit):
+    # round to steps per jit
+    length = min(
+        (int(trunc_state.length) // self.steps_per_jit) * self.steps_per_jit, 1)
+
+    p_state = self.truncated_step.init_step_state(
+        vec_p_theta,
+        worker_weights.outer_state,
+        key,
+        vectorize_theta=True,
+        num_steps_override=length)
+
+    n_state = self.truncated_step.init_step_state(
+        vec_n_theta,
+        worker_weights.outer_state,
+        key,
+        vectorize_theta=True,
+        num_steps_override=length)
+
+    if not hasattr(trunc_state, "length"):
+      raise AttributeError("Please specify a truncation schedule whose state"
+                           " contains a length attribute.")
+
+    for _ in range(length):
       with profile.Profile("data"):
         datas = self.truncated_step.get_batch(self.steps_per_jit)
 
@@ -292,7 +365,8 @@ class FullES(gradient_learner.GradientEstimator):
             datas,
             worker_weights.outer_state,
             with_summary=with_summary,
-            sample_rng_key=next(rng))
+            sample_rng_key=next(rng),
+            override_num_steps=length)
 
         metrics.append(m)
         p_yses.append(p_ys)

@@ -100,7 +100,8 @@ class GradientEstimator:
 # + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647560728420, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 240} id="1foCms9R2a10"
 task_family = quadratics.FixedDimQuadraticFamily(10)
 lopt = lopt_base.LearnableAdam()
-trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+# With FullES, there are no truncations, so we set trunc_sched to never ending.
+trunc_sched = truncation_schedule.NeverEndingTruncationSchedule()
 truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
     task_family,
     lopt,
@@ -120,9 +121,9 @@ truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
 # We can instantiate one of these as follows:
 
 # + executionInfo={"elapsed": 54, "status": "ok", "timestamp": 1647560729615, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 240} id="W5vQVk7o_VDq"
-max_length = 1000
-
-gradient_estimator = full_es.FullES(truncated_step, unroll_length=10)
+es_trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+gradient_estimator = full_es.FullES(
+    truncated_step, truncation_schedule=es_trunc_sched)
 
 # + executionInfo={"elapsed": 251, "status": "ok", "timestamp": 1647560730818, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 240} id="nLOAKLXX_nX4"
 key = jax.random.PRNGKey(0)
@@ -156,6 +157,7 @@ out.grad
 # Truncated Persistent Evolutionary Strategies (PES) is a unbiased truncation method based on ES. It was proposed in [Unbiased Gradient Estimation in Unrolled Computation Graphs with Persistent Evolution Strategies](https://arxiv.org/abs/2112.13835) and has been a promising tool for training learned optimizers.
 
 # + executionInfo={"elapsed": 53, "status": "ok", "timestamp": 1647560742648, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 240} id="ailS8_Jbr8CT"
+trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
 truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
     task_family,
     lopt,

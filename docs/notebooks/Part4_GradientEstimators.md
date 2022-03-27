@@ -125,7 +125,8 @@ id: 1foCms9R2a10
 ---
 task_family = quadratics.FixedDimQuadraticFamily(10)
 lopt = lopt_base.LearnableAdam()
-trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+# With FullES, there are no truncations, so we set trunc_sched to never ending.
+trunc_sched = truncation_schedule.NeverEndingTruncationSchedule()
 truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
     task_family,
     lopt,
@@ -159,9 +160,9 @@ executionInfo:
   user_tz: 240
 id: W5vQVk7o_VDq
 ---
-max_length = 1000
-
-gradient_estimator = full_es.FullES(truncated_step, unroll_length=10)
+es_trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
+gradient_estimator = full_es.FullES(
+    truncated_step, truncation_schedule=es_trunc_sched)
 ```
 
 ```{code-cell}
@@ -265,6 +266,7 @@ executionInfo:
   user_tz: 240
 id: ailS8_Jbr8CT
 ---
+trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
 truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
     task_family,
     lopt,

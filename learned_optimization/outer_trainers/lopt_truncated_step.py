@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Use learned optimizer based inner problems with GradientEstimator."""
+
 import functools
 from typing import Any, Callable, Optional, Tuple, TypeVar
 
@@ -27,9 +28,11 @@ from learned_optimization import training
 from learned_optimization import tree_utils
 from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.optimizers import base as opt_base
+from learned_optimization.outer_trainers import full_es
 from learned_optimization.outer_trainers import truncated_step
 from learned_optimization.outer_trainers import truncation_schedule
 from learned_optimization.tasks import base as tasks_base
+
 
 PRNGKey = jnp.ndarray
 MetaParams = Any
@@ -66,8 +69,12 @@ class SimpleLOptTruncatedStep(truncated_step.TruncatedStep):
 
   @functools.partial(jax.jit, static_argnums=(0,))
   def unroll_step(
-      self, theta: MetaParams, unroll_state: InnerState, key: chex.PRNGKey,
-      data: InnerBatch, outer_state: OuterState
+      self,
+      theta: MetaParams,
+      unroll_state: InnerState,
+      key: chex.PRNGKey,
+      data: InnerBatch,
+      outer_state: OuterState,
   ) -> Tuple[InnerState, truncated_step.TruncatedUnrollOut]:
     opt = self.lopt.opt_fn(theta)
 
@@ -136,33 +143,44 @@ class TruncatedUnrollState:
 
 @functools.partial(
     jax.jit, static_argnames=("task_family", "learned_opt", "trunc_sched"))
-@functools.partial(jax.vmap, in_axes=(None, None, None, None, None, 0))
-def init_truncation_state(task_family: tasks_base.TaskFamily,
-                          learned_opt: lopt_base.LearnedOptimizer,
-                          trunc_sched: truncation_schedule.TruncationSchedule,
-                          theta: lopt_base.MetaParams, outer_state: Any,
-                          key: PRNGKey) -> TruncatedUnrollState:
+@functools.partial(jax.vmap, in_axes=(None, None, None, None, None, 0, None))
+def init_truncation_state(
+    task_family: tasks_base.TaskFamily,
+    learned_opt: lopt_base.LearnedOptimizer,
+    trunc_sched: truncation_schedule.TruncationSchedule,
+    theta: lopt_base.MetaParams,
+    outer_state: Any,
+    key: PRNGKey,
+    num_steps_override: Optional[int] = None) -> TruncatedUnrollState:
+  """Init inner state without vectorized theta."""
   return _init_truncation_state(task_family, learned_opt, trunc_sched, theta,
-                                outer_state, key)
+                                outer_state, key, num_steps_override)
 
 
 @functools.partial(
     jax.jit, static_argnames=("task_family", "learned_opt", "trunc_sched"))
-@functools.partial(jax.vmap, in_axes=(None, None, None, 0, None, 0))
+@functools.partial(jax.vmap, in_axes=(None, None, None, 0, None, 0, None))
 def init_truncation_state_vec_theta(
-    task_family: tasks_base.TaskFamily, learned_opt: lopt_base.LearnedOptimizer,
+    task_family: tasks_base.TaskFamily,
+    learned_opt: lopt_base.LearnedOptimizer,
     trunc_sched: truncation_schedule.TruncationSchedule,
-    theta: lopt_base.MetaParams, outer_state: Any,
-    key: PRNGKey) -> TruncatedUnrollState:
+    theta: lopt_base.MetaParams,
+    outer_state: Any,
+    key: PRNGKey,
+    num_steps_override: Optional[int] = None) -> TruncatedUnrollState:
+  """Init inner state with vectorized theta."""
   return _init_truncation_state(task_family, learned_opt, trunc_sched, theta,
-                                outer_state, key)
+                                outer_state, key, num_steps_override)
 
 
-def _init_truncation_state(task_family: tasks_base.TaskFamily,
-                           learned_opt: lopt_base.LearnedOptimizer,
-                           trunc_sched: truncation_schedule.TruncationSchedule,
-                           theta: lopt_base.MetaParams, outer_state: Any,
-                           key: PRNGKey) -> TruncatedUnrollState:
+def _init_truncation_state(
+    task_family: tasks_base.TaskFamily,
+    learned_opt: lopt_base.LearnedOptimizer,
+    trunc_sched: truncation_schedule.TruncationSchedule,
+    theta: lopt_base.MetaParams,
+    outer_state: Any,
+    key: PRNGKey,
+    num_steps_override: Optional[int] = None) -> TruncatedUnrollState:
   """Initialize a single inner problem state."""
 
   key1, key2, key3, key4 = jax.random.split(key, 4)
@@ -170,7 +188,7 @@ def _init_truncation_state(task_family: tasks_base.TaskFamily,
   inner_param, inner_state = task_family.task_fn(task_param).init_with_state(
       key2)
   trunc_state = trunc_sched.init(key3, outer_state)
-  num_steps = trunc_state.length
+  num_steps = trunc_state.length if num_steps_override is None else num_steps_override
   opt_state = learned_opt.opt_fn(
       theta, is_training=True).init(
           inner_param, inner_state, num_steps=num_steps, key=key4)
@@ -278,18 +296,29 @@ def vectorized_loss_and_aux(task_family: tasks_base.TaskFamily,
 
 
 def _truncated_unroll_one_step(
-    task_family: tasks_base.TaskFamily, learned_opt: lopt_base.LearnedOptimizer,
+    task_family: tasks_base.TaskFamily,
+    learned_opt: lopt_base.LearnedOptimizer,
     trunc_sched: truncation_schedule.TruncationSchedule,
-    theta: lopt_base.MetaParams, key: PRNGKey, state: TruncatedUnrollState,
-    data: Any, outer_state: Any, meta_loss_with_aux_key
+    theta: lopt_base.MetaParams,
+    key: PRNGKey,
+    state: TruncatedUnrollState,
+    data: Any,
+    outer_state: Any,
+    meta_loss_with_aux_key,
+    override_num_steps: Optional[int] = None,
 ) -> Tuple[TruncatedUnrollState, truncated_step.TruncatedUnrollOut]:
   """Train a given inner problem state a single step or reset it when done."""
   key1, key2 = jax.random.split(key)
 
+  if override_num_steps is not None:
+    num_steps = override_num_steps
+  else:
+    num_steps = state.truncation_state.length
+
   next_inner_opt_state, task_param, next_inner_step, l = progress_or_reset_inner_opt_state(
       task_family=task_family,
       opt=learned_opt.opt_fn(theta),
-      num_steps=state.truncation_state.length,
+      num_steps=num_steps,
       key=key1,
       inner_opt_state=state.inner_opt_state,
       task_param=state.task_param,
@@ -329,12 +358,18 @@ def _truncated_unroll_one_step(
     static_argnames=("task_family", "learned_opt", "trunc_sched",
                      "meta_loss_with_aux_key"))
 @functools.partial(
-    jax.vmap, in_axes=(None, None, None, None, 0, 0, 0, None, None))
+    jax.vmap, in_axes=(None, None, None, None, 0, 0, 0, None, None, None))
 def truncated_unroll_one_step(
-    task_family: tasks_base.TaskFamily, learned_opt: lopt_base.LearnedOptimizer,
+    task_family: tasks_base.TaskFamily,
+    learned_opt: lopt_base.LearnedOptimizer,
     trunc_sched: truncation_schedule.TruncationSchedule,
-    theta: lopt_base.MetaParams, key: PRNGKey, state: TruncatedUnrollState,
-    data: Any, outer_state: Any, meta_loss_with_aux_key: Optional[str]
+    theta: lopt_base.MetaParams,
+    key: PRNGKey,
+    state: TruncatedUnrollState,
+    data: Any,
+    outer_state: Any,
+    meta_loss_with_aux_key: Optional[str],
+    override_num_steps: Optional[int],
 ) -> Tuple[TruncatedUnrollState, truncated_step.TruncatedUnrollOut]:
   """Perform one step of inner training without vectorized theta."""
   return _truncated_unroll_one_step(
@@ -346,19 +381,27 @@ def truncated_unroll_one_step(
       state=state,
       data=data,
       outer_state=outer_state,
-      meta_loss_with_aux_key=meta_loss_with_aux_key)
+      meta_loss_with_aux_key=meta_loss_with_aux_key,
+      override_num_steps=override_num_steps)
 
 
 @functools.partial(
     jax.jit,
     static_argnames=("task_family", "learned_opt", "trunc_sched",
                      "meta_loss_with_aux_key"))
-@functools.partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0, None, None))
+@functools.partial(
+    jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0, None, None, None))
 def truncated_unroll_one_step_vec_theta(
-    task_family: tasks_base.TaskFamily, learned_opt: lopt_base.LearnedOptimizer,
+    task_family: tasks_base.TaskFamily,
+    learned_opt: lopt_base.LearnedOptimizer,
     trunc_sched: truncation_schedule.TruncationSchedule,
-    theta: lopt_base.MetaParams, key: PRNGKey, state: TruncatedUnrollState,
-    data: Any, outer_state: Any, meta_loss_with_aux_key: Optional[str]
+    theta: lopt_base.MetaParams,
+    key: PRNGKey,
+    state: TruncatedUnrollState,
+    data: Any,
+    outer_state: Any,
+    meta_loss_with_aux_key: Optional[str],
+    override_num_steps: Optional[int],
 ) -> Tuple[TruncatedUnrollState, truncated_step.TruncatedUnrollOut]:
   """Perform one step of inner training with vectorized theta."""
   return _truncated_unroll_one_step(
@@ -370,11 +413,13 @@ def truncated_unroll_one_step_vec_theta(
       state=state,
       data=data,
       outer_state=outer_state,
-      meta_loss_with_aux_key=meta_loss_with_aux_key)
+      meta_loss_with_aux_key=meta_loss_with_aux_key,
+      override_num_steps=override_num_steps)
 
 
 @gin.configurable
-class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep):
+class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
+                                  full_es.OverrideStepVectorizedTruncatedStep):
   """VectorizedTruncatedStep for learned optimizer inner training.
 
   This is more fully featured than VectorizedLOptTruncated step allowing for
@@ -431,7 +476,12 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep):
   def task_name(self):
     return self.task_family.name
 
-  def init_step_state(self, theta, outer_state, key, vectorize_theta=False):
+  def init_step_state(self,
+                      theta,
+                      outer_state,
+                      key,
+                      vectorize_theta=False,
+                      num_steps_override=None):
     if vectorize_theta:
       init_fn = init_truncation_state_vec_theta
     else:
@@ -440,7 +490,8 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep):
     key1, key2 = jax.random.split(key)
     unroll_state = init_fn(self.task_family, self.learned_opt, self.trunc_sched,
                            theta, outer_state,
-                           jax.random.split(key1, self.num_tasks))
+                           jax.random.split(key1,
+                                            self.num_tasks), num_steps_override)
     # When initializing, we want to keep the trajectories not all in sync.
     # To do this, we can initialize with a random offset on the inner-step.
     if self.random_initial_iteration_offset:
@@ -476,7 +527,8 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep):
                   key,
                   data,
                   outer_state,
-                  vectorized_theta=False):
+                  vectorized_theta=False,
+                  override_num_steps: Optional[int] = None):
     # keep consistent with trunc state?
     if self.train_and_meta:
       tr_data, meta_data = data
@@ -509,7 +561,7 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep):
     next_unroll_state_, ys = fn(self.task_family, self.learned_opt,
                                 self.trunc_sched, theta, vec_keys, unroll_state,
                                 tr_data, outer_state,
-                                self.meta_loss_with_aux_key)
+                                self.meta_loss_with_aux_key, override_num_steps)
 
     if self.train_and_meta:
       vec_keys = jax.random.split(key2, self.num_tasks)

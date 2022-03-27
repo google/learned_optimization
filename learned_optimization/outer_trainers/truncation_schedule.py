@@ -86,3 +86,14 @@ class LogUniformLengthSchedule(TruncationSchedule):
     state = lax.cond(is_done, lambda ss: self.init(*ss), lambda ss: state,
                      (key, outer_state))
     return state, is_done
+
+
+@gin.configurable
+class NeverEndingTruncationSchedule(TruncationSchedule):
+  """A truncation schedule which never resets."""
+
+  def init(self, key, outer_state):
+    return ()
+
+  def next_state(self, state, step, key, outer_state):
+    return (), False

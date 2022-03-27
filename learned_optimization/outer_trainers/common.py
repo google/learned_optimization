@@ -74,6 +74,7 @@ def truncated_unroll(
     state: UnrollState,
     datas: Any,
     outer_state: Any,
+    override_num_steps: Optional[int],
     with_summary: bool = False,  # used by add_with_summary. pylint: disable=unused-argument
 ) -> Tuple[Tuple[UnrollState, truncated_step_mod.TruncatedUnrollOut], Mapping[
     str, jnp.ndarray]]:
@@ -92,6 +93,7 @@ def truncated_unroll(
         key,
         data,
         outer_state=outer_state,
+        override_num_steps=override_num_steps,
         vectorized_theta=vectorized_theta)
     return state, outs
 
@@ -112,7 +114,8 @@ def maybe_stacked_es_unroll(
     datas: Any,
     outer_state: Any,
     with_summary: bool = False,
-    sample_rng_key: Optional[chex.PRNGKey] = None
+    sample_rng_key: Optional[chex.PRNGKey] = None,
+    override_num_steps: Optional[int] = None,
 ) -> Tuple[UnrollState, UnrollState, truncated_step_mod.TruncatedUnrollOut,
            truncated_step_mod.TruncatedUnrollOut, Mapping[str, jnp.ndarray]]:
   """Run's truncated_unroll one time with stacked antithetic samples or 2x."""
@@ -135,9 +138,12 @@ def maybe_stacked_es_unroll(
 
     (pn_state, pn_ys), m = truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking,unexpected-keyword-arg,redundant-keyword-arg
         *(static_args + [
-            stack(vec_p_theta, vec_n_theta), key,
+            stack(vec_p_theta, vec_n_theta),
+            key,
             stack(p_state, n_state),
-            stack(datas, datas, axis=1), outer_state
+            stack(datas, datas, axis=1),
+            outer_state,
+            override_num_steps,
         ]),
         with_summary=with_summary,
         sample_rng_key=sample_rng_key)
@@ -149,11 +155,13 @@ def maybe_stacked_es_unroll(
     n_ys = jax.tree_map(lambda x: x[:, num_tasks:], pn_ys)
   else:
     (p_state, p_ys), m = truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking,unexpected-keyword-arg
-        *(static_args + [vec_p_theta, key, p_state, datas, outer_state]),
+        *(static_args +
+          [vec_p_theta, key, p_state, datas, outer_state, override_num_steps]),
         with_summary=with_summary,
         sample_rng_key=sample_rng_key)
     (n_state, n_ys), _ = truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking,unexpected-keyword-arg
-        *(static_args + [vec_n_theta, key, n_state, datas, outer_state]),
+        *(static_args +
+          [vec_n_theta, key, n_state, datas, outer_state, override_num_steps]),
         with_summary=False)
 
   return p_state, n_state, p_ys, n_ys, m

@@ -25,9 +25,9 @@ import gin
 from learned_optimization import outer_train
 from learned_optimization.learned_optimizers import base as lopt_base
 from learned_optimization.optimizers import base as opt_base
-from learned_optimization.outer_trainers import full_es
 from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import lopt_truncated_step
+from learned_optimization.outer_trainers import truncated_es
 from learned_optimization.outer_trainers import truncated_pes
 from learned_optimization.outer_trainers import truncation_schedule
 from learned_optimization.population import population as population_mod
@@ -62,7 +62,7 @@ class OuterTrainTest(parameterized.TestCase):
                          task_family_fn)
 
       gin.bind_parameter("build_gradient_estimators.gradient_estimator_fn",
-                         full_es.FullES)
+                         truncated_es.TruncatedES)
 
       gin.bind_parameter(
           "build_gradient_estimators.truncated_step_fn",
@@ -117,7 +117,7 @@ class OuterTrainTest(parameterized.TestCase):
                          task_family_fn)
 
       gin.bind_parameter("build_gradient_estimators.gradient_estimator_fn",
-                         full_es.FullES)
+                         truncated_es.TruncatedES)
 
       gin.bind_parameter(
           "build_gradient_estimators.truncated_step_fn",
