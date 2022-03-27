@@ -119,6 +119,34 @@ def LOpt_10000_R5(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  #
   return [cfg] * reps, [(_save_dir_from_cfg(cfg), reps)]
 
 
+def _opt_list_cfgs(task_name: str, num_steps: int) -> HParamList:
+  """Configurations with different learning rates."""
+  cfgs = []
+
+  for idx in range(1000):
+    cfgs.append({
+        "inner_train_task.task": f"@{task_name}()",
+        "inner_train_task.opt": "@OptList()",
+        "OptList.idx": idx,
+        "inner_train_task.opt_name": f"OptList{idx}",
+        "inner_train_task.task_name": task_name,
+        "inner_train_task.num_steps": num_steps,
+        "inner_train_task.eval_every": 10,
+        "inner_train_task.eval_batches": 5,
+        "inner_train_task.last_eval_batches": 10,
+    })
+
+  return cfgs
+
+
+@gin.configurable
+def OptList1k_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _opt_list_cfgs(task_name, 10000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
 def _no_hparam_cfg(task_name: str, opt_name: str, num_steps: int) -> HParamList:
   """Configurations with different learning rates."""
   return [{
