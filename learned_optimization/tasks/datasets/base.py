@@ -153,13 +153,16 @@ def dataset_lru_cache_clear():
     c.cache_clear()
 
 
-def datasets_map(fn: Callable[[Batch], Batch], datasets: Datasets) -> Datasets:
+def datasets_map(fn: Callable[[Batch], Batch],
+                 datasets: Datasets,
+                 abstract_batch: Optional[Batch] = None) -> Datasets:
   return Datasets(
       train=map(fn, datasets.train),
       inner_valid=map(fn, datasets.inner_valid),
       outer_valid=map(fn, datasets.outer_valid),
       test=map(fn, datasets.test),
-      abstract_batch=datasets.abstract_batch)
+      abstract_batch=abstract_batch
+      if abstract_batch else datasets.abstract_batch)
 
 
 def _image_map_fn(cfg: Mapping[str, Any], batch: Batch) -> Batch:

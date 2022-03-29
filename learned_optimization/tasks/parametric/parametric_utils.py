@@ -41,6 +41,12 @@ def log_int(key, lower, upper):
   return int(onp.asarray(onp.exp(val), onp.int32))
 
 
+def log_float(key, lower, upper):
+  val = jax.random.uniform(
+      key, [], minval=onp.log(lower), maxval=onp.log(upper))
+  return float(onp.exp(val))
+
+
 class SampleImageDataset:
   """Sample an image dataset."""
   dataset_fns = {

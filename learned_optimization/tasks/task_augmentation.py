@@ -22,7 +22,7 @@ operate on Task and TaskFamiliy resulting in new Task and TaskFamily.
 """
 
 import functools
-from typing import Mapping, Tuple, Union
+from typing import Mapping, Tuple, Union, Any
 
 import gin
 import jax
@@ -85,6 +85,12 @@ class ReparamWeights(base.Task):
   def loss(self, params: Params, key: PRNGKey, data: Batch) -> jnp.ndarray:
     loss, _, _ = self.loss_with_state_and_aux(params, None, key, data)
     return loss
+
+  def loss_with_state(self, params: Any, state: Any, key: jnp.ndarray,
+                      data: Any) -> Tuple[jnp.ndarray, Any]:
+    loss, state, _ = self.loss_with_state_and_aux(params, state, key, data)
+    return loss, state
+
 
 
 @gin.configurable
@@ -206,8 +212,15 @@ class ReducedBatchsizeTask(base.Task):
       bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
       return x[0:bs]
 
+    def reduce_abstract_bs(x):
+      bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
+      return jax.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
+
+    abstract_batch = jax.tree_map(reduce_abstract_bs,
+                                  self.task.datasets.abstract_batch)
     self.datasets = datasets_base.datasets_map(
-        functools.partial(jax.tree_map, reduce_bs), task.datasets)
+        functools.partial(jax.tree_map, reduce_bs), task.datasets,
+        abstract_batch)
 
 
 @gin.configurable
@@ -226,7 +239,16 @@ class ReducedBatchsizeFamily(base.TaskFamily):
       bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
       return x[0:bs]
 
+    def reduce_abstract_bs(x):
+      bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
+      return jax.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
+
+    abstract_batch = jax.tree_map(reduce_abstract_bs,
+                                  self.task_family.datasets.abstract_batch)
     self.datasets = datasets_base.datasets_map(
-        functools.partial(jax.tree_map, reduce_bs), task_family.datasets)
+        functools.partial(jax.tree_map, reduce_bs),
+        task_family.datasets,
+        abstract_batch=abstract_batch)
+
     self.task_fn = task_family.task_fn
     self.sample = task_family.sample

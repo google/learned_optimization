@@ -185,6 +185,7 @@ class ESTask(base.Task):
     self.init = task.init
     self.init_with_state = task.init_with_state
     self.datasets = task.datasets
+    self.normalizer = task.normalizer
 
     def f_fwd(params, state, key, batch):
       results = task.loss_with_state_and_aux(params, state, key, batch)

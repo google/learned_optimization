@@ -31,9 +31,14 @@ def dummary_datasets():
 
   def it():
     while True:
-      yield jnp.ones([32])
+      yield jnp.ones([32], dtype=jnp.int32)
 
-  return datasets_base.Datasets(it(), it(), it(), it())
+  return datasets_base.Datasets(
+      it(),
+      it(),
+      it(),
+      it(),
+      abstract_batch=jax.ShapedArray([32], dtype=jnp.int32))
 
 
 class DummyTask(base.Task):
@@ -150,6 +155,7 @@ class TaskAugmentationTest(absltest.TestCase):
         DummyTaskFamily(), fraction_of_batchsize=0.5)
     batch = next(task_family.datasets.train)
     self.assertEqual(batch.shape, (16,))
+    self.assertEqual(task_family.datasets.abstract_batch.shape, (16,))
 
 
 if __name__ == '__main__':

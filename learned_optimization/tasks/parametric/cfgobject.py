@@ -88,6 +88,9 @@ class CFGObject:
   obj: str = flax.struct.field(pytree_node=False)
   kwargs: Mapping[str, Any] = flax.struct.field(default_factory=dict)
 
+  def __repr__(self):
+    return f"CFGObject(obj={self.obj}, kwargs={self.kwargs})"
+
 
 @flax.struct.dataclass
 class CFGNamed:
@@ -99,6 +102,9 @@ class CFGNamed:
 
   name: str = flax.struct.field(pytree_node=False)
   values: Mapping[str, Any] = flax.struct.field(default_factory=dict)
+
+  def __repr__(self):
+    return f"CFGNamed(obj={self.name}, kwargs={self.values})"
 
 
 @gin.configurable

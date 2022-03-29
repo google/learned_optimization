@@ -86,6 +86,13 @@ def ImageMLP_FashionMnist8_Relu32():
 
 
 @gin.configurable
+def ImageMLP_Cifar10_8_Relu32():
+  """A 1 hidden layer, 32 hidden unit MLP designed for 8x8 cifar10."""
+  datasets = image.cifar10_datasets(batch_size=128, image_size=(8, 8))
+  return _MLPImageTask(datasets, [32])
+
+
+@gin.configurable
 def ImageMLP_Imagenet16_Relu256x256x256():
   """A 3 hidden layer MLP trained on 16x16 resized imagenet."""
   datasets = image.imagenet16_datasets(batch_size=128)

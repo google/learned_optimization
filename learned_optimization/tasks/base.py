@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Base classes for Task and TaskFamily."""
-from typing import Any, Optional, Tuple, TypeVar, Generic, Mapping, Callable
+from typing import Any, Optional, Tuple, TypeVar, Generic, Mapping, Callable, Sequence
 
 import gin
 import jax
@@ -147,6 +147,18 @@ def sample_single_task_family(key: PRNGKey,
     raise ValueError("task_family must be an instance of TaskFamily!"
                      f" Not {type(task_family)}")
   return task_family
+
+
+def get_task_from_name(task_name: str) -> Task:
+  return gin.get_configurable(f"{task_name}")()
+
+
+@gin.configurable
+def sample_task_family_from_task_fns(key: PRNGKey,
+                                     task_names: Sequence[str]) -> TaskFamily:
+  idx = int(jax.random.choice(key, jnp.arange(len(task_names))))
+  task_name = task_names[idx]
+  return single_task_to_family(get_task_from_name(task_name))
 
 
 def softmax_cross_entropy(
