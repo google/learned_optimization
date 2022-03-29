@@ -15,6 +15,7 @@
 
 """Utilities for programs written in jax."""
 
+import functools
 import jax
 import numpy as onp
 
@@ -25,3 +26,8 @@ def maybe_static_cond(pred, true_fn, false_fn, val):
     return true_fn(val) if pred else false_fn(val)
   else:
     return jax.lax.cond(pred, true_fn, false_fn, val)
+
+
+@functools.lru_cache(None)
+def cached_jit(fn, *args, **kwargs):
+  return jax.jit(fn, *args, **kwargs)

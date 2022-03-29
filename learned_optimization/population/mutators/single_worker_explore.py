@@ -15,14 +15,16 @@
 
 """Explore hparams on a single machine."""
 import time
-from typing import Mapping, MutableMapping, Sequence, Tuple, Any, Callable
+from typing import Any, Callable, Mapping, MutableMapping, Sequence, Tuple
 
+import gin
 from learned_optimization.population import population
 import numpy as onp
 
 BranchingState = Mapping[str, Any]
 
 
+@gin.configurable
 class BranchingSingleMachine(population.Mutate):
   r"""Explore hparams on a single machine!
 

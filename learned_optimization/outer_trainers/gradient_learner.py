@@ -25,6 +25,7 @@ import gin
 import jax
 import jax.numpy as jnp
 from learned_optimization import checkpoints
+from learned_optimization import jax_utils
 from learned_optimization import profile
 from learned_optimization import summary
 from learned_optimization import tree_utils
@@ -132,7 +133,6 @@ class GradientLearner:
                init_outer_state_from_path: Optional[str] = None,
                num_steps: Optional[int] = None):
     self._theta_opt = theta_opt
-    self._theta_opt_update = jax.jit(self._theta_opt.update)
     self._meta_init = meta_init
     self._init_theta_from_path = init_theta_from_path
     self._init_outer_state_from_path = init_outer_state_from_path
@@ -235,7 +235,7 @@ class GradientLearner:
       mean_loss = jnp.mean(losses)
       min_loss = jnp.min(losses)
 
-    theta_opt_state = self._theta_opt_update(
+    theta_opt_state = jax_utils.cached_jit(self._theta_opt.update)(
         theta_opt_state,
         grads,
         mean_loss,

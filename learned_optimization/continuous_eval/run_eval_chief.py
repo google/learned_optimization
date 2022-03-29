@@ -359,7 +359,10 @@ def write_results_thread_main(
           metrics=metrics,
           step=step)
 
-      if population_root_dir and log_to_population_tag:
+      if log_to_population_tag:
+        if not population_root_dir:
+          raise ValueError("log_to_population_tag set, but no population root"
+                           " dir was set.")
         if log_to_population_tag not in metrics:
           raise ValueError(f"No tag found! Keys: {list(metrics.keys())}")
 

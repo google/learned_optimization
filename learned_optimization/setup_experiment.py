@@ -38,6 +38,9 @@ flags.DEFINE_integer("task", 0, "Task / index of the replica for this job.")
 flags.DEFINE_string("train_log_dir", None,
                     "Training directory to save summaries/checkpoints.")
 
+flags.DEFINE_string("train_log_dir_suffix", None,
+                    "suffix to add to train_log_dir path.")
+
 FLAGS = flags.FLAGS
 
 

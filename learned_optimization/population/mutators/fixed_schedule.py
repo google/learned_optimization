@@ -18,10 +18,12 @@ import time
 from typing import Any, Mapping, MutableMapping, Sequence
 
 from absl import logging
+import gin
 from learned_optimization.population import population
 
 
 # this is a simple state machine.
+@gin.configurable
 class FixedSchedule(population.Mutate):
   """Update a single worker on a fixed schedule."""
 
@@ -50,12 +52,12 @@ class FixedSchedule(population.Mutate):
 
     for k, sched_v in sorted(
         self._schedule.items(), key=lambda k_v: int(k_v[0])):
-      logging.info(f"Checking step {k} on checkpoint {last_checkpoint.step}")  # pylint: disable=logging-format-interpolation
+      logging.info(f"Checking step {k} on checkpoint {last_checkpoint.step}")  # pylint: disable=logging-format-interpolation,logging-fstring-interpolation
 
       # If the last checkpoint iteration is greater than the key we know we must
       # apply this checkpoint.
       if int(k) <= int(last_checkpoint.step):
-        logging.info(  # pylint: disable=logging-format-interpolation
+        logging.info(  # pylint: disable=logging-format-interpolation,logging-fstring-interpolation
             f"Applying! {k} on checkpoint {last_checkpoint.step} === {sched_v}")
 
         # starting a new generation as we have new hparams

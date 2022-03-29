@@ -206,13 +206,14 @@ def maybe_resample_gradient_estimators(
   for j in range(len(gradient_estimators)):
     if stochastic_resample_frequency > 0 and onp.random.rand(
     ) < 1.0 / stochastic_resample_frequency:
-      logging.info("Resampling Static")
-      key, key1, key2 = jax.random.split(key, 3)
-      ests = build_gradient_estimators(
-          learned_opt=learned_opt, key=key1, num_gradient_estimators=1)
-      gradient_estimators[j] = ests[0]
-      unroll_states[j] = gradient_estimators[j].init_worker_state(
-          worker_weights, key2)
+      with profile.Profile("Resample_in_maybe_resample_gradient_estimators"):
+        logging.info("Resampling Static")
+        key, key1, key2 = jax.random.split(key, 3)
+        ests = build_gradient_estimators(
+            learned_opt=learned_opt, key=key1, num_gradient_estimators=1)
+        gradient_estimators[j] = ests[0]
+        unroll_states[j] = gradient_estimators[j].init_worker_state(
+            worker_weights, key2)
 
   return gradient_estimators, unroll_states
 
@@ -278,17 +279,17 @@ def train_worker(lopt: lopt_base.LearnedOptimizer,
 
     # this is only triggered with population based training!
     if last_outer_cfg != dist_data.outer_cfg:
-      # TODO(lmetz) parse outer config.
-      logging.info("Rebuilding statics due to new outer_cfg")
-      logging.info("New cfg: %s", str(dist_data.outer_cfg))
-      logging.info("Old cfg: %s", str(last_outer_cfg))
+      with profile.Profile("rebuilding_from_population"):
+        logging.info("Rebuilding statics due to new outer_cfg")
+        logging.info("New cfg: %s", str(dist_data.outer_cfg))
+        logging.info("Old cfg: %s", str(last_outer_cfg))
 
-      print("Rebuilding statics due to new outer_cfg")
-      _parse_outer_cfg(dist_data.outer_cfg)
+        print("Rebuilding statics due to new outer_cfg")
+        _parse_outer_cfg(dist_data.outer_cfg)
 
-      grad_estimators, unroll_states = build_static_and_init_unroll_state(
-          worker_weights, next(rng))
-      last_outer_cfg = dist_data.outer_cfg
+        grad_estimators, unroll_states = build_static_and_init_unroll_state(
+            worker_weights, next(rng))
+        last_outer_cfg = dist_data.outer_cfg
 
     # Initialize gradient estimators here, after the new configuration has
     # been parsed.
@@ -431,9 +432,34 @@ def _str_struct(a):
   return str(jax.tree_map(shape_dtype, a))
 
 
+def summarize_outer_cfg(outer_cfg: Sequence[str]) -> Mapping[str, float]:
+  """Convert the outer config (hparams tuned via population) to a dict.
+
+  This expects each entry in the outer_cfg to have gin style bindings -- so
+  "Adam.learning_rate=1e-3" would be a valid config.
+
+  Args:
+    outer_cfg: Sequence of gin bindings.
+
+  Returns:
+    dictionary with floating point values.
+  """
+  to_write = {}
+  if outer_cfg:
+    for o in outer_cfg:
+      name, value = o.split("=")
+      try:
+        value = float(value)
+        to_write[f"outer_cfg/{name}"] = value
+      except ValueError:
+        # Failed to parse value as float. Ignore it and don't log it.
+        pass
+  return to_write
+
+
 def train_learner(
     train_log_dir: str,
-    outer_learner: gradient_learner.GradientLearner,
+    outer_learner_fn: Callable[[], gradient_learner.GradientLearner],
     summary_every_n: int = 10,
     num_steps: int = 10000,
     num_seconds: float = 0,
@@ -449,7 +475,8 @@ def train_learner(
   Args:
     train_log_dir: Directory with which checkpoints and parameter values are
       stored as well as tensorboard logs.
-    outer_learner: Object which controls updating the learned optimizer weights.
+    outer_learner_fn: Object which controls updating the learned optimizer
+      weights.
     summary_every_n: How frequently / how many steps before metrics are
       computed.
     num_steps: Total number of meta-training steps. This function will exit at
@@ -477,6 +504,7 @@ def train_learner(
   seed = onp.random.randint(0, 10000000)
 
   key = jax.random.PRNGKey(seed)
+  outer_learner = outer_learner_fn()
   gradient_learner_state = outer_learner.init(key)
 
   gen_id = "fake_initial_gen_id"
@@ -580,13 +608,14 @@ def train_learner(
 
         # TODO(lmetz) actually putt he config into effect.
 
+        # Now actually put the config into effect.
         if outer_cfg != last_outer_cfg:
           logging.info("Rebuilding statics due to new outer_cfg")
           last_outer_cfg = outer_cfg
           _parse_outer_cfg(outer_cfg)
-          # TODO(lmetz) rebuild outer learner somehow?
-          # This is needed if the population, say, changes outer learning rate.
-          # right now this will not be updated.
+          outer_learner = outer_learner_fn()
+          # TODO(lmetz) ensure / check that this fixes all configs.
+          # I think all that is remaining is run_train overloads.
 
         dist_learner.start_server()
 
@@ -659,6 +688,8 @@ def train_learner(
         total_inner_steps=total_inner_steps,
         delta_inner_steps=applied_inner_steps,
     )
+
+    to_write = dict(**to_write, **summarize_outer_cfg(outer_cfg))
 
     if i % 5 == 0:
       elapsed_time = elapsed_time + time.time() - train_start_time
@@ -927,8 +958,8 @@ def _move_all_gin_config_to_default_scope():
 def run_train(
     train_log_dir: str,
     lopt: Union[GinRequired, lopt_base.LearnedOptimizer] = gin.REQUIRED,
-    outer_learner: Union[GinRequired,
-                         gradient_learner.GradientLearner] = gin.REQUIRED,
+    outer_learner_fn: Union[GinRequired, Callable[
+        [], gradient_learner.GradientLearner]] = gin.REQUIRED,
     num_estimators: int = 2,
     is_trainer: bool = True,
     is_worker: bool = True,
@@ -950,7 +981,8 @@ def run_train(
   Args:
     train_log_dir: directory to save logs and checkpoints to.
     lopt: learned optimizer
-    outer_learner: learner which does the actual training of the lopt weights.
+    outer_learner_fn: fn which produces the learner which does the actual
+      training of the lopt weights.
     num_estimators: number of estimators to use per outer update
     is_trainer: to run a trainer / learner
     is_worker: to run a worker
@@ -968,8 +1000,8 @@ def run_train(
     population_root_dir: root directory of the population. None if not using
       population based training.
   """
-  if outer_learner == gin.REQUIRED:
-    raise ValueError("Must set run_train.outer_learner in gin")
+  if outer_learner_fn == gin.REQUIRED:
+    raise ValueError("Must set run_train.outer_learner_fn in gin")
 
   if is_trainer:
     with filesystem.file_open(os.path.join(train_log_dir, "config.gin"),
@@ -982,7 +1014,7 @@ def run_train(
     if is_trainer and is_worker:
       local_train(
           train_log_dir=train_log_dir,
-          outer_learner=outer_learner,
+          outer_learner=outer_learner_fn(),
           lopt=lopt,
           num_estimators=num_estimators,
           summary_every_n=summary_every_n,
@@ -999,7 +1031,7 @@ def run_train(
         population = None
       train_learner(
           train_log_dir=train_log_dir,
-          outer_learner=outer_learner,
+          outer_learner_fn=outer_learner_fn,
           summary_every_n=summary_every_n,
           num_steps=num_steps,
           num_seconds=num_seconds,
@@ -1041,6 +1073,8 @@ def run_population_controller(population_root_dir: str,
   """Run the population controller for population based training."""
 
   filesystem.make_dirs(population_root_dir)
+
+  logging.info("Creating population controller.")
 
   population = population_mod.PopulationController(
       initial_population, mutator, log_dir=population_root_dir)

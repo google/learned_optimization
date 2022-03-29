@@ -18,6 +18,7 @@ import time
 from typing import Any, MutableMapping, Optional, Sequence, Tuple
 
 from absl import logging
+import gin
 from learned_optimization.population import population
 import numpy as onp
 
@@ -26,6 +27,7 @@ def _time_value(step_dict):
   return list(sorted(step_dict.values(), key=lambda x: x.time))
 
 
+@gin.configurable
 class WinnerTakeAllGenetic(population.Mutate):
   """Winner take all population based training."""
 

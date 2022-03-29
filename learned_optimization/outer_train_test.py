@@ -71,7 +71,8 @@ class OuterTrainTest(parameterized.TestCase):
               num_tasks=2,
               trunc_sched=truncation_schedule.ConstantTruncationSchedule(10)))
 
-      outer_learner = gradient_learner.GradientLearner(lopt, opt_base.Adam())
+      outer_learner_fn = functools.partial(gradient_learner.GradientLearner,
+                                           lopt, opt_base.Adam())
 
       port = portpicker.pick_unused_port()
       address = f"localhost:{port}"
@@ -96,7 +97,7 @@ class OuterTrainTest(parameterized.TestCase):
 
       outer_train.train_learner(
           train_log_dir,
-          outer_learner=outer_learner,
+          outer_learner_fn=outer_learner_fn,
           summary_every_n=2,
           num_steps=20,
           trainer_batch_size=2,
@@ -126,7 +127,8 @@ class OuterTrainTest(parameterized.TestCase):
               num_tasks=2,
               trunc_sched=truncation_schedule.ConstantTruncationSchedule(10)))
 
-      outer_learner = gradient_learner.GradientLearner(lopt, opt_base.Adam())
+      outer_learner_fn = functools.partial(gradient_learner.GradientLearner,
+                                           lopt, opt_base.Adam())
 
       port = portpicker.pick_unused_port()
       address = f"localhost:{port}"
@@ -147,7 +149,7 @@ class OuterTrainTest(parameterized.TestCase):
 
       outer_train.train_learner(
           train_log_dir,
-          outer_learner=outer_learner,
+          outer_learner_fn=outer_learner_fn,
           summary_every_n=2,
           num_steps=5,
           trainer_batch_size=2,
