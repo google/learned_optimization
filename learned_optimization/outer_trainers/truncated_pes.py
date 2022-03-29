@@ -16,7 +16,7 @@
 """A vetorized, truncated, PES based gradient estimator."""
 
 import functools
-from typing import Any, Mapping, Sequence, Tuple
+from typing import Any, Mapping, Sequence, Tuple, Optional
 
 import flax
 from flax import jax_utils
@@ -44,11 +44,14 @@ class PESWorkerState(gradient_learner.GradientEstimatorState):
   accumulator: MetaParams
 
 
-@functools.partial(jax.jit, static_argnames=("std",))
+@functools.partial(jax.jit, static_argnames=("std", "sign_delta_loss_scalar"))
 def compute_pes_grad(
     p_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
     n_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
-    accumulator: MetaParams, vec_pos: MetaParams, std: float
+    accumulator: MetaParams,
+    vec_pos: MetaParams,
+    std: float,
+    sign_delta_loss_scalar: Optional[float] = None,
 ) -> Tuple[float, MetaParams, MetaParams, truncated_step_mod.TruncatedUnrollOut,
            float]:
   """Compute the PES gradient estimate from the outputs of many unrolls.
@@ -59,6 +62,8 @@ def compute_pes_grad(
     accumulator: Current PES accumulator from the last iteration.
     vec_pos: Positive perturbations used to compute the current unroll.
     std: Standard deviation of pertrubations used.
+    sign_delta_loss_scalar: Optional, if specified the sign of the delta loss
+      multiplied by this value is used instead of the real delta_loss
 
   Returns:
     loss: the mean loss.
@@ -78,6 +83,10 @@ def compute_pes_grad(
   pos_loss = jnp.sum(p_ys.loss * p_ys.mask, axis=0) / jnp.sum(p_ys.mask, axis=0)
   neg_loss = jnp.sum(n_ys.loss * n_ys.mask, axis=0) / jnp.sum(n_ys.mask, axis=0)
   delta_loss = (pos_loss - neg_loss)
+
+  if sign_delta_loss_scalar:
+    delta_loss = jnp.sign(delta_loss) * sign_delta_loss_scalar
+
   contrib = delta_loss / (2 * std**2)
 
   # When we have not yet recieved an is_done, we want to add to the accumulator.
@@ -136,6 +145,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       std=0.01,
       steps_per_jit=10,
       stack_antithetic_samples: bool = False,
+      sign_delta_loss_scalar: Optional[float] = None,
   ):
     self.truncated_step = truncated_step
     self.std = std
@@ -143,6 +153,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     self.trunc_length = trunc_length
     self.steps_per_jit = steps_per_jit
     self.stack_antithetic_samples = stack_antithetic_samples
+    self.sign_delta_loss_scalar = sign_delta_loss_scalar
 
     if self.trunc_length % self.steps_per_jit != 0:
       raise ValueError("Pass a trunc_length and steps_per_jit that are"
@@ -218,7 +229,12 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       n_yses.append(n_ys)
 
     loss, es_grad, new_accumulator, p_ys, delta_loss = compute_pes_grad(
-        p_yses, n_yses, accumulator, vec_pos, self.std)
+        p_yses,
+        n_yses,
+        accumulator,
+        vec_pos,
+        self.std,
+        sign_delta_loss_scalar=self.sign_delta_loss_scalar)
 
     unroll_info = gradient_learner.UnrollInfo(
         loss=p_ys.loss,
