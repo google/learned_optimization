@@ -322,8 +322,9 @@ class FullES(gradient_learner.GradientEstimator):
     trunc_state = self.truncation_schedule.init(key, worker_weights.outer_state)
 
     # round to steps per jit
-    length = min(
-        (int(trunc_state.length) // self.steps_per_jit) * self.steps_per_jit, 1)
+    length = max(
+        (int(trunc_state.length) // self.steps_per_jit) * self.steps_per_jit,
+        self.steps_per_jit)
 
     p_state = self.truncated_step.init_step_state(
         vec_p_theta,
@@ -343,7 +344,7 @@ class FullES(gradient_learner.GradientEstimator):
       raise AttributeError("Please specify a truncation schedule whose state"
                            " contains a length attribute.")
 
-    for _ in range(length):
+    for _ in range(length // self.steps_per_jit):
       with profile.Profile("data"):
         datas = self.truncated_step.get_batch(self.steps_per_jit)
 
@@ -372,6 +373,9 @@ class FullES(gradient_learner.GradientEstimator):
         p_yses.append(p_ys)
         n_yses.append(n_ys)
 
+    if hasattr(p_state, "inner_step"):
+      metrics.append({"sample||end_inner_step": p_state.inner_step[0]})
+
     with profile.Profile("computing_loss_and_update"):
       if self.loss_type in ["avg", "min"]:
         mean_loss, es_grad, p_ys = traj_loss_antithetic_es(
@@ -389,6 +393,7 @@ class FullES(gradient_learner.GradientEstimator):
             is_done=p_ys.is_done)
 
       elif self.loss_type == "last_recompute":
+        # TODO(lmetz) do this in multiple passes to overlap compute and data.
         with profile.Profile("last_recompute_data"):
           datas = self.truncated_step.get_outer_batch(self.recompute_samples)
 
