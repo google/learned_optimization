@@ -93,9 +93,51 @@ def AdamLR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-nam
 
 
 @gin.configurable
+def RMSPropLR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "RMSProp", 10000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def RMSPropMomLR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "RMSProp", 10000)
+  for c in cfgs:
+    c["RMSProp.momentum"] = 0.9  # pytype: disable=unsupported-operands
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def SGDMLR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "SGDM", 10000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def SGDLR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "SGD", 10000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
 def AdamLR_10000_R1(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
   reps = 1
   cfgs = _lr_cfgs(task_name, "Adam", 10000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def AdamLR_100000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "Adam", 100000)
   paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
   return list(cfgs) * reps, paths
 

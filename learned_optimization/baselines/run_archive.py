@@ -38,7 +38,8 @@ import numpy as onp
 def maybe_get_hparam_set(
     task_name,
     hparam_set_name,
-    hparam_set_fn: Optional[Callable[[str], hparam_sets.HParamSet]] = None
+    hparam_set_fn: Optional[Callable[[str], hparam_sets.HParamSet]] = None,
+    clear_bad_files: bool = False,
 ) -> Optional[Mapping[str, Any]]:
   """Attempt to get the data for a given task_name and hparam set.
 
@@ -48,6 +49,8 @@ def maybe_get_hparam_set(
     hparam_set_fn: Optional function which is called with tak_name to return the
       values of the hparam set. If not specified we look up the hparam_set_name
       from gin. This value is designed to be injected with gin.
+    clear_bad_files: If this is True, and we comes across a file it cannot load,
+      we assume it is corrupt and delete it.
 
   Returns:
     Either None if no values could be obtained, or a stacked dictionary
@@ -60,7 +63,7 @@ def maybe_get_hparam_set(
 
   def load_one(p):
     return utils.load_baseline_results_from_dir(
-        save_dir=p, output_type="curves")
+        save_dir=p, output_type="curves", clear_bad_files=clear_bad_files)
 
   with futures.ThreadPoolExecutor(32) as executor:
     results = list(executor.map(load_one, paths))

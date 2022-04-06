@@ -14,13 +14,15 @@
 # limitations under the License.
 
 """Utilities for baseline runs."""
+
 from concurrent import futures
 import io
 import os
 import time
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, Optional
 import uuid
 
+from absl import logging
 from learned_optimization import filesystem
 from learned_optimization import profile
 import numpy as onp
@@ -82,12 +84,18 @@ def write_npz(path: str, data: Mapping[str, Any]):
 
 
 @profile.wrap()
-def read_npz(path: str) -> Mapping[str, Any]:
+def read_npz(path: str) -> Optional[Mapping[str, Any]]:
   """Read a numpyz file from the `path`."""
   with filesystem.file_open(path, "rb") as f:
     content = f.read()
   io_buffer = io.BytesIO(content)
-  return {k: v for k, v in onp.load(io_buffer, allow_pickle=True).items()}
+  try:
+    return {k: v for k, v in onp.load(io_buffer, allow_pickle=True).items()}
+  except Exception as e:  # pylint: disable=broad-except
+    logging.info("Failed to read file: %s", path)
+    print(f"Failed to read file: {path}")
+    logging.error(str(e))
+    return None
 
 
 @profile.wrap()
@@ -189,26 +197,41 @@ def write_baseline_result(data: Mapping[str, Any],
 def load_baseline_results_from_dir(
     save_dir: str,
     output_type: str,
-    threads: int = 0) -> Sequence[Mapping[str, Any]]:
+    threads: int = 0,
+    clear_bad_files: bool = False) -> Sequence[Mapping[str, Any]]:
   """Load all the baselines from a given save dir."""
   paths = filesystem.glob(save_dir + f"/*.{output_type}")
 
+  def read_and_maybe_clear(p):
+    ret = read_npz(p)
+    if ret is None and clear_bad_files:
+      filesystem.remove(p)
+      return None
+    return ret
+
   if threads > 0:
     with futures.ThreadPoolExecutor(threads) as executor:
-      return list(executor.map(read_npz, paths))
+      vals = list(executor.map(read_and_maybe_clear, paths))
   else:
-    return list(map(read_npz, paths))
+    vals = list(map(read_and_maybe_clear, paths))
+
+  if not all([v is not None for v in vals]):
+    raise ValueError("Failed to load! Check logs.")
+
+  return vals
 
 
 @profile.wrap()
-def load_baseline_results(task_name: str,
-                          opt_name: str,
-                          num_steps: int,
-                          eval_every: int,
-                          eval_batches: int,
-                          last_eval_batches: int,
-                          output_type: str,
-                          threads: int = 0) -> Sequence[Mapping[str, Any]]:
+def load_baseline_results(
+    task_name: str,
+    opt_name: str,
+    num_steps: int,
+    eval_every: int,
+    eval_batches: int,
+    last_eval_batches: int,
+    output_type: str,
+    threads: int = 0,
+    clear_bad_files: bool = False) -> Sequence[Mapping[str, Any]]:
   """Load results from the runs run with the provided info."""
 
   save_dir = get_save_dir(
@@ -218,4 +241,5 @@ def load_baseline_results(task_name: str,
       eval_every=eval_every,
       eval_batches=eval_batches,
       last_eval_batches=last_eval_batches)
-  return load_baseline_results_from_dir(save_dir, output_type, threads)
+  return load_baseline_results_from_dir(
+      save_dir, output_type, threads, clear_bad_files=clear_bad_files)
