@@ -104,7 +104,7 @@ class OptaxOptimizer(Optimizer):
   def update(self,
              opt_state: OptaxState,
              grad: Gradient,
-             loss: Optional[jnp.ndarray],
+             loss: Optional[jnp.ndarray] = None,
              model_state: Optional[ModelState] = None,
              key: Optional[PRNGKey] = None,
              **kwargs):
