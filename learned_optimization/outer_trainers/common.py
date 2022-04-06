@@ -74,7 +74,7 @@ def truncated_unroll(
     state: UnrollState,
     datas: Any,
     outer_state: Any,
-    override_num_steps: Optional[int],
+    override_num_steps: Optional[int] = None,
     with_summary: bool = False,  # used by add_with_summary. pylint: disable=unused-argument
 ) -> Tuple[Tuple[UnrollState, truncated_step_mod.TruncatedUnrollOut], Mapping[
     str, jnp.ndarray]]:
