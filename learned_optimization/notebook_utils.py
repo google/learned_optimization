@@ -16,12 +16,15 @@
 """Utilities for interactively working with data and results in notebooks."""
 
 from concurrent import futures
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, Tuple, Optional
 
+import chex
 from matplotlib import pylab as plt
 import numpy as np
 import seaborn as sns
 import tqdm
+
+Color = Any
 
 category_10 = [
     "#1f77b4",
@@ -82,27 +85,22 @@ def colors_for_num(num, rep=1, stride=None, categorical=True):
     return [cmap(float(i) / num) for i in range(num)]
 
 
-def ema(data, alpha):
+def ema(data: chex.Array, alpha: float, ignore_nan=False):
+  """Exponential moving average."""
   if len(data) == 0:  # pylint: disable=g-explicit-length-test
     return data
   data = np.asarray(data)
   x = np.zeros_like(data)
   x[0] = data[0]
   m_alpha = alpha
-  for i, a in enumerate((1 - alpha) * data[1:]):
-    x[i + 1] = x[i] * m_alpha + a
-  return x
+  # TODO(lmetz) profile if this is needed / saves much time.
+  if ignore_nan:
+    for i, a in enumerate((1 - alpha) * data[1:]):
+      x[i + 1] = x[i] if np.isnan(a) else x[i] * m_alpha + a
+  else:
+    for i, a in enumerate((1 - alpha) * data[1:]):
+      x[i + 1] = x[i] * m_alpha + a
 
-
-def nan_ema(data, alpha):
-  if len(data) == 0:  # pylint: disable=g-explicit-length-test
-    return data
-  data = np.asarray(data)
-  x = np.zeros_like(data)
-  x[0] = data[0]
-  m_alpha = alpha
-  for i, a in enumerate((1 - alpha) * data[1:]):
-    x[i + 1] = x[i] if np.isnan(a) else x[i] * m_alpha + a
   return x
 
 
@@ -113,3 +111,45 @@ def threaded_tqdm_map(threads: int, func: Callable[[Any], Any],
     for l in tqdm.tqdm(data):
       future_list.append(executor.submit(func, l))
     return [x.result() for x in tqdm.tqdm(future_list)]
+
+
+def similar_colors(
+    folders: Sequence[str],
+    remove_trailing_subfolder_number: Optional[int] = None
+) -> Tuple[Sequence[Color], Sequence[Tuple[str, Color]]]:
+  """Utility to create colors and labels from a list of folders."""
+
+  def sep(f):
+    return "rep".join(f.split("rep")[:-1])
+
+  no_rep_folders = [sep(f) for f in folders]
+  if remove_trailing_subfolder_number is not None:
+    assert remove_trailing_subfolder_number > 0
+    no_rep_folders = [
+        f.split("/")[-remove_trailing_subfolder_number] for f in no_rep_folders  # pylint: disable=invalid-unary-operand-type
+    ]
+  uniques = np.unique(no_rep_folders)
+  print(uniques)
+
+  cc = {}
+  for i, v in enumerate(uniques):
+    cc[v] = colors_for_num(len(uniques))[i]
+
+  labels = list(cc.items())
+
+  colors = []
+  for f in folders:
+    key = sep(f)
+    colors.append(cc[key])
+  return colors, labels
+
+
+def legend_to_side(*args, ax=None, rescale=True, **kwargs):
+  """Like plt.legend() but places it to the side of the plot."""
+  if ax is None:
+    ax = plt.gca()
+  box = ax.get_position()
+  if rescale:
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+  # Put a legend to the right of the current axis
+  ax.legend(*args, loc="center left", bbox_to_anchor=(1, 0.5), **kwargs)
