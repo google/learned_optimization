@@ -81,6 +81,7 @@ def traj_loss_antithetic_es(
     std: float,
     loss_type: str,
     clip_loss_diff: Optional[float] = None,
+    sign_delta_loss_scalar: Optional[float] = None,
 ) -> Tuple[jnp.ndarray, MetaParams, truncated_step_mod.TruncatedUnrollOut]:
   """Compute an ES based gradient estimate based on losses of the unroll.
 
@@ -91,6 +92,8 @@ def traj_loss_antithetic_es(
     std: Standard deviation of noise used.
     loss_type: type of loss to use. Either "avg" or "min".
     clip_loss_diff: Term used to clip the max contribution of each sample.
+    sign_delta_loss_scalar: Optional, if specified the sign of the delta loss
+      multiplied by this value is used instead of the real delta_loss
 
   Returns:
     mean_loss: average loss of positive and negative unroll.
@@ -121,6 +124,9 @@ def traj_loss_antithetic_es(
   if clip_loss_diff:
     delta_loss = jnp.clip(delta_loss, -clip_loss_diff, clip_loss_diff)  # pylint: disable=invalid-unary-operand-type
 
+  if sign_delta_loss_scalar:
+    delta_loss = jnp.sign(delta_loss) * sign_delta_loss_scalar
+
   # The actual ES update done for each vectorized task
   contrib = delta_loss / (2 * std**2)
   vec_es_grad = jax.vmap(lambda c, p: jax.tree_map(lambda e: e * c, p))(contrib,
@@ -138,7 +144,7 @@ def traj_loss_antithetic_es(
         "std",
         "recompute_samples",
         "clip_loss_diff",
-        "meta_loss_with_aux_key",
+        "sign_delta_loss_scalar",
     ))
 def last_recompute_antithetic_es(
     truncated_step: truncated_step_mod.VectorizedTruncatedStep,
@@ -153,6 +159,7 @@ def last_recompute_antithetic_es(
     std: float,
     recompute_samples: int,
     clip_loss_diff: Optional[float] = None,
+    sign_delta_loss_scalar: Optional[float] = None,
 ) -> Tuple[float, MetaParams]:
   """Compute an ES gradient estimate by recomputing the loss on both unrolls.
 
@@ -169,6 +176,8 @@ def last_recompute_antithetic_es(
     std: standard deviation of the perturbation.
     recompute_samples: number of samples to compute the loss over.
     clip_loss_diff: clipping applied to each task loss.
+    sign_delta_loss_scalar: Optional, if specified the sign of the delta loss
+      multiplied by this value is used instead of the real delta_loss
 
   Returns:
     mean_loss: mean loss between positive and negative perturbations
@@ -199,6 +208,9 @@ def last_recompute_antithetic_es(
   delta_loss = jnp.nan_to_num(delta_loss, posinf=0., neginf=0.)
   if clip_loss_diff is not None:
     delta_loss = jnp.clip(delta_loss, -clip_loss_diff, clip_loss_diff)  # pylint: disable=invalid-unary-operand-type
+
+  if sign_delta_loss_scalar:
+    delta_loss = jnp.sign(delta_loss) * sign_delta_loss_scalar
 
   contrib = delta_loss / (2 * std**2)
 
@@ -238,6 +250,7 @@ class FullES(gradient_learner.GradientEstimator):
       recompute_split: str = "train",
       clip_loss_diff: Optional[float] = None,
       stack_antithetic_samples: bool = False,
+      sign_delta_loss_scalar: Optional[float] = None,
   ):
     """Initializer.
 
@@ -261,6 +274,8 @@ class FullES(gradient_learner.GradientEstimator):
       stack_antithetic_samples: Implementation detail of how antithetic samples
         are computed. Should we stack, and run with batch hardware or run
         sequentially?
+      sign_delta_loss_scalar: Optional, if specified the sign of the delta loss
+        multiplied by this value is used instead of the real delta_loss
     """
     self.truncated_step = truncated_step
 
@@ -275,6 +290,7 @@ class FullES(gradient_learner.GradientEstimator):
     self.loss_type = loss_type
     self.recompute_samples = recompute_samples
     self.recompute_split = recompute_split
+    self.sign_delta_loss_scalar = sign_delta_loss_scalar
 
     # Some truncated step also have truncation_schedule. This will be ignored
     # by this class. Here we do a sanity check to try to prevent this mistake if
@@ -384,7 +400,8 @@ class FullES(gradient_learner.GradientEstimator):
             vec_pos,
             self.std,
             loss_type=self.loss_type,
-            clip_loss_diff=self.clip_loss_diff)
+            clip_loss_diff=self.clip_loss_diff,
+            sign_delta_loss_scalar=self.sign_delta_loss_scalar)
 
         unroll_info = gradient_learner.UnrollInfo(
             loss=p_ys.loss,
@@ -411,7 +428,8 @@ class FullES(gradient_learner.GradientEstimator):
               key,
               self.std,
               recompute_samples=self.recompute_samples,
-              clip_loss_diff=self.clip_loss_diff)
+              clip_loss_diff=self.clip_loss_diff,
+              sign_delta_loss_scalar=self.sign_delta_loss_scalar)
           # TODO(lmetz) don't just return the last component of the trunction.
           p_ys = p_yses[-1]
           unroll_info = gradient_learner.UnrollInfo(

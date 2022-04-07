@@ -19,7 +19,7 @@ See TruncatedES for more info.
 """
 
 import functools
-from typing import Mapping, Sequence, Tuple, Any
+from typing import Mapping, Sequence, Tuple, Any, Optional
 
 import gin
 import haiku as hk
@@ -38,11 +38,13 @@ MetaParams = Any
 UnrollState = Any
 
 
-@functools.partial(jax.jit, static_argnames=("std",))
+@functools.partial(jax.jit, static_argnames=("std", "sign_delta_loss_scalar"))
 def compute_es_grad(
     p_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
     n_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
-    vec_pos: MetaParams, std: float
+    vec_pos: MetaParams,
+    std: float,
+    sign_delta_loss_scalar: Optional[float] = None,
 ) -> Tuple[float, MetaParams, truncated_step_mod.TruncatedUnrollOut, float]:
   """Compute the ES gradient estimate from the outputs of many unrolls.
 
@@ -51,6 +53,9 @@ def compute_es_grad(
     n_yses: Sequence of ES outputs from the negative perturbation.
     vec_pos: Positive perturbations used to compute the current unroll.
     std: Standard deviation of pertrubations used.
+    sign_delta_loss_scalar: Optional, if specified the sign of the delta loss
+      multiplied by this value is used instead of the real delta_loss
+
 
   Returns:
     loss: the mean loss.
@@ -68,6 +73,10 @@ def compute_es_grad(
   pos_loss = jnp.sum(p_ys.loss * p_ys.mask, axis=0) / jnp.sum(p_ys.mask, axis=0)
   neg_loss = jnp.sum(n_ys.loss * n_ys.mask, axis=0) / jnp.sum(n_ys.mask, axis=0)
   delta_loss = (pos_loss - neg_loss)
+
+  if sign_delta_loss_scalar:
+    delta_loss = jnp.sign(delta_loss) * sign_delta_loss_scalar
+
   contrib = delta_loss / (2 * std**2)
 
   vec_es_grad = jax.vmap(lambda c, p: jax.tree_map(lambda e: e * c, p))(contrib,
@@ -93,6 +102,7 @@ class TruncatedES(gradient_learner.GradientEstimator):
       steps_per_jit: int = 10,
       std: float = 0.01,
       stack_antithetic_samples: bool = False,
+      sign_delta_loss_scalar: Optional[float] = None,
   ):
     """Initializer.
 
@@ -106,6 +116,8 @@ class TruncatedES(gradient_learner.GradientEstimator):
       stack_antithetic_samples: Should we run the antithetic samples as two
         separate function calls, or "stack" them and run in one vectorized
         call?
+      sign_delta_loss_scalar: Optional, if specified the sign of the delta loss
+        multiplied by this value is used instead of the real delta_loss
     """
     self.truncated_step = truncated_step
 
@@ -113,6 +125,7 @@ class TruncatedES(gradient_learner.GradientEstimator):
     self.steps_per_jit = steps_per_jit
     self.std = std
     self.stack_antithetic_samples = stack_antithetic_samples
+    self.sign_delta_loss_scalar = sign_delta_loss_scalar
 
     if self.unroll_length % self.steps_per_jit != 0:
       raise ValueError("Pass a unroll_length and steps_per_jit that are"
@@ -183,8 +196,8 @@ class TruncatedES(gradient_learner.GradientEstimator):
       n_yses.append(n_ys)
       metrics.append(m)
 
-    loss, es_grad, p_ys, delta_loss = compute_es_grad(p_yses, n_yses, vec_pos,
-                                                      self.std)
+    loss, es_grad, p_ys, delta_loss = compute_es_grad(
+        p_yses, n_yses, vec_pos, self.std, self.sign_delta_loss_scalar)
 
     unroll_info = gradient_learner.UnrollInfo(
         loss=p_ys.loss,
