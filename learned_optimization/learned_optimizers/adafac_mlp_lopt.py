@@ -166,7 +166,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
       inps.append(lax.rsqrt(fac_vec_v + 1e-8))
       inps.append(lax.rsqrt(fac_vec_v + 1e-8))
 
-      fac_mom_mult = m * (fac_vec_v)**-0.5
+      fac_mom_mult = m * (fac_vec_v + 1e-6)**-0.5
       inps.append(fac_mom_mult)
 
     # Build the weights of the NN
