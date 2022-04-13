@@ -28,8 +28,8 @@ from learned_optimization.tasks import quadratics
 
 class TruncatedPesTest(parameterized.TestCase):
 
-  @parameterized.product(train_and_meta=(True, False))
-  def test_truncated_pes_pmap_trainer_with_data(self, train_and_meta):
+  @parameterized.product(meta_loss_split=(None, "train"))
+  def test_truncated_pes_pmap_trainer_with_data(self, meta_loss_split):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
     trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
@@ -37,7 +37,7 @@ class TruncatedPesTest(parameterized.TestCase):
         task_family,
         learned_opt,
         trunc_sched,
-        train_and_meta=train_and_meta,
+        meta_loss_split=meta_loss_split,
         num_tasks=8)
 
     num_devices = len(jax.local_devices())

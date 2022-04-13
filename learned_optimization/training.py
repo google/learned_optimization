@@ -43,15 +43,14 @@ def load_state(path, state):
 
 def get_batches(task_family: tasks_base.TaskFamily,
                 batch_shape: Sequence[int],
-                train_and_meta: bool = False,
                 numpy: bool = False,
                 split: str = "train") -> Any:
   """Get batches of data with the `batch_shape` leading dimension."""
   if len(batch_shape) == 1:
-    return get_batch(task_family, batch_shape[0], train_and_meta, numpy, split)
+    return vec_get_batch(task_family, batch_shape[0], numpy=numpy, split=split)
   elif len(batch_shape) == 2:
     datas_list = [
-        get_batch(task_family, batch_shape[1], train_and_meta, numpy, split)
+        vec_get_batch(task_family, batch_shape[1], numpy=numpy, split=split)
         for _ in range(batch_shape[0])
     ]
     if numpy:
@@ -60,8 +59,8 @@ def get_batches(task_family: tasks_base.TaskFamily,
       return tree_utils.tree_zip_jnp(datas_list)
   elif len(batch_shape) == 3:
     datas_list = [
-        get_batches(task_family, [batch_shape[1], batch_shape[2]],
-                    train_and_meta, numpy, split) for _ in range(batch_shape[0])
+        get_batches(task_family, [batch_shape[1], batch_shape[2]], numpy, split)
+        for _ in range(batch_shape[0])
     ]
     if numpy:
       return tree_utils.tree_zip_onp(datas_list)
@@ -69,21 +68,6 @@ def get_batches(task_family: tasks_base.TaskFamily,
       return tree_utils.tree_zip_jnp(datas_list)
   else:
     raise NotImplementedError()
-
-
-def get_batch(task_family: tasks_base.TaskFamily,
-              n_tasks: int,
-              train_and_meta: bool = False,
-              numpy: bool = False,
-              split: str = "train") -> Any:
-  """Get batches of data with a `n_tasks` leading dimension."""
-  if train_and_meta:
-    train_data = vec_get_batch(task_family, n_tasks, "train", numpy=numpy)
-    meta_data = vec_get_batch(task_family, n_tasks, "outer_valid", numpy=numpy)
-    return (train_data, meta_data)
-  else:
-    train_data = vec_get_batch(task_family, n_tasks, split, numpy=numpy)
-    return train_data
 
 
 @profile.wrap()

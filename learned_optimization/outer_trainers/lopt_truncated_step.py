@@ -432,8 +432,7 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
       learned_opt: lopt_base.LearnedOptimizer,
       trunc_sched: truncation_schedule.TruncationSchedule,
       num_tasks: int,
-      loss_type: str = "avg",
-      train_and_meta: bool = False,
+      meta_loss_split: Optional[str] = None,
       random_initial_iteration_offset: int = 0,
       outer_data_split="train",
       meta_loss_with_aux_key: Optional[str] = None,
@@ -445,10 +444,13 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
       learned_opt: learned optimizer instance.
       trunc_sched: truncation schedule to use.
       num_tasks: number of tasks to vmap over.
-      loss_type: either "avg" or "last_recompute". How to compute the loss for
-        ES.
-      train_and_meta: Use just training data, or use both training data and
-        validation data for the meta-objective.
+      meta_loss_split: This can take 3 values: None, 'same_data', or a
+        dataset split: {"train", "outer_valid", "inner_valid", "test"}.
+        If set to a dataset split we use a new batch of data to compute the
+        meta-loss which is evaluated on the newly created inner state (after
+        applying the lopt.). If set to 'same_data', the same data is reused to
+        evaluate the meta-loss. If None no additional computation is performed
+        and the previous state's loss evaluated on the training batch is used.
       random_initial_iteration_offset: An initial offset for the inner-steps of
         each task. This is to prevent all tasks running in lockstep. This should
         be set to the max number of steps the truncation schedule.
@@ -460,8 +462,7 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     self.learned_opt = learned_opt
     self.trunc_sched = trunc_sched
     self.num_tasks = num_tasks
-    self.loss_type = loss_type
-    self.train_and_meta = train_and_meta
+    self.meta_loss_split = meta_loss_split
     self.random_initial_iteration_offset = random_initial_iteration_offset
     self.outer_data_split = outer_data_split
     self.meta_loss_with_aux_key = meta_loss_with_aux_key
@@ -510,8 +511,15 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
       data_shape = (steps, self.num_tasks)
     else:
       data_shape = (self.num_tasks,)
-    return training.get_batches(
-        self.task_family, data_shape, self.train_and_meta, numpy=False)
+    tr_batch = training.get_batches(
+        self.task_family, data_shape, numpy=False, split="train")
+
+    if self.meta_loss_split == "same_data" or self.meta_loss_split is None:
+      return tr_batch
+    else:
+      outer_batch = training.get_batches(
+          self.task_family, data_shape, numpy=False, split=self.meta_loss_split)
+      return (tr_batch, outer_batch)
 
   def get_outer_batch(self, steps: Optional[int] = None):
     if steps is not None:
@@ -529,11 +537,17 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
                   outer_state,
                   vectorized_theta=False,
                   override_num_steps: Optional[int] = None):
-    # keep consistent with trunc state?
-    if self.train_and_meta:
-      tr_data, meta_data = data
-    else:
+    # per-step data changes depending on if we use a extra eval batch per step.
+    if self.meta_loss_split == "same_data":
+      # use same batch of data
       tr_data = data
+      meta_data = data
+    elif self.meta_loss_split is None:
+      tr_data = data
+      meta_data = None
+    else:
+      # Otherwise assume we passed a valid data split.
+      tr_data, meta_data = data
 
     key1, key2 = jax.random.split(key)
 
@@ -563,7 +577,8 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
                                 tr_data, outer_state,
                                 self.meta_loss_with_aux_key, override_num_steps)
 
-    if self.train_and_meta:
+    # Should we evaluate resulting state on potentially new data?
+    if meta_data is not None:
       vec_keys = jax.random.split(key2, self.num_tasks)
       if stack_antithetic_samples:
         vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),

@@ -38,8 +38,8 @@ class TruncatedESTest(parameterized.TestCase):
         truncated_step, steps_per_jit=3, unroll_length=9)
     test_utils.trainer_smoketest(trainer)
 
-  @parameterized.product(train_and_meta=(True, False))
-  def test_truncated_es_trainer_with_data(self, train_and_meta):
+  @parameterized.product(meta_loss_split=(None, "train", "same_data"))
+  def test_truncated_es_trainer_with_data(self, meta_loss_split):
     learned_opt = base.LearnableSGD()
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
     trunc_sched = truncation_schedule.ConstantTruncationSchedule(10)
@@ -48,7 +48,7 @@ class TruncatedESTest(parameterized.TestCase):
         learned_opt,
         trunc_sched,
         num_tasks=4,
-        train_and_meta=train_and_meta)
+        meta_loss_split=meta_loss_split)
 
     trainer = truncated_es.TruncatedES(
         truncated_step, steps_per_jit=5, unroll_length=5)
