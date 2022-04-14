@@ -3,9 +3,8 @@
 [![Documentation Status](https://readthedocs.org/projects/learned-optimization/badge/?version=latest)](https://learned-optimization.readthedocs.io/en/latest/?badge=latest)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-
-*learned\_optimization* is a research codebase for training learned
-optimizers. It implements hand designed and learned optimizers, tasks to meta-train and meta-test them, and outer-training algorithms such as ES, PES, and truncated backprop through time.
+*learned\_optimization* is a research codebase for training, designing, evaluating, and applying learned
+optimizers, and for meta-training of dynamical systems more broadly. It implements hand-designed and learned optimizers, tasks to meta-train and meta-test them, and outer-training algorithms such as ES, PES, and truncated backprop through time.
 
 To get started see our [documentation](https://learned-optimization.readthedocs.io/en/latest/).
 
