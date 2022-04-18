@@ -219,7 +219,10 @@ def _pmap_vector_random_split(key: PRNGKey, n_split: int) -> PRNGKey:
 
 @dataclasses.dataclass
 class _CachedTrainFun:
-  init: Callable[[lopt_base.MetaParams, PRNGKey, int], OptState]
+  init: Callable[[lopt_base.MetaParams, PRNGKey, int], Tuple[OptState,
+                                                             TaskParam]]
+  init_with_task_params: Callable[
+      [lopt_base.MetaParams, PRNGKey, int, TaskParam], OptState]
   unroll_n_steps: Callable[
       [lopt_base.MetaParams, OptState, TaskParam, Tuple[Data, PRNGKey]],
       Tuple[OptState, jnp.ndarray, jnp.ndarray]]
@@ -270,6 +273,20 @@ def _cached_vectorize_train_fns(
 
     return fn(key)
 
+  @functools.partial(jax.pmap, in_axes=(None, 0, None, 0))
+  def vec_single_task_with_task_params(theta, key, num_steps, task_params):
+    opt = learned_opt.opt_fn(theta)
+
+    @jax.vmap
+    def fn(key, task_param):
+      key1, key2 = jax.random.split(key, 2)
+      inner_param, inner_state = task_family.task_fn(
+          task_param).init_with_state(key1)
+      opt_state = opt.init(inner_param, inner_state, num_steps, key=key2)
+      return opt_state
+
+    return fn(key, task_params)
+
   def one_step(opt, task_param, opt_state, data_key):
     data, key = data_key
     task = task_family.task_fn(task_param)
@@ -315,6 +332,7 @@ def _cached_vectorize_train_fns(
 
   return _CachedTrainFun(
       init=vec_single_task,
+      init_with_task_params=vec_single_task_with_task_params,
       unroll_n_steps=vec_unroll_n_steps,
       eval_loss=eval_loss)
 
@@ -327,6 +345,7 @@ def multi_task_training_curves(
     n_tasks: int,
     seed: Optional[int] = None,
     key: Optional[PRNGKey] = None,
+    task_params: Optional[Any] = None,
     n_devices: Optional[int] = None,
     n_eval_batches_vec: int = 1,
     n_eval_batches: int = 1,
@@ -351,6 +370,7 @@ def multi_task_training_curves(
       n_devices.
     seed: Initial seed for jax RNG. Note this does not control data.
     key: RNG to seed task initializations. Note this does not control data.
+    task_params: Task parameters to use instead of sampling them.
     n_devices: number of devices to spread the n_tasks over.
     n_eval_batches_vec: number of evaluation batches to run vectorized.
     n_eval_batches: number of evaluation batches to run in python for loop.
@@ -398,7 +418,17 @@ def multi_task_training_curves(
       steps_per_jit=steps_per_jit,
       with_aux_values=with_aux_values)
 
-  opt_states, task_params = train_fns.init(theta, keys, steps)
+  # Not passed in! So sample a new task params
+  if task_params is None:
+    opt_states, task_params = train_fns.init(theta, keys, steps)
+  else:
+    if jax.tree_leaves(task_params):
+      assert tree_utils.first_dim(task_params) == n_tasks
+    task_params = jax.tree_map(
+        lambda x: jnp.reshape(x, (n_devices, n_tasks_per_device) + x.shape[1:]),
+        task_params)
+    opt_states = train_fns.init_with_task_params(theta, keys, steps,
+                                                 task_params)
 
   if steps % steps_per_jit:
     raise ValueError("Please set steps and steps_per_jit to be multiples of"
