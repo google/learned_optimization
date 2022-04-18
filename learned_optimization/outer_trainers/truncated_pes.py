@@ -79,50 +79,57 @@ def compute_pes_grad(
   p_ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(p_yses))
   n_ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(n_yses))
 
-  # mean over the num steps axis.
-  pos_loss = jnp.sum(p_ys.loss * p_ys.mask, axis=0) / jnp.sum(p_ys.mask, axis=0)
-  neg_loss = jnp.sum(n_ys.loss * n_ys.mask, axis=0) / jnp.sum(n_ys.mask, axis=0)
-  delta_loss = (pos_loss - neg_loss)
+  delta_losses = p_ys.loss - n_ys.loss
 
   if sign_delta_loss_scalar:
-    delta_loss = jnp.sign(delta_loss) * sign_delta_loss_scalar
-
-  contrib = delta_loss / (2 * std**2)
-
-  # When we have not yet recieved an is_done, we want to add to the accumulator.
-  # after this point, we want to use the zeros accumulator (just the state.)
-  accumulator = tree_utils.tree_add(vec_pos, accumulator)
-
-  accumulated_vec_es_grad = jax.vmap(
-      lambda c, p: jax.tree_map(lambda e: e * c, p))(contrib, accumulator)
-
-  non_accumulated_vec_es_grad = jax.vmap(
-      lambda c, p: jax.tree_map(lambda e: e * c, p))(contrib, vec_pos)
-
-  @jax.vmap
-  def switch_grad(has_finished):
-
-    def _switch_one(a, b):
-      shape = [has_finished.shape[0]] + [1] * (len(a.shape) - 1)
-      return jnp.where(jnp.reshape(has_finished, shape), a, b)
-
-    return jax.tree_multimap(_switch_one, non_accumulated_vec_es_grad,
-                             accumulated_vec_es_grad)
+    # With PES, there is no single loss for a truncation. For the particular
+    # perturbation we will estimate the sign by first averaging.
+    sign_per_task = jnp.sign(jnp.mean(delta_losses * p_ys.mask, axis=0))
+    delta_losses = jnp.ones_like(
+        delta_losses) * sign_per_task * sign_delta_loss_scalar
 
   has_finished = lax.cumsum(jnp.asarray(p_ys.is_done, dtype=jnp.int32)) > 0
-  vec_es_grad = switch_grad(has_finished)
-  vec_es_grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
+
+  # p_ys is of the form [sequence, n_tasks]
+  denom = jnp.sum(p_ys.mask, axis=0)
+
+  last_unroll_loss = jnp.sum(
+      delta_losses * (1.0 - has_finished) * p_ys.mask, axis=0) / denom
+
+  new_unroll_loss = jnp.sum(
+      delta_losses * has_finished * p_ys.mask, axis=0) / denom
+
+  factor = 1.0 / (2 * std**2)
+
+  accumulator = tree_utils.tree_add(vec_pos, accumulator)
+
+  num_tasks = last_unroll_loss.shape[0]
+
+  def reshape_to(loss, p):
+    return loss.reshape((num_tasks,) + (1,) * (len(p.shape) - 1)) * factor * p
+
+  es_grad_from_accum = jax.tree_map(
+      functools.partial(reshape_to, last_unroll_loss), accumulator)
+
+  es_grad_from_new_perturb = jax.tree_map(
+      functools.partial(reshape_to, new_unroll_loss), vec_pos)
+
+  vec_es_grad = jax.tree_map(lambda a, b: a + b, es_grad_from_accum,
+                             es_grad_from_new_perturb)
+
+  es_grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
 
   def _switch_one_accum(a, b):
-    shape = [has_finished.shape[1]] + [1] * (len(a.shape) - 1)
+    shape = [num_tasks] + [1] * (len(a.shape) - 1)
     return jnp.where(jnp.reshape(has_finished[-1], shape), a, b)
 
   new_accumulator = jax.tree_multimap(_switch_one_accum, vec_pos, accumulator)
 
-  es_grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
+  pos_loss = jnp.sum(p_ys.loss * p_ys.mask, axis=0) / jnp.sum(p_ys.mask, axis=0)
+  neg_loss = jnp.sum(n_ys.loss * n_ys.mask, axis=0) / jnp.sum(n_ys.mask, axis=0)
 
   return jnp.mean(
-      (pos_loss + neg_loss) / 2.0), es_grad, new_accumulator, p_ys, delta_loss
+      (pos_loss + neg_loss) / 2.0), es_grad, new_accumulator, p_ys, delta_losses
 
 
 @gin.configurable
