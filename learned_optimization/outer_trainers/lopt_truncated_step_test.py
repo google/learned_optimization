@@ -33,31 +33,31 @@ class LoptTruncatedStepTest(absltest.TestCase):
     truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
         task_family, lopt, sched, num_tasks=num_tasks)
     key = jax.random.PRNGKey(0)
-    vectorize_theta = False
+    theta_is_vector = False
     outer_state = None
     theta = truncated_step.outer_init(key)
     inner_state = truncated_step.init_step_state(theta, outer_state, key,
-                                                 vectorize_theta)
+                                                 theta_is_vector)
 
     data = truncated_step.get_batch()
     next_inner_state, out = truncated_step.unroll_step(theta, inner_state, key,
                                                        data, outer_state,
-                                                       vectorize_theta)
+                                                       theta_is_vector)
     self.assertEqual(out.loss.shape, (num_tasks,))
 
     data = truncated_step.get_batch()
     next_inner_state, out = truncated_step.unroll_step(theta, next_inner_state,
                                                        key, data, outer_state,
-                                                       vectorize_theta)
+                                                       theta_is_vector)
     self.assertEqual(out.loss.shape, (num_tasks,))
 
     data = truncated_step.get_outer_batch()
     loss = truncated_step.meta_loss_batch(theta, next_inner_state, key, data,
-                                          outer_state, vectorize_theta)
+                                          outer_state, theta_is_vector)
 
     self.assertEqual(loss.shape, (num_tasks,))
 
-  def test_lopt_truncated_step_vectorized_theta(self):
+  def test_lopt_truncated_step_theta_is_vector(self):
     task_family = quadratics.FixedDimQuadraticFamilyData(10)
     sched = truncation_schedule.LogUniformLengthSchedule(4, 10)
     lopt = lopt_base.LearnableAdam()
@@ -66,34 +66,34 @@ class LoptTruncatedStepTest(absltest.TestCase):
         task_family, lopt, sched, num_tasks=num_tasks)
 
     key = jax.random.PRNGKey(0)
-    vectorize_theta = True
+    theta_is_vector = True
     outer_state = None
 
     keys = jax.random.split(key, num_tasks)
     theta = jax.vmap(truncated_step.outer_init)(keys)
 
     inner_state = truncated_step.init_step_state(theta, outer_state, key,
-                                                 vectorize_theta)
+                                                 theta_is_vector)
 
     data = truncated_step.get_batch()
     next_inner_state, out = truncated_step.unroll_step(theta, inner_state, key,
                                                        data, outer_state,
-                                                       vectorize_theta)
+                                                       theta_is_vector)
     self.assertEqual(out.loss.shape, (num_tasks,))
 
     data = truncated_step.get_batch()
     next_inner_state, out = truncated_step.unroll_step(theta, next_inner_state,
                                                        key, data, outer_state,
-                                                       vectorize_theta)
+                                                       theta_is_vector)
     self.assertEqual(out.loss.shape, (num_tasks,))
 
     data = truncated_step.get_outer_batch()
     loss = truncated_step.meta_loss_batch(theta, next_inner_state, key, data,
-                                          outer_state, vectorize_theta)
+                                          outer_state, theta_is_vector)
 
     self.assertEqual(loss.shape, (num_tasks,))
 
-  def test_simple_vec_lopt_truncated_step_vectorized_theta(self):
+  def test_simple_vec_lopt_truncated_step_theta_is_vector(self):
     task = quadratics.QuadraticTask(10)
     lopt = lopt_base.LearnableAdam()
     num_tasks = 3
@@ -101,30 +101,30 @@ class LoptTruncatedStepTest(absltest.TestCase):
         task, lopt, num_tasks=num_tasks, unroll_length=4)
 
     key = jax.random.PRNGKey(0)
-    vectorize_theta = True
+    theta_is_vector = True
     outer_state = None
 
     keys = jax.random.split(key, num_tasks)
     theta = jax.vmap(truncated_step.outer_init)(keys)
 
     inner_state = truncated_step.init_step_state(theta, outer_state, key,
-                                                 vectorize_theta)
+                                                 theta_is_vector)
 
     data = truncated_step.get_batch()
     next_inner_state, out = truncated_step.unroll_step(theta, inner_state, key,
                                                        data, outer_state,
-                                                       vectorize_theta)
+                                                       theta_is_vector)
     self.assertEqual(out.loss.shape, (num_tasks,))
 
     data = truncated_step.get_batch()
     next_inner_state, out = truncated_step.unroll_step(theta, next_inner_state,
                                                        key, data, outer_state,
-                                                       vectorize_theta)
+                                                       theta_is_vector)
     self.assertEqual(out.loss.shape, (num_tasks,))
 
     data = truncated_step.get_outer_batch()
     loss = truncated_step.meta_loss_batch(theta, next_inner_state, key, data,
-                                          outer_state, vectorize_theta)
+                                          outer_state, theta_is_vector)
 
     self.assertEqual(loss.shape, (num_tasks,))
 

@@ -62,13 +62,13 @@ def vector_sample_perturbations(theta: T, key: chex.PRNGKey, std: float,
 @functools.partial(
     jax.jit,
     static_argnames=("truncated_step", "with_summary", "unroll_length",
-                     "vectorized_theta"),
+                     "theta_is_vector"),
 )
 @functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 9))
 def truncated_unroll(
     truncated_step: truncated_step_mod.VectorizedTruncatedStep,
     unroll_length: int,
-    vectorized_theta: bool,
+    theta_is_vector: bool,
     theta: MetaParams,
     key: chex.PRNGKey,
     state: UnrollState,
@@ -87,14 +87,19 @@ def truncated_unroll(
 
   def step_fn(state, xs):
     key, data = xs
+    if override_num_steps is not None:
+      extra_kwargs = {"override_num_steps": override_num_steps}
+    else:
+      extra_kwargs = {}
+
     state, outs = truncated_step.unroll_step(
         theta,
         state,
         key,
         data,
         outer_state=outer_state,
-        override_num_steps=override_num_steps,
-        vectorized_theta=vectorized_theta)
+        theta_is_vector=theta_is_vector,
+        **extra_kwargs)
     return state, outs
 
   key_and_data = jax.random.split(key, unroll_length), datas
@@ -119,11 +124,11 @@ def maybe_stacked_es_unroll(
 ) -> Tuple[UnrollState, UnrollState, truncated_step_mod.TruncatedUnrollOut,
            truncated_step_mod.TruncatedUnrollOut, Mapping[str, jnp.ndarray]]:
   """Run's truncated_unroll one time with stacked antithetic samples or 2x."""
-  vectorized_theta = True
+  theta_is_vector = True
   static_args = [
       truncated_step,
       unroll_length,
-      vectorized_theta,
+      theta_is_vector,
   ]
   # we provide 2 ways to compute the antithetic unrolls:
   # First, we stack the positive and negative states and compute things

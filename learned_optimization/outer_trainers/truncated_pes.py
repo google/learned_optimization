@@ -172,7 +172,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     theta = worker_weights.theta
 
     pos_unroll_state = self.truncated_step.init_step_state(
-        theta, worker_weights.outer_state, key, vectorize_theta=False)
+        theta, worker_weights.outer_state, key, theta_is_vector=False)
     neg_unroll_state = pos_unroll_state
 
     accumulator = jax.tree_multimap(
@@ -316,13 +316,13 @@ class TruncatedPESPMAP(TruncatedPES):
       ))
   def pmap_unroll_next_state(self, vec_theta, key, state, datas, outer_state,
                              with_summary):
-    vectorized_theta = True
+    theta_is_vector = True
     key1, key2 = jax.random.split(key)
     override_num_steps = None
     (p_state, p_ys), m = common.truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking
         self.truncated_step,
         self.steps_per_jit,
-        vectorized_theta,
+        theta_is_vector,
         vec_theta,
         key1,
         state,

@@ -86,7 +86,7 @@ class TruncatedESNoHyst(gradient_learner.GradientEstimator):
         worker_weights.theta,
         worker_weights.outer_state,
         key,
-        vectorize_theta=False)
+        theta_is_vector=False)
 
   @profile.wrap()
   def compute_gradient_estimate(
@@ -113,7 +113,7 @@ class TruncatedESNoHyst(gradient_learner.GradientEstimator):
         (state, out), metrics = common.truncated_unroll(
             self.truncated_step,
             self.steps_per_jit,
-            vectorized_theta=False,
+            theta_is_vector=False,
             theta=theta,
             key=next(rng),
             state=state,

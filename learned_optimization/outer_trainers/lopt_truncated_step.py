@@ -481,9 +481,9 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
                       theta,
                       outer_state,
                       key,
-                      vectorize_theta=False,
+                      theta_is_vector=False,
                       num_steps_override=None):
-    if vectorize_theta:
+    if theta_is_vector:
       init_fn = init_truncation_state_vec_theta
     else:
       init_fn = init_truncation_state
@@ -535,7 +535,7 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
                   key,
                   data,
                   outer_state,
-                  vectorized_theta=False,
+                  theta_is_vector=False,
                   override_num_steps: Optional[int] = None):
     # per-step data changes depending on if we use a extra eval batch per step.
     if self.meta_loss_split == "same_data":
@@ -571,7 +571,7 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
       vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
                               vec_keys)
 
-    fn = truncated_unroll_one_step_vec_theta if vectorized_theta else truncated_unroll_one_step
+    fn = truncated_unroll_one_step_vec_theta if theta_is_vector else truncated_unroll_one_step
     next_unroll_state_, ys = fn(self.task_family, self.learned_opt,
                                 self.trunc_sched, theta, vec_keys, unroll_state,
                                 tr_data, outer_state,
@@ -607,7 +607,7 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
                       key: Any,
                       data: Any,
                       outer_state: Any,
-                      vectorize_theta: bool = False):
+                      theta_is_vector: bool = False):
     keys = jax.random.split(key, self.num_tasks)
     loss, aux_metrics = vectorized_loss_and_aux(self.task_family,
                                                 self.learned_opt, theta,

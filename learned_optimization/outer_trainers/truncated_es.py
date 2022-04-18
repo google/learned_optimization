@@ -141,7 +141,7 @@ class TruncatedES(gradient_learner.GradientEstimator):
         worker_weights.theta,
         worker_weights.outer_state,
         key,
-        vectorize_theta=False)
+        theta_is_vector=False)
 
   @profile.wrap()
   def compute_gradient_estimate(

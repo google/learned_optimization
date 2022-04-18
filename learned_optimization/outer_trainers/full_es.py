@@ -54,7 +54,7 @@ class OverrideStepVectorizedTruncatedStep(Protocol):
                   key,
                   data,
                   outer_state,
-                  vectorized_theta=False,
+                  theta_is_vector=False,
                   override_num_steps: Optional[int] = None):
     pass
 
@@ -62,7 +62,7 @@ class OverrideStepVectorizedTruncatedStep(Protocol):
                       theta,
                       outer_state,
                       key,
-                      vectorize_theta=False,
+                      theta_is_vector=False,
                       num_steps_override=None):
     pass
 
@@ -187,7 +187,7 @@ def last_recompute_antithetic_es(
   def single_vec_batch(theta, state, key_data):
     key, data = key_data
     loss = truncated_step.meta_loss_batch(
-        theta, state, key, data, outer_state, vectorize_theta=True)
+        theta, state, key, data, outer_state, theta_is_vector=True)
     return loss
 
   keys = jax.random.split(key, recompute_samples)
@@ -346,14 +346,14 @@ class FullES(gradient_learner.GradientEstimator):
         vec_p_theta,
         worker_weights.outer_state,
         key,
-        vectorize_theta=True,
+        theta_is_vector=True,
         num_steps_override=length)
 
     n_state = self.truncated_step.init_step_state(
         vec_n_theta,
         worker_weights.outer_state,
         key,
-        vectorize_theta=True,
+        theta_is_vector=True,
         num_steps_override=length)
 
     if not hasattr(trunc_state, "length"):

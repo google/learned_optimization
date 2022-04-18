@@ -168,19 +168,24 @@ class VectorizedTruncatedStep(TruncatedStep):
   @functools.partial(
       jax.jit, static_argnames=(
           "self",
-          "vectorize_theta",
+          "theta_is_vector",
       ))
-  def init_step_state(self, theta, outer_state, key, vectorize_theta=False):
+  def init_step_state(self,
+                      theta,
+                      outer_state,
+                      key,
+                      theta_is_vector=False,
+                      **kwargs):
     keys = jax.random.split(key, self.num_tasks)
-    vec_theta = 0 if vectorize_theta else None
+    vec_theta = 0 if theta_is_vector else None
     return jax.vmap(
-        self.truncated_step.init_step_state,
+        functools.partial(self.truncated_step.init_step_state, **kwargs),
         in_axes=(vec_theta, None, 0))(theta, outer_state, keys)
 
   @functools.partial(
       jax.jit, static_argnames=(
           "self",
-          "vectorize_theta",
+          "theta_is_vector",
       ))
   def unroll_step(self,
                   theta,
@@ -188,11 +193,12 @@ class VectorizedTruncatedStep(TruncatedStep):
                   key,
                   data,
                   outer_state,
-                  vectorize_theta=False):
+                  theta_is_vector=False,
+                  **kwargs):
     keys = jax.random.split(key, self.num_tasks)
-    in_axes = (0 if vectorize_theta else None, 0, 0, 0, None)
+    in_axes = (0 if theta_is_vector else None, 0, 0, 0, None)
     return jax.vmap(
-        self.truncated_step.unroll_step,
+        functools.partial(self.truncated_step.unroll_step, **kwargs),
         in_axes=in_axes)(theta, unroll_state, keys, data, outer_state)
 
   def task_name(self):
@@ -223,9 +229,9 @@ class VectorizedTruncatedStep(TruncatedStep):
                       key,
                       data,
                       outer_state,
-                      vectorize_theta=False):
+                      theta_is_vector=False):
     keys = jax.random.split(key, self.num_tasks)
-    in_axes = (0 if vectorize_theta else None, 0, 0, 0, None)
+    in_axes = (0 if theta_is_vector else None, 0, 0, 0, None)
     return jax.vmap(
         self.truncated_step.meta_loss_batch,
         in_axes=in_axes)(theta, unroll_state, keys, data, outer_state)

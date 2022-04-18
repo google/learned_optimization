@@ -89,7 +89,7 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
         worker_weights.theta,
         worker_weights.outer_state,
         key,
-        vectorize_theta=False)
+        theta_is_vector=False)
 
   @profile.wrap()
   def compute_gradient_estimate(
@@ -108,11 +108,11 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
         key1, key2 = jax.random.split(key_i)
 
         override_num_steps = None
-        vectorized_theta = False
+        theta_is_vector = False
         (state, ys), m = common.truncated_unroll(
             self.truncated_step,
             self.steps_per_jit,
-            vectorized_theta,
+            theta_is_vector,
             theta,
             key1,
             state,
@@ -132,7 +132,9 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
       assert ys.loss.shape == (self.unroll_length,
                                self.truncated_step.num_tasks)
 
-      vec_mean_loss = jnp.mean(ys.loss, axis=0)
+      vec_mean_loss = jnp.sum(
+          ys.mask * ys.loss, axis=0) / jnp.sum(
+              ys.mask, axis=0)
       return jnp.mean(vec_mean_loss), (state, ys, metrics)
 
     (mean_loss, (state, ys, metrics)), meta_grad = jax.value_and_grad(
