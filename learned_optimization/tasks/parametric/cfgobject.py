@@ -57,11 +57,13 @@ Zero is used when the feature is not needed / not being used (e.g. float
 features have no need for int values).
 These features are variable length depending on how many keys are in the cfg.
 """
+
 import copy
 import hashlib
 import pickle
 from typing import Any, Mapping, Optional, Sequence, Tuple
 
+from absl import logging
 import flax
 import gin
 import jax
@@ -157,7 +159,15 @@ def flatten_cfg(cfg: CFGObject) -> Mapping[str, Any]:
     elif isinstance(a, CFGNamed):
       to_process.append((k + "/" + a.name, a.values))
     elif isinstance(a, LogFeature):
-      rets.append((k, onp.log(a.value)))
+
+      def log_fn(x):
+        is_jnp = isinstance(x, (jnp.ndarray, jax.core.Tracer))
+        if is_jnp:
+          return jnp.log(x)
+        else:
+          return onp.log(x)
+
+      to_process.append((k, jax.tree_map(log_fn, a.value)))
     else:
       rets.append((k, a))
   return {k: v for k, v in rets}
@@ -171,8 +181,12 @@ def hash_trick(x: str) -> int:
 def pad(x: jnp.ndarray, length: int = 8) -> jnp.ndarray:
   x = jnp.asarray(x).ravel()
   if len(x) > length:
-    raise ValueError("Nested feature configurations too deep!")
-  r = jnp.pad(x, [(0, length - len(x))])
+    logging.warning(  # pylint:disable=logging-fstring-interpolation
+        f"Nested feature configurations too deep! -- found: {len(x)} with val {x}"
+    )
+    r = x[0:length]
+  else:
+    r = jnp.pad(x, [(0, length - len(x))])
   return r
 
 
@@ -192,9 +206,12 @@ def featurize_value(val: Any) -> jnp.ndarray:
     return empty, jnp.asarray(hash_trick(val))
   if isinstance(val, Sequence):
     return pad(val), 0
-  if isinstance(val, int):
+  if isinstance(val, (int, onp.int32, onp.int64)):
     return empty, jnp.asarray(val)
-  if isinstance(val, float):
+  if isinstance(val, (bool, onp.bool_)):
+    return pad(onp.asarray(val, dtype=onp.float32)), jnp.asarray(
+        val, dtype=onp.int32)
+  if isinstance(val, (float, onp.float32)):
     return pad(val), 0
   if isinstance(val, jnp.ndarray):
     return pad(val), 0

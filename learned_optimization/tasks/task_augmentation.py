@@ -36,6 +36,8 @@ import numpy as onp
 
 PRNGKey = jnp.ndarray
 
+LogFeat = cfgobject.LogFeature
+
 
 class ReparamWeights(base.Task):
   """Reparameterize weights of target task by the param_scale.
@@ -57,12 +59,13 @@ class ReparamWeights(base.Task):
     self._param_scale = param_scale
 
   def _match_param_scale_to_pytree(self, params: Params) -> Params:
-    if isinstance(self._param_scale, (jnp.ndarray, onp.ndarray, float, int)):
+    if isinstance(self._param_scale,
+                  (jnp.ndarray, onp.ndarray, float, int, onp.float32)):
       return jax.tree_map(lambda x: self._param_scale, params)
     else:
       tree = jax.tree_structure(params)
       tree_scale = jax.tree_structure(self._param_scale)
-      assert tree == tree_scale
+      assert tree == tree_scale, f"Structures: {tree} AND {tree_scale}"
       return self._param_scale
 
   def init_with_state(self, key: PRNGKey) -> Tuple[Params, ModelState]:
@@ -131,8 +134,8 @@ class ReparamWeightsFamily(base.TaskFamily):
 
     if self._level == "parameter":
       sub_config, keys = cfg.values["sub_cfg"], cfg.values["param_scale_keys"]
-      abstract_params = jax.eval_shape(
-          lambda key: self.task_family.sample_task(key).init(key),
+      abstract_params, _ = jax.eval_shape(
+          lambda key: self.task_family.sample_task(key).init_with_state(key),
           jax.random.PRNGKey(0))
 
       def single(p, key):
@@ -144,6 +147,10 @@ class ReparamWeightsFamily(base.TaskFamily):
       param_scale = jax.tree_map(single, abstract_params, keys)
 
     task = self.task_family.task_fn(sub_config)
+
+    if isinstance(param_scale, LogFeat):
+      param_scale = param_scale.value
+
     return ReparamWeights(task, param_scale)
 
   def sample(self, key: PRNGKey) -> cfgobject.CFGNamed:
@@ -158,25 +165,25 @@ class ReparamWeightsFamily(base.TaskFamily):
           aggregation="sample")
       return cfgobject.CFGNamed("ReparamWeightsFamily", {
           "sub_cfg": sub_config,
-          "param_scale": param_scale
+          "param_scale": LogFeat(param_scale)
       })
     elif self._level == "tensor":
-      abstract_params = jax.eval_shape(
-          lambda key: self.task_family.sample_task(key).init(key),
+      abstract_params, _ = jax.eval_shape(
+          lambda key: self.task_family.sample_task(key).init_with_state(key),
           jax.random.PRNGKey(0))
       leaves, tree = jax.tree_flatten(abstract_params)
       keys = jax.tree_unflatten(tree, jax.random.split(key2, len(leaves)))
       param_scale = jax.tree_multimap(self._single_random, keys)
       return cfgobject.CFGNamed("ReparamWeightsFamily", {
           "sub_cfg": sub_config,
-          "param_scale": param_scale
+          "param_scale": LogFeat(param_scale)
       })
     elif self._level == "parameter":
       # the task configs cannot be huge as they are saved to disk and logged.
       # As such, for per parameter applications a rng key is used instead
       # of the generated value.
-      abstract_params = jax.eval_shape(
-          lambda key: self.task_family.sample_task(key).init(key),
+      abstract_params, _ = jax.eval_shape(
+          lambda key: self.task_family.sample_task(key).init_with_state(key),
           jax.random.PRNGKey(0))
       leaves, tree = jax.tree_flatten(abstract_params)
       keys = jax.tree_unflatten(tree, jax.random.split(key2, len(leaves)))
