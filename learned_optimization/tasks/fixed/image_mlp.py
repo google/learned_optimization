@@ -106,6 +106,12 @@ def ImageMLP_Cifar10_128x128x128_Relu():
 
 
 @gin.configurable
+def ImageMLP_Cifar100_128x128x128_Relu():
+  datasets = image.cifar100_datasets(batch_size=128)
+  return _MLPImageTask(datasets, [128, 128, 128])
+
+
+@gin.configurable
 def ImageMLP_Cifar10_128x128x128_Tanh_bs64():
   datasets = image.cifar10_datasets(batch_size=64)
   return _MLPImageTask(datasets, [128, 128, 128], act_fn=jnp.tanh)
