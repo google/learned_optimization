@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""TruncatedES with the same noise for an entire trajectory."""
+"""Hysteresis free TruncatedES."""
 import functools
 from typing import Mapping, Sequence, Tuple, Any
 
@@ -28,212 +28,161 @@ from learned_optimization.outer_trainers import common
 from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import truncated_es
 from learned_optimization.outer_trainers import truncated_step as truncated_step_mod
-import chex
-
 
 PRNGKey = jnp.ndarray
 MetaParams = Any
 UnrollState = Any
-TruncatedUnrollState = Any
 
-import flax
-import ipdb
-
-# this is different from vector_sample_perturbations
-# as we don't need the positive and negatively perturbed thetas
-# (theta, key, std) # only keys are different over multiple samples
-sample_multiple_perturbations = jax.jit(jax.vmap(common.sample_perturbations, in_axes=(None, 0, None)))
-
-
-@flax.struct.dataclass
-class TruncatedESSharedNoiseAttributes:
-  pos_unroll_states: TruncatedUnrollState
-  neg_unroll_states: TruncatedUnrollState
-  epsilons: jnp.ndarray
 
 @gin.configurable
-class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
-    # does multiple particles already
+class TruncatedESNoHyst(gradient_learner.GradientEstimator):
+  """Estimate gradients with truncated evolution strategies and no hysteresis!
+
+  This estimator is fork of TruncatedES to remove hysteresis via brute force.
+  It is much slower than the original estimator and is used as a research tool.
+  """
 
   def __init__(
       self,
       truncated_step: truncated_step_mod.VectorizedTruncatedStep,
+      burnin_steps: int,
       unroll_length: int = 20,
+      steps_per_jit: int = 10,
       std: float = 0.01,
+      stack_antithetic_samples: bool = False,
   ):
     """Initializer.
 
     Args:
       truncated_step: class containing functions for initializing and
         progressing a inner-training state.
+      burnin_steps: number of steps to burn in for when removing hysteresis.
       unroll_length: length of the unroll
+      steps_per_jit: How many steps to jit together. Needs to be a multiple of
         unroll_length.
       std: standard deviation for ES.
+      stack_antithetic_samples: Should we run the antithetic samples as two
+        separate function calls, or "stack" them and run in one vectorized call?
     """
     self.truncated_step = truncated_step
-    self.unroll_length = unroll_length
-    self.std = std
 
+    self.burnin_steps = burnin_steps
+    self.unroll_length = unroll_length
+    self.steps_per_jit = steps_per_jit
+    self.std = std
+    self.stack_antithetic_samples = stack_antithetic_samples
+
+    if self.unroll_length % self.steps_per_jit != 0:
+      raise ValueError("Pass a unroll_length and steps_per_jit that are"
+                       " multiples of each other.")
 
   def task_name(self):
     return self.truncated_step.task_name()
 
   @profile.wrap()
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
-                        key: PRNGKey) -> TruncatedESSharedNoiseAttributes:
-    unroll_states = self.truncated_step.init_step_state(
+                        key: PRNGKey) -> UnrollState:
+    return self.truncated_step.init_step_state(
         worker_weights.theta,
         worker_weights.outer_state,
         key,
-        vectorize_theta=False)
-
-    # we use sample_perturbations instead of vector_sample_perturbations
-    # as we don't need the positively/negatively perturbed thetas
-    keys = jax.random.split(key, self.truncated_step.num_tasks)
-    epsilons = sample_multiple_perturbations(
-      worker_weights.theta, keys, self.std)
-
-    return TruncatedESSharedNoiseAttributes(
-      pos_unroll_states=unroll_states,
-      neg_unroll_states=unroll_states,
-      epsilons=epsilons)
+        theta_is_vector=False)
 
   @profile.wrap()
   def compute_gradient_estimate(
       self,
       worker_weights,
-      key: PRNGKey,
-      state: TruncatedESSharedNoiseAttributes, # this is the same state returned by init_worker_state
+      key,
+      state,
       with_summary=False,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
- 
-    # because we have a for loop we let haiku manages the key
     rng = hk.PRNGSequence(key)
 
     theta = worker_weights.theta
 
-    # sum the gradients over both
-    # 1. the unroll_length
-    # 2. the number of particles
-    # for the step when the particle resets,
-    # we exclude that step's contributed gradient
-    loss_sum = 0.
-    g_sum = jax.tree_map(jnp.zeros_like, theta)
-    # cannot use jnp.zeros(shape=1) for total_count (this will be a length 1 array which is undesired)
-    total_count = 0. 
-    
+    num_tasks = tree_utils.first_dim(state)
 
-    for i in range(self.unroll_length):
-      data = self.truncated_step.get_batch()
-      curr_key = next(rng)
-      
-      state, loss_sum_step, g_sum_step, count =\
-        self.shared_es_unroll(
-            theta,
-            state,
-            curr_key,
-            data,
-            worker_weights.outer_state)
+    # Reset the step and run the burnin to remove hysterisis.
+    with profile.Profile("new_state"):
+      state = self.init_worker_state(worker_weights, next(rng))
 
-      loss_sum += loss_sum_step
-      g_sum = jax.tree_map(lambda x, y: x + y, g_sum, g_sum_step)
-      total_count += count
+    with profile.Profile("burnin"):
+      assert self.burnin_steps % self.steps_per_jit == 0
+      for _ in range(self.burnin_steps // self.steps_per_jit):
+        datas = self.truncated_step.get_batch(self.steps_per_jit)
+        (state, out), metrics = common.truncated_unroll(
+            self.truncated_step,
+            self.steps_per_jit,
+            theta_is_vector=False,
+            theta=theta,
+            key=next(rng),
+            state=state,
+            datas=datas,
+            outer_state=None)
 
-    # average over both particle and number of unroll step (this makes sure we are optimizing the average loss over all time steps)
-    # because each particle over one step contributes both a pos and neg loss
-    # we divide 2 times total_count
-    mean_loss = loss_sum / (2 * total_count) 
-    g = jax.tree_map(lambda x: x / total_count, g_sum)
+    # The rest is the standard TruncatedES compute_gradient_estimate.
 
-    # unroll_info = gradient_learner.UnrollInfo(
-    #     loss=p_ys.loss,
-    #     iteration=p_ys.iteration,
-    #     task_param=p_ys.task_param,
-    #     is_done=p_ys.is_done)
+    vec_pos, vec_p_theta, vec_n_theta = common.vector_sample_perturbations(
+        theta, next(rng), self.std, num_tasks)
+
+    p_yses = []
+    n_yses = []
+    metrics = []
+
+    # Strt both the positive and negative perturbation from the same inner-state
+    p_state = state
+    n_state = state
+
+    for _ in range(self.unroll_length // self.steps_per_jit):
+      datas = self.truncated_step.get_batch(self.steps_per_jit)
+
+      # force all to be non weak type. This is for cache hit reasons.
+      # TODO(lmetz) consider instead just setting the weak type flag?
+      p_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), p_state)
+      n_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), n_state)
+
+      key = next(rng)
+
+      p_state, n_state, p_ys, n_ys, m = common.maybe_stacked_es_unroll(
+          self.truncated_step,
+          self.steps_per_jit,
+          self.stack_antithetic_samples,
+          vec_p_theta,
+          vec_n_theta,
+          p_state,
+          n_state,
+          key,
+          datas,
+          worker_weights.outer_state,
+          with_summary=with_summary,
+          sample_rng_key=next(rng))
+
+      p_yses.append(p_ys)
+      n_yses.append(n_ys)
+      metrics.append(m)
+
+    loss, es_grad, p_ys, delta_loss = truncated_es.compute_es_grad(
+        p_yses, n_yses, vec_pos, self.std)
+
+    unroll_info = gradient_learner.UnrollInfo(
+        loss=p_ys.loss,
+        iteration=p_ys.iteration,
+        task_param=p_ys.task_param,
+        is_done=p_ys.is_done)
 
     output = gradient_learner.GradientEstimatorOut(
-        mean_loss=mean_loss,
-        grad=g,
-        unroll_state=state,
-        unroll_info=None)
+        mean_loss=loss,
+        grad=es_grad,
+        unroll_state=p_state,
+        unroll_info=unroll_info)
 
-    return output, {}
+    metrics = summary.aggregate_metric_list(metrics)
+    if with_summary:
+      metrics["sample||delta_loss_sample"] = summary.sample_value(
+          key, jnp.abs(delta_loss))
+      metrics["mean||delta_loss_mean"] = jnp.abs(delta_loss)
+      if hasattr(p_state, "inner_step"):
+        metrics["sample||inner_step"] = p_state.inner_step[0]
+        metrics["sample||end_inner_step"] = p_state.inner_step[0]
 
-
-  @functools.partial(
-      jax.jit, static_argnums=(0,))
-  def shared_es_unroll(
-    self,
-    theta: MetaParams, # there is a single copy of theta
-    state: TruncatedESSharedNoiseAttributes, 
-    key: chex.PRNGKey,
-    data: Any, # single batch of data to be used for both pos and neg unroll
-    outer_state: Any) -> Tuple[TruncatedESSharedNoiseAttributes, jnp.ndarray, MetaParams, jnp.ndarray]:
-      # returns new_state, 
-
-    # unpack the current state
-    pos_unroll_states, neg_unroll_states, epsilons = \
-      state.pos_unroll_states, state.neg_unroll_states, state.epsilons
-    
-    # compute the perturbation for this unroll step
-    # there is one perturbed pos/neg theta for each trajectory
-    pos_perturbed_thetas = jax.tree_map(lambda a,b: jnp.expand_dims(a, 0) + b, theta, epsilons)
-    neg_perturbed_thetas = jax.tree_map(lambda a,b: jnp.expand_dims(a, 0) - b, theta, epsilons)
-
-    key1, key2 = jax.random.split(key)
-    pos_unroll_states, pos_outs = \
-      self.truncated_step.unroll_step(
-        theta=pos_perturbed_thetas,
-        unroll_state=pos_unroll_states,
-        key=key1,
-        data=data,
-        outer_state=outer_state,
-        vectorized_theta=True)
-    neg_unroll_states, neg_outs = \
-      self.truncated_step.unroll_step(
-        theta=neg_perturbed_thetas,
-        unroll_state=neg_unroll_states,
-        key=key1,
-        # using the same key as pos ensures when resetting we get the same initial inner state and
-        # and also ensures we get the same loss evaluation (if it takes randomness)
-        data=data, # also use the same data
-        outer_state=outer_state,
-        vectorized_theta=True)
-        
-    # keep track of sum of losses for logging
-    # pos_outs.loss is an array of losses (one for each trajectory/particle)
-    # need to exclude the 0 entries when the trajectory has resetted and a loss of 0 is returned. 
-    loss_sum_step = jnp.sum(pos_outs.loss * pos_outs.mask + neg_outs.loss * neg_outs.mask)
-        
-    # we set the multiplicative weight for the particle that resets to 0
-    multiplier = ((pos_outs.loss - neg_outs.loss) * pos_outs.mask) * 1 / (2 * self.std ** 2) 
-    # g_sum_step is equal to the sum of gradient estimates for all particles
-    # which has non trivial gradient estimates (this excludes the particles)
-    # that has reset in this unroll.                            
-    g_sum_step = jax.tree_map(lambda eps:
-            jnp.sum( # sum over all particles (each particle is working on one trajectory)
-              eps * jnp.reshape(multiplier, [multiplier.shape[0]] + [1]*(len(eps.shape)-1)),
-              axis=0),
-                              epsilons)
-    # count keeps track of how many gradient estimates are summed in this unroll
-    count = jnp.sum(pos_outs.mask)
-
-    # for the particle that resets, we sample a new epsilon
-    keys = jax.random.split(key2, self.truncated_step.num_tasks)
-    new_epsilons = sample_multiple_perturbations(theta, keys, self.std)
-    # replace epsilon of the trajectory that has finished with a new epsilon
-    def update_eps(eps, new_eps):
-      reshape_isdone = jnp.reshape(pos_outs.is_done,
-                                    [self.truncated_step.num_tasks] + [1] * (len(eps.shape)-1))
-      return eps * (1 - reshape_isdone) + new_eps * (reshape_isdone)
-    epsilons = jax.tree_map(lambda eps, new_eps: update_eps(eps, new_eps), epsilons, new_epsilons)
-
-    return (
-      TruncatedESSharedNoiseAttributes(
-              pos_unroll_states=pos_unroll_states,
-              neg_unroll_states=neg_unroll_states,
-              epsilons=epsilons),
-      loss_sum_step,
-      g_sum_step,
-      count)
-
+    return output, metrics
