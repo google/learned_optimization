@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Sets of configurations representating baseline hparam searches."""
-from typing import Any, Mapping, Sequence, Tuple
+from typing import Any, Mapping, Sequence, Tuple, Optional
 
 import gin
 from learned_optimization.baselines import utils
@@ -29,16 +29,21 @@ PathsList = Sequence[Tuple[str, int]]
 HParamSet = Tuple[HParamList, PathsList]
 
 
-def _lr_cfgs(task_name: str, opt_name: str, num_steps: int) -> HParamList:
+def _lr_cfgs(task_name: str,
+             opt_name: str,
+             num_steps: int,
+             opt_name_override: Optional[str] = None) -> HParamList:
   """Configurations with different learning rates."""
   cfgs = []
+  if opt_name_override is None:
+    opt_name_override = opt_name
 
   for lr in _LRS:
     cfgs.append({
         "inner_train_task.task": f"@{task_name}()",
         "inner_train_task.opt": f"@{opt_name}()",
         f"{opt_name}.learning_rate": lr,
-        "inner_train_task.opt_name": f"{opt_name}_lr{lr}",
+        "inner_train_task.opt_name": f"{opt_name_override}_lr{lr}",
         "inner_train_task.task_name": task_name,
         "inner_train_task.num_steps": num_steps,
         "inner_train_task.eval_every": 10,
@@ -222,6 +227,38 @@ _names = [
     "Adafactor", "AdaGrad"
 ]
 for n in _names:
-  set_name = f"{n}LR_10000_R5"
-  locals()[set_name] = _make_lr(n)
-  gin.external_configurable(locals()[set_name], set_name)
+  _set_name = f"{n}LR_10000_R5"
+  locals()[_set_name] = _make_lr(n)
+  gin.external_configurable(locals()[_set_name], _set_name)
+
+
+def _shampoo_make_lr(graft_type, block_size, opt_name):
+  """Make learning rate sweep for the shampoo optimizer."""
+
+  def _fn(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+    reps = 5
+    cfgs = _lr_cfgs(task_name, "Shampoo", 10000, opt_name_override=opt_name)
+    for c in cfgs:
+      # copy the config to make pytype happy.
+      c = {k: v for k, v in c.items()}
+      c["Shampoo.graft_type"] = graft_type
+      c["Shampoo.block_size"] = block_size
+    paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+    return list(cfgs) * reps, paths
+
+  return _fn
+
+
+def _to_name(graft_type):
+  names = graft_type.lower().replace("_", " ").split(" ")
+  return "".join([n.capitalize() for n in names])
+
+
+for _graft_type in [
+    "SGD", "ADAGRAD", "RMSPROP", "RMSPROP_NORMALIZED", "SQRT_N",
+    "ADAGRAD_NORMALIZED"
+]:
+  _set_name = f"Shampoo128{_to_name(_graft_type)}LR_10000_R5"
+  _opt_name = f"Shampoo128{_to_name(_graft_type)}"
+  locals()[_set_name] = _shampoo_make_lr(_graft_type, 128, _opt_name)
+  gin.external_configurable(locals()[_set_name], _set_name)
