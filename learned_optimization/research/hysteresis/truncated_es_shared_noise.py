@@ -84,7 +84,7 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
         worker_weights.theta,
         worker_weights.outer_state,
         key,
-        vectorize_theta=False)
+        theta_is_vector=False)
 
     # we use sample_perturbations instead of vector_sample_perturbations
     # as we don't need the positively/negatively perturbed thetas
