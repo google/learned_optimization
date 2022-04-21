@@ -31,6 +31,79 @@ import numpy as onp
 
 
 
+def get_fake_results(task_name="QuadraticTask", step=432):
+  # most of these values are rank 2 array with index [seed, sequence].
+
+  value1 = {
+      "eval/train/loss": onp.asarray([[0.0, 0.0]]),
+      "eval/xs": onp.asarray([[0.0, 1.0]]),
+      "eval/train/norm_loss": onp.asarray([[0.0, 0.0]]),
+      "eval/outer_valid/loss": onp.asarray([[0.0, 0.0]]),
+      "eval/outer_valid/norm_loss": onp.asarray([[0.0, 0.0]]),
+      "eval/train/aux/l2": onp.asarray([[0.0, 0.0]]),
+      "eval/outer_valid/aux/l2": onp.asarray([[0.0, 0.0]]),
+      "total_time": 1.0,
+      "gen_id": "my_genid",
+      "step": step
+  }
+
+  value2 = {
+      "eval/train/loss": onp.asarray([[0.0, 0.0, 1.0]]),
+      "eval/xs": onp.asarray([[0.0, 1.0]]),
+      "eval/train/norm_loss": onp.asarray([[0.0, 0.0, 1.0]]),
+      "eval/outer_valid/loss": onp.asarray([[0.0, 0.0, 1.0]]),
+      "eval/outer_valid/norm_loss": onp.asarray([[0.0, 0.0, 1.0]]),
+      "eval/train/aux/l2": onp.asarray([[0.0, 0.0]]),
+      "eval/outer_valid/aux/l2": onp.asarray([[0.0, 0.0]]),
+      "total_time": 1.0,
+      "gen_id": "my_genid",
+      "step": step
+  }
+
+  values = [value1, value2]
+
+  paths = {
+      "params_": "path/blah_params_123",
+      "checkpoint_": "path/blah_checkpoint_123",
+  }
+  task_group = (0, paths)
+
+  task1 = task_group_server.EvalTask(
+      task_content=(
+          [f"get_task_family.task=@{task_name}"],
+          "task1",
+      ),
+      task_group=task_group,
+      task_index=0)
+  task2 = task_group_server.EvalTask(
+      task_content=(
+          [f"get_task_family.task=@{task_name}"],
+          "task2",
+      ),
+      task_group=task_group,
+      task_index=1)
+
+  tasks = [task1, task2]
+  result = task_group, values, tasks
+  return result
+
+
+class FakeChief():
+
+  def __init__(self):
+    self.chief_name = "chief_name"
+    self.i = -1
+
+  def get_finished_task_group(self):
+    self.i += 1
+    return [
+        None,
+        get_fake_results(step=0), None,
+        get_fake_results(step=1),
+        get_fake_results(step=2)
+    ][self.i]
+
+
 class RunEvalChiefTest(absltest.TestCase):
 
   def test_monitor_checkpoint_dir(self):
@@ -77,68 +150,21 @@ class RunEvalChiefTest(absltest.TestCase):
       self.assertEqual(mapping["params_"],
                        os.path.join(monitor_dir, "default_params_2"))
 
-  def get_fake_results(self, i=432):
-
-    value1 = {
-        "eval/train/loss": onp.asarray([0.0, 0.0]),
-        "eval/train/norm_loss": onp.asarray([0.0, 0.0]),
-        "eval/outer_valid/loss": onp.asarray([0.0, 0.0]),
-        "eval/outer_valid/norm_loss": onp.asarray([0.0, 0.0]),
-        "eval/train/aux/l2": onp.asarray([0.0, 0.0]),
-        "eval/outer_valid/aux/l2": onp.asarray([0.0, 0.0]),
-        "total_time": 1.0,
-        "gen_id": "my_genid",
-        "step": i
-    }
-
-    value2 = {
-        "eval/train/loss": onp.asarray([0.0, 0.0, 1.0]),
-        "eval/train/norm_loss": onp.asarray([0.0, 0.0, 1.0]),
-        "eval/outer_valid/loss": onp.asarray([0.0, 0.0, 1.0]),
-        "eval/outer_valid/norm_loss": onp.asarray([0.0, 0.0, 1.0]),
-        "eval/train/aux/l2": onp.asarray([0.0, 0.0]),
-        "eval/outer_valid/aux/l2": onp.asarray([0.0, 0.0]),
-        "total_time": 1.0,
-        "gen_id": "my_genid",
-        "step": i
-    }
-
-    values = [value1, value2]
-
-    paths = {
-        "params_": "path/blah_params_123",
-        "checkpoint_": "path/blah_checkpoint_123",
-    }
-    task_group = (0, paths)
-
-    task1 = task_group_server.EvalTask(
-        task_content=(
-            ["eval_task_family.task_fn=@QuadraticTask"],
-            "task1",
-        ),
-        task_group=task_group,
-        task_index=0)
-    task2 = task_group_server.EvalTask(
-        task_content=(
-            ["eval_task_family.task_fn=@QuadraticTask"],
-            "task2",
-        ),
-        task_group=task_group,
-        task_index=1)
-
-    tasks = [task1, task2]
-    result = task_group, values, tasks
-    return result
-
   def test_write_results_plain(self):
-    result = self.get_fake_results()
+    result = get_fake_results()
     task_group, values, tasks = result
     steps = [r["step"] for r in values]
     step = int(steps[0])
 
     summary_writer = summary.InMemorySummaryWriter()
-    metrics = run_eval_chief.convert_result_to_metric_dict(
-        task_group, values, tasks)
+
+    metrics = {}
+    for fn in run_eval_chief.DEFAULT_METRICS_FN:
+      metric = fn(task_group, values, tasks)
+      for k, v in metric.items():
+        if k in metrics:
+          self.fail(f"Key: {k} duplicated.")
+        metrics[k] = v
 
     run_eval_chief.write_results_to_summary_writer(
         summary_writer,
@@ -147,12 +173,12 @@ class RunEvalChiefTest(absltest.TestCase):
         step=step)
 
     assert "eval_chief_name/task1/time" in summary_writer.data
-    assert "eval_chief_name/task1/nonorm_avg_meta_loss" in summary_writer.data
+    assert "eval_chief_name/task1/nonorm_avg_loss" in summary_writer.data
 
     print(summary_writer.data.keys())
     print("@@")
-    assert "eval_chief_name/aux_loss_mean/train/l2" in summary_writer.data
-    assert "eval_chief_name/aux_loss_last/outer_valid/l2" in summary_writer.data
+    assert "eval_chief_name/aux_mean/train/l2" in summary_writer.data
+    assert "eval_chief_name/aux_last/outer_valid/l2" in summary_writer.data
 
   def test_write_results_population(self):
     server_name = "test_server_name"
@@ -170,7 +196,7 @@ class RunEvalChiefTest(absltest.TestCase):
     server.Bind("set_eval", set_eval)
     server.Start()
 
-    result = self.get_fake_results()
+    result = get_fake_results()
     run_eval_chief.write_result_to_population(
         result,
         value=123,
@@ -181,33 +207,34 @@ class RunEvalChiefTest(absltest.TestCase):
     self.assertEqual(params_path, "path/blah_checkpoint_123")
 
   def test_write_results_thread_main(self):
-    parent = self
-
-    class FakeChief():
-
-      def __init__(self):
-        self.chief_name = "chief_name"
-        self.i = -1
-
-      def get_finished_task_group(self):
-        self.i += 1
-        return [
-            None,
-            parent.get_fake_results(0), None,
-            parent.get_fake_results(1),
-            parent.get_fake_results(2)
-        ][self.i]
-
-    summary_writer = summary.InMemorySummaryWriter()
-
     chief = FakeChief()
+    summary_writer = summary.InMemorySummaryWriter()
 
     run_eval_chief.write_results_thread_main(
         chief, summary_writer, number_to_write=3)
-    x, unused_y = summary_writer.data["chief_name/task1/nonorm_avg_meta_loss"]
+    x, unused_y = summary_writer.data["chief_name/task1/nonorm_avg_loss"]
     # check just the steps for now.
     self.assertEqual((0, 1, 2), tuple([int(xx) for xx in x]))
 
+  def test_write_results_thread_main_from_gin_metrics_fns(self):
+    chief = FakeChief()
+    summary_writer = summary.InMemorySummaryWriter()
+
+    run_eval_chief.write_results_thread_main(
+        chief,
+        summary_writer,
+        number_to_write=3,
+        values_to_metrics_fns=("metrics_fn_for_checkpoint",))
+
+    assert "chief_name/checkpoint" in summary_writer.data
+
+  def test_metrics_fn_for_speedup_normalized(self):
+    result = get_fake_results(task_name="ImageMLP_FashionMnist8_Relu32")
+    task_group, values, tasks = result
+    metrics = run_eval_chief.metrics_fn_for_speedup_normalized(
+        task_group, values, tasks)
+    assert "adamspeedup_mean/adamspeedup_last" in metrics
+    assert "adamspeedup_perc20/adamspeedup_last" in metrics
 
 if __name__ == "__main__":
   absltest.main()

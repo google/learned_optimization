@@ -22,28 +22,59 @@ To remedy this, we can "normalize" each different task. These normalizations
 are often built by running hand designed optimizers, and rescaling based on
 these.
 """
+from concurrent import futures
 import functools
 import io
 import os
 from typing import Any, Callable, Mapping, Sequence
 
+import chex
 import jax.numpy as jnp
 from learned_optimization import filesystem
 from learned_optimization import jax_utils
-from learned_optimization import notebook_utils
 from learned_optimization.baselines import utils
 import numpy as onp
+import tqdm
 
 NormData = Any
 NormFN = Callable[[jnp.ndarray], jnp.ndarray]
+
+
+def ema(data: chex.Array, alpha: float, ignore_nan=False):
+  """Exponential moving average."""
+  # TODO(lmetz) dedup with notebook_utils!
+  if len(data) == 0:  # pylint: disable=g-explicit-length-test
+    return data
+  data = onp.asarray(data)
+  x = onp.zeros_like(data)
+  x[0] = data[0]
+  m_alpha = alpha
+  # TODO(lmetz) profile if this is needed / saves much time.
+  if ignore_nan:
+    for i, a in enumerate((1 - alpha) * data[1:]):
+      x[i + 1] = x[i] if onp.isnan(a) else x[i] * m_alpha + a
+  else:
+    for i, a in enumerate((1 - alpha) * data[1:]):
+      x[i + 1] = x[i] * m_alpha + a
+
+  return x
+
+
+def threaded_tqdm_map(threads: int, func: Callable[[Any], Any],
+                      data: Sequence[Any]) -> Sequence[Any]:
+  # TODO(lmetz) dedup with notebook_utils!
+  future_list = []
+  with futures.ThreadPoolExecutor(threads) as executor:
+    for l in tqdm.tqdm(data):
+      future_list.append(executor.submit(func, l))
+    return [x.result() for x in tqdm.tqdm(future_list)]
 
 
 def _speedup_over_adam_build(task_name: str) -> NormData:
   """Construct data needed for normalization function."""
   big_adam = utils.load_archive(task_name, "AdamLR_100000_R5")
   emaed_curves = [
-      notebook_utils.ema(c, 0.95)
-      for c in onp.mean(big_adam["eval/train/loss"], axis=1)
+      ema(c, 0.95) for c in onp.mean(big_adam["eval/train/loss"], axis=1)
   ]
   xs = big_adam["eval/xs"][0][0]
 
@@ -68,17 +99,18 @@ def _speedup_over_adam_make_func(norm_data: NormData) -> NormFN:
   """
   xp, yp = norm_data
 
+  xp = onp.asarray(xp)[::-1]
+  yp = onp.asarray(yp)[::-1]
+
   def fn(x):
-    return jax_utils.cached_jit(jnp.interp)(x, yp[::-1], xp[::-1])
+    return jax_utils.cached_jit(jnp.interp)(x, yp, xp)
 
   return fn
 
 
 def speedup_over_adam_build_and_write(tasks: Sequence[str], output_path: str):
   """Build and write the normalization data for the provided set of tasks."""
-  flat_norm_datas = notebook_utils.threaded_tqdm_map(32,
-                                                     _speedup_over_adam_build,
-                                                     tasks)
+  flat_norm_datas = threaded_tqdm_map(32, _speedup_over_adam_build, tasks)
   norm_datas = {}
   for d, t in zip(flat_norm_datas, tasks):
     norm_datas[t] = d
