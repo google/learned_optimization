@@ -16,19 +16,19 @@
 """Base class for Optimizer and a couple hand designed optimizer."""
 import abc
 import collections
-import functools
-from typing import Any, Tuple, Optional, Sequence, Callable
+from typing import Any, Optional, Tuple
+import warnings
+
+import chex
 import gin
 import jax
 import jax.numpy as jnp
-import optax
 
 # pytree containing jax types
 ModelState = Any
 Params = Any
 Gradient = Params
 OptState = Any
-PRNGKey = jnp.ndarray  # pylint: disable=invalid-name
 
 StatelessState = collections.namedtuple("StatelessState", ["params", "state"])
 
@@ -49,7 +49,7 @@ class Optimizer(abc.ABC):
            params: Params,
            state: Optional[ModelState] = None,
            num_steps: Optional[int] = None,
-           key: Optional[PRNGKey] = None,
+           key: Optional[chex.PRNGKey] = None,
            **kwargs) -> OptState:
     raise NotImplementedError
 
@@ -61,7 +61,7 @@ class Optimizer(abc.ABC):
       opt_state: OptState,
       grad: Gradient,
       model_state: Optional[ModelState] = None,
-      key: Optional[PRNGKey] = None,
+      key: Optional[chex.PRNGKey] = None,
       **kwargs,
   ) -> OptState:
     raise NotImplementedError()
@@ -75,192 +75,6 @@ class Optimizer(abc.ABC):
     the object. For example: "<ClassName>_<param1><value>_<param2><value>"
     """
     return "UnnamedOptimizer"
-
-
-# Internal-ish states
-OptaxState = collections.namedtuple(
-    "OptaxState", ["params", "state", "optax_opt_state", "iteration"])
-
-
-class OptaxOptimizer(Optimizer):
-  """Wrapper to convert optax optimizers into `Optimizers`."""
-
-  def __init__(self, opt: optax.GradientTransformation):
-    super().__init__()
-    self.opt = opt
-
-  def init(self,
-           params: Params,
-           model_state: Optional[ModelState] = None,
-           num_steps: Optional[int] = None,
-           key: Optional[PRNGKey] = None):
-    return OptaxState(
-        params=params,
-        optax_opt_state=self.opt.init(params),
-        state=model_state,
-        iteration=0)
-
-  @functools.partial(jax.jit, static_argnums=(0,))
-  def update(self,
-             opt_state: OptaxState,
-             grad: Gradient,
-             loss: Optional[jnp.ndarray] = None,
-             model_state: Optional[ModelState] = None,
-             key: Optional[PRNGKey] = None,
-             **kwargs):
-    del loss
-    update, new_opt_state = self.opt.update(grad, opt_state.optax_opt_state,
-                                            opt_state.params)
-    return OptaxState(
-        state=model_state,
-        params=optax.apply_updates(opt_state.params, update),
-        optax_opt_state=new_opt_state,
-        iteration=opt_state.iteration + 1,
-    )
-
-
-@gin.configurable
-class SGD(OptaxOptimizer):
-  """Stochastic gradient descent."""
-
-  def __init__(self, learning_rate=0.01):
-    self.learning_rate = learning_rate
-    opt = optax.sgd(learning_rate)
-    super().__init__(opt)
-
-  @property
-  def name(self):
-    return f"SGD_lr{self.learning_rate}"
-
-
-@gin.configurable
-class SGDM(OptaxOptimizer):
-  """Stochastic gradient descent with momentum."""
-
-  def __init__(self, learning_rate=0.01, momentum=0.9):
-    self.learning_rate = learning_rate
-    self.momentum = momentum
-    opt = optax.sgd(learning_rate, momentum)
-    super().__init__(opt)
-
-  @property
-  def name(self):
-    return f"SGDM_lr{self.learning_rate}_m{self.momentum}"
-
-
-@gin.configurable
-class Adam(OptaxOptimizer):
-  """Adam optimizer."""
-
-  def __init__(self,
-               learning_rate=0.01,
-               beta1=0.9,
-               beta2=0.999,
-               epsilon=1e-8,
-               epsilon_root=1e-8):
-    self.learning_rate = learning_rate
-    self.beta1 = beta1
-    self.beta2 = beta2
-    self.epsilon = epsilon
-    self.epsilon_root = epsilon_root
-
-    opt = optax.adam(
-        learning_rate=learning_rate,
-        b1=beta1,
-        b2=beta2,
-        eps=epsilon,
-        eps_root=epsilon_root)
-    super().__init__(opt)
-
-  @property
-  def name(self):
-    return (f"Adam_lr{self.learning_rate}_b1{self.beta1}_b2{self.beta2}"
-            f"_eps{self.epsilon}_epsroot{self.epsilon_root}")
-
-
-def piecewise_linear(times: Sequence[float],
-                     vals: Sequence[float]) -> Callable[[float], float]:
-  """Returns a function which interpolates piecewise values."""
-  times = jnp.asarray(times)
-  vals = jnp.asarray(vals)
-
-  def fn(x):
-    if len(times) <= 1:
-      assert len(vals) == 1
-      return vals[0]
-
-    vs = []
-
-    all_before = jnp.all(x <= times)
-    all_after = jnp.all(x >= times)
-
-    for i in range(len(times) - 1):
-      x1 = times[i]
-      x2 = times[i + 1]
-      y1 = vals[i]
-      y2 = vals[i + 1]
-      m = (y2 - y1) / (x2 - x1)
-      v = (x - x1) * m + y1
-      vs.append(v)
-    idx = jnp.sum(x > times) - 1
-
-    mid = jnp.take(jnp.asarray(vs), idx)
-    return all_before * vals[0] + all_after * vals[-1] + mid * (
-        (1 - all_before) * (1 - all_after))
-
-  return fn
-
-
-@gin.configurable
-class PiecewiseLinearAdam(OptaxOptimizer):
-  """Adam with a piecewise linear learning rate schedule."""
-
-  def __init__(self,
-               times=(10000, 20000),
-               lrs=(1e-4, 1e-5),
-               beta1=0.9,
-               beta2=0.999,
-               epsilon=1e-8,
-               epsilon_root=1e-8):
-    opt = optax.chain(
-        optax.scale_by_adam(
-            b1=beta1, b2=beta2, eps=epsilon, eps_root=epsilon_root),
-        optax.scale_by_schedule(piecewise_linear(times, vals=lrs)),
-        optax.scale(-1),
-    )
-    super().__init__(opt)
-
-
-@gin.configurable
-class RMSProp(OptaxOptimizer):
-  """RMSProp optimizer (including momentum)."""
-
-  def __init__(
-      self,
-      learning_rate=0.01,
-      decay=0.9,
-      epsilon=1e-8,
-      momentum=0.0,
-      nesterov=False,
-  ):
-    self.learning_rate = learning_rate
-    self.decay = decay
-    self.epsilon = epsilon
-    self.momentum = momentum
-    self.nesterov = nesterov
-    opt = optax.rmsprop(
-        learning_rate=learning_rate,
-        decay=decay,
-        eps=epsilon,
-        nesterov=nesterov,
-        momentum=momentum,
-    )
-    super().__init__(opt)
-
-  @property
-  def name(self):
-    return (f"RMSProp_lr{self.learning_rate}_d{self.decay}_eps{self.epsilon}"
-            f"_m{self.momentum}_nesterov{self.nesterov}")
 
 
 @gin.configurable
@@ -281,3 +95,34 @@ class GradientClipOptimizer(Optimizer):
     grad = jax.tree_map(lambda x: jnp.clip(x, -self.grad_clip, self.grad_clip),
                         grad)
     return self.opt.update(opt_state, grad, *args, **kwargs)
+
+
+# TODO(lmetz) remove these in May 2022.
+
+
+def SGD(*args, **kwargs):  # pylint: disable=invalid-name
+  from learned_optimization.optimizers import optax_opts  # pytype: disable=import-error # pylint: disable=g-import-not-at-top
+  warnings.warn("SGD module has been moved to optax_opts!"
+                " Calling here from base is deprecated!")
+  return optax_opts.SGD(*args, **kwargs)
+
+
+def SGDM(*args, **kwargs):  # pylint: disable=invalid-name
+  from learned_optimization.optimizers import optax_opts  # pytype: disable=import-error  # pylint: disable=g-import-not-at-top
+  warnings.warn("SGDM module has been moved to optax_opts!"
+                " Calling here from base is deprecated!")
+  return optax_opts.SGDM(*args, **kwargs)
+
+
+def RMSProp(*args, **kwargs):  # pylint: disable=invalid-name
+  from learned_optimization.optimizers import optax_opts  # pytype: disable=import-error  # pylint: disable=g-import-not-at-top
+  warnings.warn("RMSProp module has been moved to optax_opts!"
+                " Calling here from base is deprecated!")
+  return optax_opts.RMSProp(*args, **kwargs)
+
+
+def Adam(*args, **kwargs):  # pylint: disable=invalid-name
+  from learned_optimization.optimizers import optax_opts  # pytype: disable=import-error  # pylint: disable=g-import-not-at-top
+  warnings.warn("Adammodule has been moved to optax_opts!"
+                " Calling here from base is deprecated!")
+  return optax_opts.Adam(*args, **kwargs)

@@ -24,7 +24,7 @@ from absl.testing import parameterized
 import gin
 from learned_optimization import outer_train
 from learned_optimization.learned_optimizers import base as lopt_base
-from learned_optimization.optimizers import base as opt_base
+from learned_optimization.optimizers import optax_opts
 from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import lopt_truncated_step
 from learned_optimization.outer_trainers import truncated_es
@@ -72,7 +72,7 @@ class OuterTrainTest(parameterized.TestCase):
               trunc_sched=truncation_schedule.ConstantTruncationSchedule(10)))
 
       outer_learner_fn = functools.partial(gradient_learner.GradientLearner,
-                                           lopt, opt_base.Adam())
+                                           lopt, optax_opts.Adam())
 
       port = portpicker.pick_unused_port()
       address = f"localhost:{port}"
@@ -128,7 +128,7 @@ class OuterTrainTest(parameterized.TestCase):
               trunc_sched=truncation_schedule.ConstantTruncationSchedule(10)))
 
       outer_learner_fn = functools.partial(gradient_learner.GradientLearner,
-                                           lopt, opt_base.Adam())
+                                           lopt, optax_opts.Adam())
 
       port = portpicker.pick_unused_port()
       address = f"localhost:{port}"
@@ -178,7 +178,7 @@ class OuterTrainTest(parameterized.TestCase):
               num_tasks=2,
               trunc_sched=sched))
 
-      outer_learner = gradient_learner.GradientLearner(lopt, opt_base.Adam())
+      outer_learner = gradient_learner.GradientLearner(lopt, optax_opts.Adam())
 
       outer_train.local_train(
           train_log_dir,

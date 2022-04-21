@@ -89,7 +89,7 @@ def smoketest_optimizer(optimizer: base.Optimizer, strict_types: bool = True):
         jax.tree_leaves(eqls)), "does not have the same input output shape"
 
     if strict_types:
-      assert shape1 == shape2, "miss-match dtypes/shapes!"
+      assert shape1 == shape2, f"miss-match dtypes/shapes! {shape1} != {shape2}"
 
     opt_state = optimizer.update(
         opt_state, grad, loss=l, model_state=s, is_valid=True, key=key)

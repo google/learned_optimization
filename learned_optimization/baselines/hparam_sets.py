@@ -203,3 +203,25 @@ def _no_hparam_cfg(task_name: str, opt_name: str, num_steps: int) -> HParamList:
   }]
 
 
+
+
+### HParam sweep of less popular hparam lists.
+def _make_lr(name):
+
+  def _fn(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+    reps = 5
+    cfgs = _lr_cfgs(task_name, name, 10000)
+    paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+    return list(cfgs) * reps, paths
+
+  return _fn
+
+
+_names = [
+    "AdaBelief", "SM3", "Yogi", "RAdam", "Lamb", "Lars", "Fromage", "AdamW",
+    "Adafactor", "AdaGrad"
+]
+for n in _names:
+  set_name = f"{n}LR_10000_R5"
+  locals()[set_name] = _make_lr(n)
+  gin.external_configurable(locals()[set_name], set_name)

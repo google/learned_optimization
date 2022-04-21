@@ -14,3 +14,5 @@
 # limitations under the License.
 
 """learned_optimizers.optimizers module."""
+from learned_optimization.optimizers.base import *
+from learned_optimization.optimizers.optax_opts import *

@@ -23,6 +23,7 @@ import haiku as hk
 import jax.numpy as jnp
 from learned_optimization import summary
 from learned_optimization.optimizers import base as opt_base
+from learned_optimization.optimizers import optax_opts
 
 MetaParamOpt = collections.namedtuple("MetaParamOpt", ["init", "opt_fn"])
 
@@ -67,7 +68,7 @@ class LearnableSGD(LearnedOptimizer):
     summary.summary("learnable_sgd/pre_lr", theta["log_lr"])
     summary.summary("learnable_sgd/lr", lr)
 
-    return opt_base.SGD(lr)
+    return optax_opts.SGD(lr)
 
 
 @gin.configurable
@@ -95,7 +96,7 @@ class LearnableSGDM(LearnedOptimizer):
     summary.summary("learnable_sgdm/pre_mom", theta["one_minus_momentum"])
     summary.summary("learnable_sgdm/mom", mom)
 
-    return opt_base.SGDM(lr, mom)
+    return optax_opts.SGDM(lr, mom)
 
 
 @gin.configurable
@@ -140,7 +141,7 @@ class LearnableAdam(LearnedOptimizer):
       summary.summary("learnable_adam/pre_epsilon", theta["log_epsilon"])
       summary.summary("learnable_adam/epsilon", eps)
 
-    return opt_base.Adam(lr, beta1, beta2, eps)
+    return optax_opts.Adam(lr, beta1, beta2, eps)
 
 
 def learned_optimizer_from_opt(opt: opt_base.Optimizer) -> LearnedOptimizer:

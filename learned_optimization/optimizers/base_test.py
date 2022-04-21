@@ -16,28 +16,15 @@
 """Tests for learned_optimizers.optimizers.base."""
 from absl.testing import absltest
 from learned_optimization.optimizers import base
+from learned_optimization.optimizers import optax_opts
 from learned_optimization.optimizers import test_utils
 
 
 class BaseTest(absltest.TestCase):
 
-  def test_adam(self):
-    test_utils.smoketest_optimizer(base.Adam(1e-4))
-
-  def test_adam_piecewise(self):
-    test_utils.smoketest_optimizer(base.PiecewiseLinearAdam())
-
-  def test_rmsprop(self):
-    test_utils.smoketest_optimizer(base.RMSProp(1e-4))
-
-  def test_sgd(self):
-    test_utils.smoketest_optimizer(base.SGD(1e-4))
-
-  def test_sgdm(self):
-    test_utils.smoketest_optimizer(base.SGDM(1e-4))
-
   def test_gradient_clip_adam(self):
-    test_utils.smoketest_optimizer(base.GradientClipOptimizer(base.Adam(1e-4)))
+    test_utils.smoketest_optimizer(
+        base.GradientClipOptimizer(optax_opts.Adam(1e-4)))
 
 if __name__ == '__main__':
   absltest.main()
