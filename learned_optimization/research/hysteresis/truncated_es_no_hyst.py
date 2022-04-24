@@ -14,8 +14,7 @@
 # limitations under the License.
 
 """Hysteresis free TruncatedES."""
-import functools
-from typing import Mapping, Sequence, Tuple, Any
+from typing import Mapping, Tuple, Any
 
 import gin
 import haiku as hk
@@ -110,7 +109,7 @@ class TruncatedESNoHyst(gradient_learner.GradientEstimator):
       assert self.burnin_steps % self.steps_per_jit == 0
       for _ in range(self.burnin_steps // self.steps_per_jit):
         datas = self.truncated_step.get_batch(self.steps_per_jit)
-        (state, out), metrics = common.truncated_unroll(
+        (state, unused_out), metrics = common.truncated_unroll(
             self.truncated_step,
             self.steps_per_jit,
             theta_is_vector=False,

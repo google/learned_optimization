@@ -27,6 +27,11 @@ def tree_add(treea, treeb):
 
 
 @jax.jit
+def tree_sub(treea, treeb):
+  return jax.tree_multimap(lambda a, b: a - b, treea, treeb)
+
+
+@jax.jit
 def tree_mean_abs(val):
   num_entry = sum(map(lambda x: onp.prod(x.shape), jax.tree_leaves(val)))
   sum_abs = sum(map(lambda x: jnp.sum(jnp.abs(x)), jax.tree_leaves(val)))
