@@ -410,6 +410,9 @@ def write_results_thread_main(
       logging.info(str(tasks))
 
       metrics = {}
+      for fn in values_to_metrics_fns:
+        logging.info(f"Found metrics_fn: {fn}")  # pylint: disable=logging-fstring-interpolation
+
       if isinstance(values_to_metrics_fns[0], str):
         # value passed in through gin. Do a lookup to convert these to fn.
         values_to_metrics_fns = [
