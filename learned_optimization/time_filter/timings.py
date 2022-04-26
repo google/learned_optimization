@@ -102,6 +102,85 @@ def _unrolled_meta_loss(opt: opt_base.Optimizer,
   return meta_loss, next_opt_state
 
 
+def time_for_task_family_vmap_unroll_func(
+    task_family: tasks_base.TaskFamily,
+    num_tasks: int,
+    unroll_steps: int,
+    opt: Optional[opt_base.Optimizer] = None,
+    lopt: Optional[lopt_base.LearnedOptimizer] = None,
+    scan_unroll: int = 1) -> Callable[[], jnp.ndarray]:
+  """Return function which computes one unrolled optimization.
+
+  This function, by default, times `unroll_steps` of inner training done with
+  SGD. If either lopt or opt are specified, these are used instead.
+
+  Args:
+    task_family: The task family to time.
+    num_tasks: Number of tasks to run in parallel.
+    unroll_steps: How many inner-steps to time over.
+    opt: Optional optimizer to use for the unroll.
+    lopt: Optional learned optimizer to use for the unroll.
+    scan_unroll: How many steps to inline leveraging scan's unroll argument.
+
+  Returns:
+    A function which returns a jax ndarray.
+  """
+
+  if opt is None and lopt is None:
+    opt = opt_base.SGD()
+
+  key = jax.random.PRNGKey(0)
+  keys = jax.random.split(key, num_tasks)
+  logging.info("Sampling task params")
+  task_params = jax.vmap(task_family.sample)(keys)
+
+  if lopt:
+    thetas = jax.vmap(lopt.init)(keys)
+  else:
+    # Fake value here with correct leading dimensions.
+    thetas = jnp.zeros([num_tasks])
+
+  @jax.vmap
+  def init(task_param, key):
+    return task_family.task_fn(task_param).init_with_state(key)
+
+  logging.info("init_params")
+  p, s = jax.jit(init)(task_params, keys)
+
+  inner_traj_num_steps = 1000
+  logging.info("init opt state")
+  if lopt:
+    opt_state = jax.jit(
+        jax.vmap(lambda pp, ss, t: lopt.opt_fn(t).  # pylint: disable=g-long-lambda
+                 init(pp, ss, num_steps=inner_traj_num_steps)))(p, s, thetas)
+  else:
+    opt_state = jax.jit(
+        jax.vmap(
+            lambda pp, ss: opt.init(pp, ss, num_steps=inner_traj_num_steps)))(p,
+                                                                              s)
+
+  def meta_loss(opt_state, task_params, key, datas, theta):
+    if lopt:
+      use_opt = lopt.opt_fn(theta)
+    else:
+      use_opt = opt
+    l, _ = _unrolled_meta_loss(
+        use_opt,
+        task_family,
+        opt_state,
+        task_params,
+        key,
+        datas,
+        unroll_steps,
+        scan_unroll=scan_unroll)
+    return l
+
+  multi_meta_loss = jax.jit(jax.vmap(meta_loss))
+  datas = training.get_batches(
+      task_family, [num_tasks, unroll_steps], split="train")
+  return lambda: multi_meta_loss(opt_state, task_params, keys, datas, thetas)
+
+
 def time_for_task_family_vmap_unroll(
     task_family: tasks_base.TaskFamily,
     num_tasks: int,
@@ -128,63 +207,15 @@ def time_for_task_family_vmap_unroll(
     mean and standard error of the `num_time_estimates` samples.
   """
   try:
-    if opt is None and lopt is None:
-      opt = opt_base.SGD()
-
-    key = jax.random.PRNGKey(0)
-    keys = jax.random.split(key, num_tasks)
-    logging.info("Sampling task params")
-    task_params = jax.vmap(task_family.sample)(keys)
-
-    if lopt:
-      thetas = jax.vmap(lopt.init)(keys)
-    else:
-      # Fake value here with correct leading dimensions.
-      thetas = jnp.zeros([num_tasks])
-
-    @jax.vmap
-    def init(task_param, key):
-      return task_family.task_fn(task_param).init_with_state(key)
-
-    logging.info("init_params")
-    p, s = jax.jit(init)(task_params, keys)
-
-    inner_traj_num_steps = 1000
-    logging.info("init opt state")
-    if lopt:
-      opt_state = jax.jit(
-          jax.vmap(lambda pp, ss, t: lopt.opt_fn(t).  # pylint: disable=g-long-lambda
-                   init(pp, ss, num_steps=inner_traj_num_steps)))(p, s, thetas)
-    else:
-      opt_state = jax.jit(
-          jax.vmap(
-              lambda pp, ss: opt.init(pp, ss, num_steps=inner_traj_num_steps)))(
-                  p, s)
-
-    def meta_loss(opt_state, task_params, key, datas, theta):
-      if lopt:
-        use_opt = lopt.opt_fn(theta)
-      else:
-        use_opt = opt
-      l, _ = _unrolled_meta_loss(
-          use_opt,
-          task_family,
-          opt_state,
-          task_params,
-          key,
-          datas,
-          unroll_steps,
-          scan_unroll=scan_unroll)
-      return l
-
-    multi_meta_loss = jax.jit(jax.vmap(meta_loss))
-    datas = training.get_batches(
-        task_family, [num_tasks, unroll_steps], split="train")
-
+    fn = time_for_task_family_vmap_unroll_func(
+        task_family,
+        num_tasks,
+        unroll_steps,
+        opt=opt,
+        lopt=lopt,
+        scan_unroll=scan_unroll)
     logging.info("run jit")
-    mean, stderr = time_jax_fn(
-        lambda: multi_meta_loss(opt_state, task_params, keys, datas, thetas),
-        time_measurements=num_time_estimates)
+    mean, stderr = time_jax_fn(fn, time_measurements=num_time_estimates)
     mean = mean / (num_tasks * unroll_steps)
     stderr = stderr / (num_tasks * unroll_steps)
     return mean, stderr
