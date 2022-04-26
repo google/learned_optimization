@@ -101,6 +101,16 @@ class _ConvTask(base.Task):
 
 
 @gin.configurable
+def Conv_Cifar10_8_16x32():
+  """A 3 hidden layer convnet designed for 16x16 cifar10."""
+  base_model_fn = _cross_entropy_pool_loss([16, 32],
+                                           jax.nn.relu,
+                                           num_classes=10)
+  datasets = image.cifar10_datasets(batch_size=128, image_size=(8, 8))
+  return _ConvTask(base_model_fn, datasets)
+
+
+@gin.configurable
 def Conv_Cifar10_16_32x64x64():
   """A 3 hidden layer convnet designed for 16x16 cifar10."""
   base_model_fn = _cross_entropy_pool_loss([32, 64, 64],
