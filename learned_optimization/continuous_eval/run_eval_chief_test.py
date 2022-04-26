@@ -137,8 +137,14 @@ class RunEvalChiefTest(absltest.TestCase):
     step = int(steps[0])
 
     summary_writer = summary.InMemorySummaryWriter()
-    metrics = run_eval_chief.convert_result_to_metric_dict(
-        task_group, values, tasks)
+
+    metrics = {}
+    for fn in run_eval_chief.DEFAULT_METRICS_FN:
+      metric = fn(task_group, values, tasks)
+      for k, v in metric.items():
+        if k in metrics:
+          self.fail(f"Key: {k} duplicated.")
+        metrics[k] = v
 
     run_eval_chief.write_results_to_summary_writer(
         summary_writer,
@@ -147,12 +153,12 @@ class RunEvalChiefTest(absltest.TestCase):
         step=step)
 
     assert "eval_chief_name/task1/time" in summary_writer.data
-    assert "eval_chief_name/task1/nonorm_avg_meta_loss" in summary_writer.data
+    assert "eval_chief_name/task1/nonorm_avg_loss" in summary_writer.data
 
     print(summary_writer.data.keys())
     print("@@")
-    assert "eval_chief_name/aux_loss_mean/train/l2" in summary_writer.data
-    assert "eval_chief_name/aux_loss_last/outer_valid/l2" in summary_writer.data
+    assert "eval_chief_name/aux_mean/train/l2" in summary_writer.data
+    assert "eval_chief_name/aux_last/outer_valid/l2" in summary_writer.data
 
   def test_write_results_population(self):
     server_name = "test_server_name"
@@ -204,7 +210,7 @@ class RunEvalChiefTest(absltest.TestCase):
 
     run_eval_chief.write_results_thread_main(
         chief, summary_writer, number_to_write=3)
-    x, unused_y = summary_writer.data["chief_name/task1/nonorm_avg_meta_loss"]
+    x, unused_y = summary_writer.data["chief_name/task1/nonorm_avg_loss"]
     # check just the steps for now.
     self.assertEqual((0, 1, 2), tuple([int(xx) for xx in x]))
 

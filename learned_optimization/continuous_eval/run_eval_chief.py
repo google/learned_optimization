@@ -20,7 +20,7 @@ import json
 import os
 import threading
 import time
-from typing import Any, Iterator, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Iterator, Mapping, Optional, Sequence, Tuple, Union, Callable
 
 from absl import app
 from absl import logging
@@ -135,64 +135,35 @@ def monitor_checkpoint_dir(
 
 
 @profile.wrap()
-def convert_result_to_metric_dict(task_group: Tuple[int, Mapping[str, str]],
-                                  values: Sequence[Mapping[str, Any]],
-                                  tasks: Sequence[Any]) -> Mapping[str, float]:
-  """Aggregate the results into a dictionary of metrics for logging.
+def metrics_fn_for_checkpoint(task_group: Tuple[int, Mapping[str, str]],
+                              values: Sequence[Mapping[str, Any]],
+                              tasks: Sequence[Any]) -> Mapping[str, float]:
+  """Extract the checkpoint idx this eval was run off of."""
+  del values, tasks
+  return {"checkpoint": float(task_group[0])}
 
-  The results data contain raw training curves. This function aggreates them
-  under a number of different normalizers so that lossses can be compared
-  across tasks.
 
-  The normalizations we use are:
-    * inner_norm: The normalization functions defined on each task.
-    * autonorm: Normalization computed from Adam baselines on each task.
-    * nonorm: No normalization -- raw values from task loss.
-
-  For each normalization, we log out aggregates across tasks, and performance
-  of each task.
-
-  Args:
-    task_group: The group / idx of the checkpoint this evaluation came from.
-    values: Sequence of training curves computed by workers.
-    tasks: Sequence of task configurations passed to workers.
-
-  Returns:
-    Dictionary containing the metrics to be logged out.
-  """
-
-  # For the evaluation jobs we have here, tasks looks like:
-  # (path, (["bindings=name", ...], name_of_task))
-
-  unnorm_v = [r["eval/train/loss"] for r in values]
-  norm_v = [r["eval/train/norm_loss"] for r in values]
+@profile.wrap()
+def metrics_fn_for_time(task_group: Tuple[int, Mapping[str, str]],
+                        values: Sequence[Mapping[str, Any]],
+                        tasks: Sequence[Any]) -> Mapping[str, float]:
+  """Extract wallclock times for each task."""
+  del task_group
   times = [r["total_time"] for r in values]
-
   to_write = {}
+  for t, task_time in zip(tasks, times):
+    unused_cfg, name = t.task_content
+    to_write[f"{name}/time"] = task_time
 
-  # need to write out this task group checkpoint idx so that we can load back
-  # a checkpoint if needed.
-  to_write["checkpoint"] = int(task_group[0])
+  return {k: float(v) for k, v in to_write.items()}
 
-  meta_loss = onp.mean([onp.nanmean(x) for x in norm_v])
-  to_write["inner_norm_meta_loss"] = float(meta_loss)
 
-  inner_norm_meta_loss = onp.mean([onp.nanmin(v) for v in norm_v])
-  to_write["min_inner_norm_meta_loss"] = float(inner_norm_meta_loss)
-
-  inner_norm_meta_loss = onp.nanmean([v[-1] for v in norm_v])
-  to_write["last_inner_norm_meta_loss"] = float(inner_norm_meta_loss)
-
-  # aggregates without any form of normalization
-  meta_loss = onp.mean([onp.nanmean(x) for x in unnorm_v])
-  to_write["inner_nonorm_meta_loss"] = float(meta_loss)
-
-  inner_unnorm_meta_loss = onp.mean([onp.nanmin(v) for v in unnorm_v])
-  to_write["min_inner_nonorm_meta_loss"] = float(inner_unnorm_meta_loss)
-
-  inner_unnorm_meta_loss = onp.nanmean([v[-1] for v in unnorm_v])
-  to_write["last_inner_nonorm_meta_loss"] = float(inner_unnorm_meta_loss)
-
+@profile.wrap()
+def metrics_fn_for_aux(task_group: Tuple[int, Mapping[str, str]],
+                       values: Sequence[Mapping[str, Any]],
+                       tasks: Sequence[Any]) -> Mapping[str, float]:
+  """Extract auxiliary losses computed by each task."""
+  del task_group, tasks
   def aggregate_aux_for_split(split):
     all_keys = values[0].keys()
     ret = {}
@@ -201,86 +172,101 @@ def convert_result_to_metric_dict(task_group: Tuple[int, Mapping[str, str]],
       if k.startswith(prefix):
         aux_name = k[len(prefix):]
 
-        mean_aux = onp.mean([onp.nanmean(r[k]) for r in values])
-        ret[f"aux_loss_mean/{split}/{aux_name}"] = mean_aux
+        vals = [r[k] for r in values]
+        ret[f"aux_mean/{split}/{aux_name}"] = _mean_mean(vals)
+        ret[f"aux_min/{split}/{aux_name}"] = _mean_min(vals)
+        ret[f"aux_last/{split}/{aux_name}"] = _mean_last(vals)
 
-        min_aux = onp.mean([onp.nanmin(r[k]) for r in values])
-        ret[f"aux_loss_min/{split}/{aux_name}"] = min_aux
-
-        last_aux = onp.mean([r[k][-1] for r in values])
-        ret[f"aux_loss_last/{split}/{aux_name}"] = last_aux
     return ret
 
-  to_write = {**to_write, **aggregate_aux_for_split("train")}
+  metrics = aggregate_aux_for_split("train")
+  # check if we ran over the outer_valid data split by checking the loss.
+  if "eval/outer_valid/loss" in values[0]:
+    metrics = {**metrics, **aggregate_aux_for_split("outer_valid")}
+
+  return {k: float(v) for k, v in metrics.items()}
+
+
+def _mean_mean(vs):
+  return float(onp.mean([onp.nanmean(v) for v in vs]))
+
+
+def _mean_min(vs):
+  return float(onp.mean([onp.nanmin(v) for v in vs]))
+
+
+def _mean_last(vs):
+  return float(onp.mean([v[-1] for v in vs]))
+
+
+@profile.wrap()
+def metrics_fn_for_aggregate_unnormalized_losses(
+    task_group: Tuple[int, Mapping[str, str]], values: Sequence[Mapping[str,
+                                                                        Any]],
+    tasks: Sequence[Any]) -> Mapping[str, float]:
+  """Extract aggregated losses for unnormalized inner-loss values."""
+  del task_group, tasks
+  metrics = {}
+  losses = [r["eval/train/loss"] for r in values]
+  metrics["train/nonorm_avg_loss"] = _mean_mean(losses)
+  metrics["train/nonorm_min_loss"] = _mean_min(losses)
+  metrics["train/nonorm_last_loss"] = _mean_last(losses)
 
   # check if we ran over the outer_valid data split by checking the loss.
   if "eval/outer_valid/loss" in values[0]:
-    valid_norm_v = [r["eval/outer_valid/norm_loss"] for r in values]
+    losses = [r["eval/outer_valid/loss"] for r in values]
+    metrics["outer_valid/nonorm_avg_loss"] = _mean_mean(losses)
+    metrics["outer_valid/nonorm_min_loss"] = _mean_min(losses)
+    metrics["outer_valid/nonorm_last_loss"] = _mean_last(losses)
 
-    valid_meta_loss = onp.mean([onp.nanmean(x) for x in valid_norm_v])
-    to_write["inner_norm_valid_meta_loss"] = float(valid_meta_loss)
+  return metrics
 
-    valid_inner_norm_meta_loss = onp.mean([onp.nanmin(v) for v in valid_norm_v])
-    to_write["min_inner_norm_valid_meta_loss"] = float(
-        valid_inner_norm_meta_loss)
 
-    valid_inner_norm_meta_loss = onp.nanmean([v[-1] for v in valid_norm_v])
-    to_write["last_inner_norm_valid_meta_loss"] = float(
-        valid_inner_norm_meta_loss)
+@profile.wrap()
+def metrics_fn_for_aggregate_normalized_losses(
+    task_group: Tuple[int, Mapping[str, str]], values: Sequence[Mapping[str,
+                                                                        Any]],
+    tasks: Sequence[Any]) -> Mapping[str, float]:
+  """Extract aggregated losses for normalized inner-loss values."""
+  del task_group, tasks
+  metrics = {}
+  losses = [r["eval/train/norm_loss"] for r in values]
+  metrics["train/norm_avg_loss"] = _mean_mean(losses)
+  metrics["train/norm_min_loss"] = _mean_min(losses)
+  metrics["train/norm_last_loss"] = _mean_last(losses)
 
-    to_write = {**to_write, **aggregate_aux_for_split("outer_valid")}
+  # check if we ran over the outer_valid data split by checking the loss.
+  if "eval/outer_valid/norm_loss" in values[0]:
+    losses = [r["eval/outer_valid/loss"] for r in values]
+    metrics["outer_valid/norm_avg_loss"] = _mean_mean(losses)
+    metrics["outer_valid/norm_min_loss"] = _mean_min(losses)
+    metrics["outer_valid/norm_last_loss"] = _mean_last(losses)
 
-  # Create features now for each task
+  return metrics
 
-  def get_single_task(cfgs):
-    for c in cfgs:
-      if "task_fn=@" in c:
-        return c.split("task_fn=@")[1]
-    else:
-      return None
 
+def metrics_fn_for_each_task(task_group: Tuple[int, Mapping[str, str]],
+                             values: Sequence[Mapping[str, Any]],
+                             tasks: Sequence[Any]) -> Mapping[str, float]:
+  """Extract metrics split out for each task."""
+  del task_group
   assert len(tasks) == len(values)
-  all_mean = []
-  all_mean_min = []
-  all_mean_last = []
 
-  for t, v, inner_norm_v, task_time in zip(tasks, unnorm_v, norm_v, times):
-    cfg, name = t.task_content
-    to_write[f"{name}/time"] = task_time
+  unnorm_v = [r["eval/train/loss"] for r in values]
+  norm_v = [r["eval/train/norm_loss"] for r in values]
 
-    to_write[f"{name}/nonorm_avg_meta_loss"] = onp.mean(v)
-    to_write[f"{name}/nonorm_min_meta_loss"] = onp.nanmin(v)
+  metrics = {}
+  for t, v, norm_v in zip(tasks, unnorm_v, norm_v):
+    unused_cfg, name = t.task_content
+    metrics[f"{name}/nonorm_avg_loss"] = onp.mean(v)
+    metrics[f"{name}/nonorm_min_loss"] = onp.nanmin(v)
+    metrics[f"{name}/nonorm_last_loss"] = v[-1]
 
-    to_write[f"{name}/innernorm_avg_meta_loss"] = onp.mean(inner_norm_v)
-    to_write[f"{name}/innernorm_min_meta_loss"] = onp.nanmin(inner_norm_v)
+    metrics[f"{name}/norm_avg_loss"] = onp.mean(norm_v)
+    metrics[f"{name}/norm_min_loss"] = onp.nanmin(norm_v)
+    metrics[f"{name}/norm_last_loss"] = norm_v[-1]
 
-    # TODO(lmetz) add in the auto normalizers.
-    task_name = get_single_task(cfg)  # pylint: disable=unused-variable
-    # norm_fn = normalizer.get_normalizer_for_task(task_name)
-    norm_fn = None
-
-    if norm_fn:
-      norm_v = norm_fn(v)  # pylint: disable=not-callable
-      mean_norm_v = onp.mean(norm_v)
-      all_mean.append(mean_norm_v)
-      to_write[f"{name}/autonorm_avg_meta_loss"] = mean_norm_v
-
-      mean_norm_v = onp.nanmin(norm_v)
-      all_mean_min.append(mean_norm_v)
-      to_write[f"{name}/autonorm_min_meta_loss"] = float(mean_norm_v)
-
-      all_mean_last.append(norm_v[-1])
-
-    else:
-      all_mean.append(onp.mean(v))
-      all_mean_min.append(onp.nanmin(v))
-      all_mean_last.append(v[-1])
-
-  to_write["autonorm_avg_meta_loss"] = onp.mean(all_mean)
-  to_write["autonorm_min_meta_loss"] = onp.mean(all_mean_min)
-  to_write["autonorm_last_meta_loss"] = onp.nanmean(all_mean_last)
-
-  return {k: float(v) for k, v in to_write.items()}
+  return {k: float(v) for k, v in metrics.items()}
 
 
 def write_results_to_summary_writer(summary_writer: Any, chief_name: str,
@@ -318,6 +304,18 @@ def write_result_to_population(result: Tuple[Any, Sequence[Any], Sequence[Any]],
 
 
 
+TaskGroup = Tuple[int, Mapping[str, str]]
+Values = Sequence[Mapping[str, Any]]
+Tasks = Sequence[Any]
+Metrics = Mapping[str, float]
+ValueToMetricsFNs = Callable[[TaskGroup, Values, Tasks], Metrics]
+
+DEFAULT_METRICS_FN = (metrics_fn_for_each_task,
+                      metrics_fn_for_aggregate_normalized_losses,
+                      metrics_fn_for_aggregate_unnormalized_losses,
+                      metrics_fn_for_aux, metrics_fn_for_time,
+                      metrics_fn_for_checkpoint)
+
 
 @profile.wrap()
 @gin.configurable
@@ -328,6 +326,7 @@ def write_results_thread_main(
     population_root_dir=None,
     population_worker_id=None,
     number_to_write=None,
+    values_to_metrics_fns: Sequence[ValueToMetricsFNs] = DEFAULT_METRICS_FN,
 ):
   """Thread that writes out results in the backgroud."""
   for _ in range(number_to_write) if number_to_write else itertools.count():
@@ -347,7 +346,13 @@ def write_results_thread_main(
       logging.info("and tasks")
       logging.info(str(tasks))
 
-      metrics = convert_result_to_metric_dict(task_group, values, tasks)
+      metrics = {}
+      for fn in values_to_metrics_fns:
+        metric = fn(task_group, values, tasks)
+        for k, v in metric.items():
+          if k in metrics:
+            raise ValueError(f"Duplicate metric key found! [[{k}]]")
+          metrics[k] = v
       logging.info("Successfully converted metrics %s", str(metrics))
 
       steps = [r["step"] for r in values]
