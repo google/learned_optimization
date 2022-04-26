@@ -20,7 +20,7 @@ import json
 import os
 import threading
 import time
-from typing import Any, Iterator, Mapping, Optional, Sequence, Tuple, Union, Callable
+from typing import Any, Callable, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
 from absl import app
 from absl import logging
@@ -135,6 +135,7 @@ def monitor_checkpoint_dir(
 
 
 @profile.wrap()
+@gin.configurable()
 def metrics_fn_for_checkpoint(task_group: Tuple[int, Mapping[str, str]],
                               values: Sequence[Mapping[str, Any]],
                               tasks: Sequence[Any]) -> Mapping[str, float]:
@@ -144,6 +145,7 @@ def metrics_fn_for_checkpoint(task_group: Tuple[int, Mapping[str, str]],
 
 
 @profile.wrap()
+@gin.configurable()
 def metrics_fn_for_time(task_group: Tuple[int, Mapping[str, str]],
                         values: Sequence[Mapping[str, Any]],
                         tasks: Sequence[Any]) -> Mapping[str, float]:
@@ -159,6 +161,7 @@ def metrics_fn_for_time(task_group: Tuple[int, Mapping[str, str]],
 
 
 @profile.wrap()
+@gin.configurable()
 def metrics_fn_for_aux(task_group: Tuple[int, Mapping[str, str]],
                        values: Sequence[Mapping[str, Any]],
                        tasks: Sequence[Any]) -> Mapping[str, float]:
@@ -196,10 +199,11 @@ def _mean_min(vs):
 
 
 def _mean_last(vs):
-  return float(onp.mean([v[-1] for v in vs]))
+  return float(onp.mean([v[:, -1] for v in vs]))
 
 
 @profile.wrap()
+@gin.configurable()
 def metrics_fn_for_aggregate_unnormalized_losses(
     task_group: Tuple[int, Mapping[str, str]], values: Sequence[Mapping[str,
                                                                         Any]],
@@ -223,6 +227,7 @@ def metrics_fn_for_aggregate_unnormalized_losses(
 
 
 @profile.wrap()
+@gin.configurable()
 def metrics_fn_for_aggregate_normalized_losses(
     task_group: Tuple[int, Mapping[str, str]], values: Sequence[Mapping[str,
                                                                         Any]],
@@ -245,6 +250,8 @@ def metrics_fn_for_aggregate_normalized_losses(
   return metrics
 
 
+@profile.wrap()
+@gin.configurable()
 def metrics_fn_for_each_task(task_group: Tuple[int, Mapping[str, str]],
                              values: Sequence[Mapping[str, Any]],
                              tasks: Sequence[Any]) -> Mapping[str, float]:
@@ -256,15 +263,70 @@ def metrics_fn_for_each_task(task_group: Tuple[int, Mapping[str, str]],
   norm_v = [r["eval/train/norm_loss"] for r in values]
 
   metrics = {}
-  for t, v, norm_v in zip(tasks, unnorm_v, norm_v):
+  for t, v, nv in zip(tasks, unnorm_v, norm_v):
     unused_cfg, name = t.task_content
     metrics[f"{name}/nonorm_avg_loss"] = onp.mean(v)
     metrics[f"{name}/nonorm_min_loss"] = onp.nanmin(v)
-    metrics[f"{name}/nonorm_last_loss"] = v[-1]
+    metrics[f"{name}/nonorm_last_loss"] = onp.mean(v[:, -1])
 
-    metrics[f"{name}/norm_avg_loss"] = onp.mean(norm_v)
-    metrics[f"{name}/norm_min_loss"] = onp.nanmin(norm_v)
-    metrics[f"{name}/norm_last_loss"] = norm_v[-1]
+    metrics[f"{name}/norm_avg_loss"] = onp.mean(nv)
+    metrics[f"{name}/norm_min_loss"] = onp.nanmin(nv)
+    metrics[f"{name}/norm_last_loss"] = onp.mean(nv[:, -1])
+
+  return {k: float(v) for k, v in metrics.items()}
+
+
+@profile.wrap()
+@gin.configurable()
+def metrics_fn_for_speedup_normalized(
+    task_group: Tuple[int, Mapping[str, str]], values: Sequence[Mapping[str,
+                                                                        Any]],
+    tasks: Sequence[Any]) -> Mapping[str, float]:
+  """Extract training losses normalized by the speedup over adam."""
+  del task_group
+  from learned_optimization.baselines import normalizers  # pylint: disable=g-import-not-at-top
+  norm_map = normalizers.speedup_over_adam_normalizer_map()
+
+  def get_single_task(cfgs):
+    # TODO(lmetz) standardize this! For now, we take a guess based on the
+    # get_task_family configurable
+    for c in cfgs:
+      if "get_task_family.task=@" in c:
+        return c.split("get_task_family.task=@")[1].replace("()", "")
+    else:
+      return None
+
+  losses = [r["eval/train/loss"] for r in values]
+  xs = [r["eval/xs"] for r in values]
+  metrics = {}
+
+  eval_names = []
+  for t, v, x in zip(tasks, losses, xs):
+    cfg, name = t.task_content
+    eval_names.append(name)
+    task_name = get_single_task(cfg)  # pylint: disable=unused-variable
+    if task_name not in norm_map:
+      raise ValueError(f"Task name: {task_name} doesn't have a normalizer!")
+
+    v = onp.mean(v, axis=0)
+    nv = norm_map[task_name](v)
+    # assume that the seeds have same inner step.
+    max_steps = x[0, -1]
+    nv = nv / max_steps
+
+    metrics[f"{name}/adamspeedup_avg"] = onp.nanmean(nv)
+    metrics[f"{name}/adamspeedup_max"] = onp.nanmax(nv)
+    metrics[f"{name}/adamspeedup_last"] = onp.mean(nv[-1])
+    metrics[f"{name}/max_steps"] = float(max_steps)
+
+  speedups = [metrics[f"{x}/adamspeedup_last"] for x in eval_names]
+  for i in range(19):
+    perc = (i + 1) * 5
+    metrics[f"adamspeedup_perc{perc}/adamspeedup_last"] = onp.percentile(
+        speedups, perc)
+
+  metrics["adamspeedup_mean/adamspeedup_last"] = onp.nanmean(speedups)
+  metrics["adamspeedup_std/adamspeedup_last"] = onp.std(speedups)
 
   return {k: float(v) for k, v in metrics.items()}
 
@@ -326,7 +388,8 @@ def write_results_thread_main(
     population_root_dir=None,
     population_worker_id=None,
     number_to_write=None,
-    values_to_metrics_fns: Sequence[ValueToMetricsFNs] = DEFAULT_METRICS_FN,
+    values_to_metrics_fns: Sequence[Union[
+        str, ValueToMetricsFNs]] = DEFAULT_METRICS_FN,
 ):
   """Thread that writes out results in the backgroud."""
   for _ in range(number_to_write) if number_to_write else itertools.count():
@@ -347,6 +410,12 @@ def write_results_thread_main(
       logging.info(str(tasks))
 
       metrics = {}
+      if isinstance(values_to_metrics_fns[0], str):
+        # value passed in through gin. Do a lookup to convert these to fn.
+        values_to_metrics_fns = [
+            gin.get_configurable(c) for c in values_to_metrics_fns
+        ]
+
       for fn in values_to_metrics_fns:
         metric = fn(task_group, values, tasks)
         for k, v in metric.items():
