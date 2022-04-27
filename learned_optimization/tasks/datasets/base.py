@@ -240,6 +240,7 @@ def tfds_image_classification_datasets(
 
   def make_iter(split: str) -> Iterator[Batch]:
     ds = tfds.load(datasetname, split=split)
+    ds = ds.repeat(-1)
     ds = ds.map(functools.partial(_image_map_fn, cfg))
     ds = ds.shuffle(shuffle_buffer_size)
     ds = ds.batch(batch_size, drop_remainder=True)

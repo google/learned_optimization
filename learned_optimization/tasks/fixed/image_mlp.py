@@ -86,6 +86,20 @@ def ImageMLP_FashionMnist8_Relu32():
 
 
 @gin.configurable
+def ImageMLP_FashionMnist16_Relu32():
+  """A 1 hidden layer, 32 hidden unit MLP designed for 8x8 fashion mnist."""
+  datasets = image.fashion_mnist_datasets(batch_size=128, image_size=(16, 16))
+  return _MLPImageTask(datasets, [32])
+
+
+@gin.configurable
+def ImageMLP_FashionMnist32_Relu32():
+  """A 1 hidden layer, 32 hidden unit MLP designed for 8x8 fashion mnist."""
+  datasets = image.fashion_mnist_datasets(batch_size=128, image_size=(32, 32))
+  return _MLPImageTask(datasets, [32])
+
+
+@gin.configurable
 def ImageMLP_Cifar10_8_Relu32():
   """A 1 hidden layer, 32 hidden unit MLP designed for 8x8 cifar10."""
   datasets = image.cifar10_datasets(batch_size=128, image_size=(8, 8))
@@ -133,6 +147,36 @@ def ImageMLP_Cifar10_128x128x128_Tanh_bs256():
 def ImageMLP_Mnist_128x128x128_Relu():
   datasets = image.mnist_datasets(batch_size=128)
   return _MLPImageTask(datasets, [128, 128, 128])
+
+
+@gin.configurable
+def ImageMLP_Cifar10_256x256_Relu():
+  datasets = image.cifar10_datasets(batch_size=128)
+  return _MLPImageTask(datasets, [256, 256])
+
+
+@gin.configurable
+def ImageMLP_Cifar10_1024x1024_Relu():
+  datasets = image.cifar10_datasets(batch_size=128)
+  return _MLPImageTask(datasets, [1024, 1024])
+
+
+@gin.configurable
+def ImageMLP_Cifar10_4096x4096_Relu():
+  datasets = image.cifar10_datasets(batch_size=128)
+  return _MLPImageTask(datasets, [4096, 4096])
+
+
+@gin.configurable
+def ImageMLP_Cifar10_8192x8192_Relu():
+  datasets = image.cifar10_datasets(batch_size=128)
+  return _MLPImageTask(datasets, [8192, 8192])
+
+
+@gin.configurable
+def ImageMLP_Cifar10_16384x16384_Relu():
+  datasets = image.cifar10_datasets(batch_size=128)
+  return _MLPImageTask(datasets, [16384, 16384])
 
 
 class _MLPImageTaskMSE(_MLPImageTask):
