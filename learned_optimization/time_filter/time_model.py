@@ -130,13 +130,16 @@ import numpy as onp
 PRNGKey = jnp.ndarray
 
 
-def features_to_hidden(key_feats: jnp.ndarray,
-                       float_feats: jnp.ndarray,
-                       int_feats: jnp.ndarray,
-                       feat_mask: jnp.ndarray,
-                       n_embed: int = 4096,
-                       n_hidden: int = 128,
-                       n_hidden2: int = 512) -> jnp.ndarray:
+def features_to_hidden(
+    key_feats: jnp.ndarray,
+    float_feats: jnp.ndarray,
+    int_feats: jnp.ndarray,
+    feat_mask: jnp.ndarray,
+    n_embed: int = 4096,
+    n_hidden: int = 128,
+    n_hidden2: int = 512,
+    num_mixing_layers: int = 1,
+) -> jnp.ndarray:
   """Map features, to a sense hidden representation.
 
   See module level documentation for more info.
@@ -156,6 +159,7 @@ def features_to_hidden(key_feats: jnp.ndarray,
     n_embed: Number of embedded values for both keys and ints.
     n_hidden: hidden size while working with the N keys.
     n_hidden2: hidden size after reducing across the N keys.
+    num_mixing_layers: number of mixing layers to apply
 
   Returns:
     float32[BS, H] the featurized cfgs
@@ -165,15 +169,23 @@ def features_to_hidden(key_feats: jnp.ndarray,
   #.   So the key MLP/hidden_size would have 2 values and the rest 0.
   # for for simplicity we will simply add each entity up and rely upon the mod
   # to collapse them down to one.
+  # flat_keys_feats = jnp.sum(key_feats, axis=2)
+  # last key that is non-zero.
   flat_keys_feats = jnp.sum(key_feats, axis=2)
+
+  # Mod here will always return a positive value.
   flat_keys_feats = flat_keys_feats % n_embed
 
   nan = hk.initializers.Constant(jnp.nan)
   min_state = hk.get_state("min", shape=[n_embed, 8], init=nan)
   max_state = hk.get_state("max", shape=[n_embed, 8], init=nan)
 
-  new_min = jnp.fmin(min_state[flat_keys_feats], jnp.min(float_feats, axis=0))
-  new_max = jnp.fmax(max_state[flat_keys_feats], jnp.max(float_feats, axis=0))
+  @jax.vmap
+  @jax.vmap
+  def min_of_one(ff_key, x):
+    return jnp.fmin(x, min_state[ff_key]), jnp.fmax(x, max_state[ff_key])
+
+  new_min, new_max = min_of_one(flat_keys_feats, float_feats)
 
   float_feats = (float_feats - new_min) / (1e-15 + (new_max - new_min))
   float_feats = (float_feats - 0.5) * 2
@@ -204,26 +216,49 @@ def features_to_hidden(key_feats: jnp.ndarray,
       jax.vmap(jax.vmap(lambda a, b, c: a @ b + c))(
           float_feats, float_emb[flat_keys_feats],
           float_emb_b[flat_keys_feats]))
-  hidden = (int_feat_embed + feat_embed)
+
+  key_emb = hk.get_parameter(
+      "key_feats",
+      shape=[n_embed, n_hidden],
+      init=hk.initializers.RandomUniform(-0.1, 0.1))
+
+  @jax.vmap
+  @jax.vmap
+  @jax.vmap
+  def key_feat(k):
+    return key_emb[k]
+
+  key_feats = key_feat(key_feats)
+  key_feats = jnp.mean(key_feats, axis=2)  # reduce along number of keys dim.
+
+  assert int_feat_embed.shape == feat_embed.shape
+  assert key_feats.shape == feat_embed.shape
+
+  # TODO(lmetz) consider layernorm on each component?
+  hidden = (int_feat_embed + feat_embed + key_feats)
 
   assert feat_mask.shape == (hidden.shape[0], hidden.shape[1], 1)
 
-  hidden = hk.Linear(n_hidden)(hidden)
-  hidden = jax.nn.relu(hidden)
-  hidden = hidden * feat_mask
+  # mixing layers.
+  for _ in range(num_mixing_layers):
+    hidden = hk.Linear(n_hidden)(hidden)
+    hidden = jax.nn.relu(hidden)
+    hidden = hidden * feat_mask
 
-  # hidden is currently [batch, number of attributes, features]
-  hmean = jnp.sum(
-      hidden, axis=1, keepdims=True) / jnp.sum(
-          feat_mask, axis=1, keepdims=True)
-  hmax = jnp.max(hidden, axis=1, keepdims=True)
+    # hidden is currently [batch, number of attributes, features]
+    hmean = jnp.sum(
+        hidden, axis=1, keepdims=True) / jnp.sum(
+            feat_mask, axis=1, keepdims=True)
+    hmax = jnp.max(hidden, axis=1, keepdims=True)
 
-  h0 = jax.nn.relu(hk.Linear(n_hidden)(hidden))
-  h1 = jax.nn.relu(hk.Linear(n_hidden)(hmean))
-  h2 = jax.nn.relu(hk.Linear(n_hidden)(hmax))
+    h0 = jax.nn.relu(hk.Linear(n_hidden)(hidden))
+    h1 = jax.nn.relu(hk.Linear(n_hidden)(hmean))
+    h2 = jax.nn.relu(hk.Linear(n_hidden)(hmax))
 
-  hidden = hk.Linear(n_hidden2)((h0 + h1 + h2) / 3.)
-  hidden = hidden * feat_mask
+    hidden = hk.Linear(n_hidden2)((h0 + h1 + h2) / 3.)
+    hidden = hidden * feat_mask
+
+  # flatten.
   hidden = jnp.sum(hidden, axis=1) / jnp.sum(feat_mask, axis=1)
 
   # hidden is now [batch, features]

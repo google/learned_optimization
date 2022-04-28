@@ -50,5 +50,11 @@ class LmTransformerTest(absltest.TestCase):
     obj = cfgobject.object_from_config(cfg1)
     self.assertIsInstance(obj, vit.ParametricVIT)
 
+  def test_timed_sample_vit(self):
+    key = jax.random.PRNGKey(0)
+    sampled_task = vit.timed_sample_vit(key)
+    self.assertIsInstance(sampled_task, cfgobject.CFGObject)
+
+
 if __name__ == '__main__':
   absltest.main()

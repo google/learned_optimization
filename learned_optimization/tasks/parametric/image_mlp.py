@@ -25,6 +25,7 @@ from learned_optimization.tasks import base
 from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import model_paths
 from learned_optimization.time_filter import time_model
 import numpy as onp
 
@@ -131,9 +132,8 @@ def sample_image_mlp(key: PRNGKey) -> cfgobject.CFGObject:
       })
 
 
-model_path = "sample_image_mlp/time/tpu_TPUv4/20220315_185859.weights"
-
 @gin.configurable()
 def timed_sample_image_mlp(key: PRNGKey, max_time=1e-5):
+  model_path = model_paths.models[("sample_image_mlp", "time")]
   return time_model.rejection_sample(sample_image_mlp, model_path, key,
                                      max_time)

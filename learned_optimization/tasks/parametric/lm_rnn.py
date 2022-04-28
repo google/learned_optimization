@@ -26,6 +26,7 @@ from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.datasets import language  # pylint: disable=unused-import
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import model_paths
 from learned_optimization.time_filter import time_model
 import numpy as onp
 
@@ -214,9 +215,7 @@ def sample_lm_rnn(key: PRNGKey) -> cfgobject.CFGObject:
       })
 
 
-model_path = "sample_lm_rnn/time/tpu_TPUv4/20220315_190026.weights"
-
-
 @gin.configurable()
 def timed_sample_lm_rnn(key: PRNGKey, max_time=1e-4):
+  model_path = model_paths.models[("sample_lm_rnn", "time")]
   return time_model.rejection_sample(sample_lm_rnn, model_path, key, max_time)

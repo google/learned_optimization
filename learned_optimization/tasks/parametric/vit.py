@@ -28,6 +28,8 @@ from learned_optimization.tasks.datasets import language  # pylint: disable=unus
 from learned_optimization.tasks.fixed import vit
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import model_paths
+from learned_optimization.time_filter import time_model
 import ml_collections
 import numpy as onp
 
@@ -108,3 +110,11 @@ def sample_vit(key: chex.PRNGKey) -> cfgobject.CFGObject:
   kwargs["attension_dropout"] = float(attention_dropout * use_mask)
 
   return cfgobject.CFGObject("ParametricVIT", kwargs)
+
+
+@gin.configurable()
+def timed_sample_vit(key: chex.PRNGKey, max_time: float = 1e-4):
+  model_path = model_paths.models[("sample_vit", "time")]
+  valid_path = model_paths.models[("sample_vit", "valid")]
+  return time_model.rejection_sample(
+      sample_vit, model_path, key, max_time, model_path_valid_suffix=valid_path)

@@ -26,6 +26,7 @@ from learned_optimization.tasks import resnet
 from learned_optimization.tasks.datasets import base as datasets_base
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import model_paths
 from learned_optimization.time_filter import time_model
 import numpy as onp
 
@@ -156,10 +157,8 @@ def sample_image_resnet(key: PRNGKey) -> cfgobject.CFGObject:
   return cfgobject.CFGObject("ParametricImageResNet", kwargs)
 
 
-model_path = "sample_image_resnet/time/tpu_TPUv4/20220315_190328.weights"
-
-
 @gin.configurable()
 def timed_sample_image_resnet(key: PRNGKey, max_time=1e-4):
+  model_path = model_paths.models[("sample_image_resnet", "time")]
   return time_model.rejection_sample(sample_image_resnet, model_path, key,
                                      max_time)
