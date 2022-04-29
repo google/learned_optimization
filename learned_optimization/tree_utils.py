@@ -49,6 +49,12 @@ def tree_div(treea, scalar):
   return jax.tree_multimap(lambda a: a / scalar, treea)
 
 
+@jax.jit
+def tree_dot(treea, treeb):
+  mult = jax.tree_map(lambda a, b: a * b, treea, treeb)
+  return sum(map(jnp.sum, jax.tree_leaves(mult)))
+
+
 def tree_zip_onp(xs):
   xs = list(xs)
   _, tree_def = jax.tree_flatten(xs[0])

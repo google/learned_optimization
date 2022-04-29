@@ -172,13 +172,23 @@ class TaskAugmentationTest(absltest.TestCase):
 
   def test_ModifyTaskGradient(self):
     task = DummyTask()
-    fn = lambda tree: jax.tree_map(lambda x: x * 0 + 9, tree)
+    fn = lambda tree, key: jax.tree_map(lambda x: x * 0 + 9, tree)
     task = task_augmentation.ModifyTaskGradient(task, fn)
     params = task.init(jax.random.PRNGKey(0))
     batch = next(task.datasets.train)
     key = jax.random.PRNGKey(0)
     grad = jax.grad(task.loss)(params, key, batch)
     self.assertEqual(grad[0][0], 9.)
+    test_utils.smoketest_task(task)
+
+  def test_SubsampleDirectionsTaskGradient(self):
+    task = DummyTask()
+    task = task_augmentation.SubsampleDirectionsTaskGradient(task, directions=4)
+    test_utils.smoketest_task(task)
+
+  def test_NormalizeTaskGradient(self):
+    task = DummyTask()
+    task = task_augmentation.SubsampleDirectionsTaskGradient(task)
     test_utils.smoketest_task(task)
 
 

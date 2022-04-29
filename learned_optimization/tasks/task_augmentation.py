@@ -22,12 +22,14 @@ operate on Task and TaskFamiliy resulting in new Task and TaskFamily.
 """
 
 import functools
-from typing import Mapping, Tuple, Union, Any, Callable
+from typing import Any, Callable, Mapping, Tuple, Union
 
+import chex
 import gin
 import jax
 import jax.numpy as jnp
 from learned_optimization import summary
+from learned_optimization import tree_utils
 from learned_optimization.tasks import base
 from learned_optimization.tasks.base import Batch, ModelState, Params  # pylint: disable=g-multiple-import
 from learned_optimization.tasks.datasets import base as datasets_base
@@ -293,7 +295,8 @@ class ConvertFloatDType(base.Task):
 class ModifyTaskGradient(base.Task):
   """A task which modifies the passed in Task's gradient."""
 
-  def __init__(self, task: base.Task, fn: Callable[[PyTree], PyTree]):
+  def __init__(self, task: base.Task, fn: Callable[[PyTree, chex.PRNGKey],
+                                                   PyTree]):
     super().__init__()
 
     self.loss_with_state_and_aux = jax.custom_vjp(task.loss_with_state_and_aux)
@@ -307,14 +310,15 @@ class ModifyTaskGradient(base.Task):
     self.fn = fn
 
     def f_fwd(params, state, key, batch):
+      key1, key = jax.random.split(key)
       results, f_vjp = jax.vjp(task.loss_with_state_and_aux, params, state, key,
                                batch)
-      return results, (f_vjp,)
+      return results, (f_vjp, key1)
 
     def f_bwd(args, g):
-      (f_vjp,) = args
+      (f_vjp, key) = args
       dparams, dstate, dkey, dbatch = f_vjp(g)
-      dparams = self.fn(dparams)
+      dparams = self.fn(dparams, key)
       return (dparams, dstate, dkey, dbatch)
 
     self.loss_with_state_and_aux.defvjp(f_fwd, f_bwd)
@@ -330,3 +334,58 @@ class ModifyTaskGradient(base.Task):
   def loss_with_aux(self, params, key, data):
     loss, _, aux = self.loss_with_state_and_aux(params, None, key, data)
     return loss, aux
+
+
+@gin.configurable
+def NormalizeTaskGradient(task):  # pylint: disable=invalid-name
+
+  def norm_fn(tree, key):
+    del key
+    norm = tree_utils.tree_norm(tree)
+    return jax.tree_map(lambda x: x / norm, tree)
+
+  return ModifyTaskGradient(task, norm_fn)
+
+
+def _sample_perturbations(variables: chex.ArrayTree,
+                          key: chex.PRNGKey) -> chex.ArrayTree:
+  flat, tree_def = jax.tree_flatten(variables)
+  keys = jax.random.split(key, len(flat))
+  perturbs = []
+  for key, f in zip(keys, flat):
+    perturbs.append(jax.random.normal(key, shape=f.shape, dtype=f.dtype))
+  perturb = jax.tree_unflatten(tree_def, perturbs)
+  norm = tree_utils.tree_norm(perturb)
+  return tree_utils.tree_div(perturb, norm)
+
+
+@gin.configurable
+def SubsampleDirectionsTaskGradient(task, directions=1, sign_direction=False):  # pylint: disable=invalid-name
+  """Given a gradient, compute contributions along random directions only.
+
+  This is meant to simulate gradients which would be computed from many samples
+  of ES.
+
+  Args:
+    task: Task to wrap
+    directions: Number of random directions to use
+    sign_direction: Compute the sign of the dot product of gradients and random
+      directions.
+
+  Returns:
+    task: Wrapped task
+  """
+
+  def subsample_one(tree, key):
+    perturb = _sample_perturbations(tree, key)
+    amt = tree_utils.tree_dot(tree, perturb)
+    if sign_direction:
+      amt = jnp.sign(amt)
+    return jax.tree_map(lambda x: x * amt, perturb)
+
+  def subsample_many(tree, key):
+    keys = jax.random.split(key, directions)
+    dirs = jax.vmap(subsample_one, in_axes=(None, 0))(tree, keys)
+    return jax.tree_map(lambda x: jnp.sum(x, axis=0), dirs)
+
+  return ModifyTaskGradient(task, subsample_many)
