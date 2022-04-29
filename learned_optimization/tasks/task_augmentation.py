@@ -259,3 +259,31 @@ class ReducedBatchsizeFamily(base.TaskFamily):
 
     self.task_fn = task_family.task_fn
     self.sample = task_family.sample
+
+
+class ConvertFloatDType(base.Task):
+  """Convert the parameters and data type of a task."""
+
+  def __init__(self, task: base.Task, dtype=jnp.bfloat16):
+    super().__init__()
+    self.task = task
+    self.datasets = self.task.datasets
+    self.dtype = dtype
+
+  def loss_with_state(self, params, state, key, data):
+    f = lambda x: jnp.asarray(x, self.dtype) if x.dtype == jnp.float32 else x
+    data = jax.tree_map(f, data)
+    return self.task.loss_with_state(params, state, key, data)
+
+  def loss(self, params, key, data):
+    l, _ = self.loss_with_state(params, None, key, data)
+    return l
+
+  def init_with_state(self, key):
+    params, state = self.task.init_with_state(key)
+    params = jax.tree_map(lambda x: jnp.asarray(x, dtype=self.dtype), params)
+    return params, state
+
+  def init(self, key):
+    params, _ = self.init_with_state(key)
+    return params

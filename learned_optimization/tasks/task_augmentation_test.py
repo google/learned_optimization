@@ -22,6 +22,7 @@ import jax
 import jax.numpy as jnp
 from learned_optimization.tasks import base
 from learned_optimization.tasks import task_augmentation
+from learned_optimization.tasks import test_utils
 from learned_optimization.tasks.datasets import base as datasets_base
 import numpy as onp
 from numpy import testing
@@ -157,6 +158,13 @@ class TaskAugmentationTest(absltest.TestCase):
     self.assertEqual(batch.shape, (16,))
     self.assertEqual(task_family.datasets.abstract_batch.shape, (16,))
 
+  def test_ConvertFloatDType(self):
+    task = DummyTask()
+    task = task_augmentation.ConvertFloatDType(task, dtype=jnp.bfloat16)
+    params = task.init(jax.random.PRNGKey(0))
+    p = jax.tree_leaves(params)[0]
+    self.assertEqual(p.dtype, jnp.bfloat16)
+    test_utils.smoketest_task(task)
 
 if __name__ == '__main__':
   absltest.main()
