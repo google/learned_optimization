@@ -22,7 +22,7 @@ operate on Task and TaskFamiliy resulting in new Task and TaskFamily.
 """
 
 import functools
-from typing import Mapping, Tuple, Union, Any
+from typing import Mapping, Tuple, Union, Any, Callable
 
 import gin
 import jax
@@ -35,6 +35,7 @@ from learned_optimization.tasks.parametric import cfgobject
 import numpy as onp
 
 PRNGKey = jnp.ndarray
+PyTree = Any
 
 LogFeat = cfgobject.LogFeature
 
@@ -93,7 +94,6 @@ class ReparamWeights(base.Task):
                       data: Any) -> Tuple[jnp.ndarray, Any]:
     loss, state, _ = self.loss_with_state_and_aux(params, state, key, data)
     return loss, state
-
 
 
 @gin.configurable
@@ -287,3 +287,46 @@ class ConvertFloatDType(base.Task):
   def init(self, key):
     params, _ = self.init_with_state(key)
     return params
+
+
+@gin.configurable
+class ModifyTaskGradient(base.Task):
+  """A task which modifies the passed in Task's gradient."""
+
+  def __init__(self, task: base.Task, fn: Callable[[PyTree], PyTree]):
+    super().__init__()
+
+    self.loss_with_state_and_aux = jax.custom_vjp(task.loss_with_state_and_aux)
+
+    self.task = task
+
+    self.init = task.init
+    self.init_with_state = task.init_with_state
+    self.datasets = task.datasets
+    self.normalizer = task.normalizer
+    self.fn = fn
+
+    def f_fwd(params, state, key, batch):
+      results, f_vjp = jax.vjp(task.loss_with_state_and_aux, params, state, key,
+                               batch)
+      return results, (f_vjp,)
+
+    def f_bwd(args, g):
+      (f_vjp,) = args
+      dparams, dstate, dkey, dbatch = f_vjp(g)
+      dparams = self.fn(dparams)
+      return (dparams, dstate, dkey, dbatch)
+
+    self.loss_with_state_and_aux.defvjp(f_fwd, f_bwd)
+
+  def loss(self, params, key, data):
+    loss, _, _ = self.loss_with_state_and_aux(params, None, key, data)
+    return loss
+
+  def loss_with_state(self, params, state, key, data):
+    loss, state, _ = self.loss_with_state_and_aux(params, state, key, data)
+    return loss, state
+
+  def loss_with_aux(self, params, key, data):
+    loss, _, aux = self.loss_with_state_and_aux(params, None, key, data)
+    return loss, aux

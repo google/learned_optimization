@@ -44,6 +44,10 @@ def dummary_datasets():
 
 class DummyTask(base.Task):
 
+  def __init__(self):
+    super().__init__()
+    self.datasets = dummary_datasets()
+
   def init(self, key: jnp.ndarray) -> Any:
     return (jnp.ones([2]), jnp.ones([2]))
 
@@ -165,6 +169,18 @@ class TaskAugmentationTest(absltest.TestCase):
     p = jax.tree_leaves(params)[0]
     self.assertEqual(p.dtype, jnp.bfloat16)
     test_utils.smoketest_task(task)
+
+  def test_ModifyTaskGradient(self):
+    task = DummyTask()
+    fn = lambda tree: jax.tree_map(lambda x: x * 0 + 9, tree)
+    task = task_augmentation.ModifyTaskGradient(task, fn)
+    params = task.init(jax.random.PRNGKey(0))
+    batch = next(task.datasets.train)
+    key = jax.random.PRNGKey(0)
+    grad = jax.grad(task.loss)(params, key, batch)
+    self.assertEqual(grad[0][0], 9.)
+    test_utils.smoketest_task(task)
+
 
 if __name__ == '__main__':
   absltest.main()
