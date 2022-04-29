@@ -31,6 +31,13 @@ class ImageTest(absltest.TestCase):
     self.assertEqual(datasets.abstract_batch["image"].shape, (128, 16, 16, 3))
     self.assertEqual(data["image"].shape, (128, 16, 16, 3))
 
+  def test_cifar10_black_and_white(self):
+    datasets = image.cifar10_datasets(
+        128, image_size=(16, 16), convert_to_black_and_white=True)
+    data = next(datasets.train)
+    self.assertEqual(datasets.abstract_batch["image"].shape, (128, 16, 16, 1))
+    self.assertEqual(data["image"].shape, (128, 16, 16, 1))
+
   def test_mnist(self):
     datasets = image.mnist_datasets(128)
     data = next(datasets.train)

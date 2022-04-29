@@ -28,6 +28,7 @@ tasks = [
     "ImageMLP_Cifar10_128x128_Dropout05_Relu_MSE",
     "ImageMLP_Cifar10_128x128x128_BatchNorm_Relu",
     "ImageMLP_Cifar10_128x128x128_LayerNorm_Relu",
+    "ImageMLP_Cifar10BW8_Relu32",
 ]
 
 

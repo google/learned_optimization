@@ -193,6 +193,9 @@ def _image_map_fn(cfg: Mapping[str, Any], batch: Batch) -> Batch:
     batch["image"] = image / tf.constant(
         cfg["normalize_std"], shape=[1, 1, 1, 3], dtype=image.dtype)
 
+  if cfg["convert_to_black_and_white"]:
+    batch["image"] = tf.reduce_mean(batch["image"], axis=3, keepdims=True)
+
   batch["label"] = tf.cast(batch["label"], tf.int32)
   return hk.data_structures.to_immutable_dict({
       "image": batch["image"],
@@ -209,7 +212,9 @@ def tfds_image_classification_datasets(
     prefetch_batches: int = 300,
     shuffle_buffer_size: int = 10000,
     normalize_mean: Optional[Tuple[int, int, int]] = None,
-    normalize_std: Optional[Tuple[int, int, int]] = None) -> Datasets:
+    normalize_std: Optional[Tuple[int, int, int]] = None,
+    convert_to_black_and_white: Optional[bool] = False,
+) -> Datasets:
   """Load an image dataset with tfds in a streaming fashion.
 
   Args:
@@ -223,6 +228,7 @@ def tfds_image_classification_datasets(
     shuffle_buffer_size: size of shuffle buffer.
     normalize_mean: mean RGB value to subtract off of images to normalize imgs
     normalize_std: std RGB of dataset to normalize imgs
+    convert_to_black_and_white: conver a color image to black and white.
 
   Returns:
     A Datasets object containing data iterators.
@@ -235,7 +241,8 @@ def tfds_image_classification_datasets(
       "aug_flip_left_right": False,
       "aug_flip_up_down": False,
       "normalize_mean": normalize_mean,
-      "normalize_std": normalize_std
+      "normalize_std": normalize_std,
+      "convert_to_black_and_white": convert_to_black_and_white,
   }
 
   def make_iter(split: str) -> Iterator[Batch]:
@@ -254,6 +261,9 @@ def tfds_image_classification_datasets(
     output_channel = builder.info.features["image"].shape[-1:]
   else:
     output_channel = (stack_channels,)
+
+  if convert_to_black_and_white:
+    output_channel = (1,)
 
   abstract_batch = {
       "image":
@@ -276,7 +286,9 @@ def preload_tfds_image_classification_datasets(
     stack_channels: int = 1,
     prefetch_batches: int = 300,
     normalize_mean: Optional[Tuple[int, int, int]] = None,
-    normalize_std: Optional[Tuple[int, int, int]] = None) -> Datasets:
+    normalize_std: Optional[Tuple[int, int, int]] = None,
+    convert_to_black_and_white: Optional[bool] = False,
+) -> Datasets:
   """Load an image dataset with tfds by first loading into host ram.
 
   Args:
@@ -289,6 +301,7 @@ def preload_tfds_image_classification_datasets(
     prefetch_batches: number of batches to prefetch
     normalize_mean: mean RGB value to subtract off of images to normalize imgs
     normalize_std: std RGB of dataset to normalize imgs
+    convert_to_black_and_white: conver a color image to black and white.
 
   Returns:
     A Datasets object containing data iterators.
@@ -301,7 +314,8 @@ def preload_tfds_image_classification_datasets(
       "aug_flip_left_right": False,
       "aug_flip_up_down": False,
       "normalize_mean": normalize_mean,
-      "normalize_std": normalize_std
+      "normalize_std": normalize_std,
+      "convert_to_black_and_white": convert_to_black_and_white,
   }
 
   def make_python_iter(split: str) -> Iterator[Batch]:
@@ -338,6 +352,9 @@ def preload_tfds_image_classification_datasets(
     output_channel = builder.info.features["image"].shape[-1:]
   else:
     output_channel = (stack_channels,)
+
+  if convert_to_black_and_white:
+    output_channel = (1,)
 
   abstract_batch = {
       "image":
@@ -379,7 +396,9 @@ def tfrecord_image_classification_datasets(
     aug_flip_left_right: bool = False,
     aug_flip_up_down: bool = False,
     normalize_mean: Optional[Tuple[int, int, int]] = None,
-    normalize_std: Optional[Tuple[int, int, int]] = None) -> Datasets:
+    normalize_std: Optional[Tuple[int, int, int]] = None,
+    convert_to_black_and_white: Optional[bool] = False,
+) -> Datasets:
   """Load an image dataset from tfrecords.
 
   Args:
@@ -396,6 +415,7 @@ def tfrecord_image_classification_datasets(
     aug_flip_up_down: randomly flip up/down
     normalize_mean: mean RGB value to subtract off of images to normalize imgs
     normalize_std: std RGB of dataset to normalize imgs
+    convert_to_black_and_white: conver a color image to black and white.
 
   Returns:
     A Datasets object containing data iterators.
@@ -422,7 +442,8 @@ def tfrecord_image_classification_datasets(
       "aug_flip_left_right": aug_flip_left_right,
       "aug_flip_up_down": aug_flip_up_down,
       "normalize_mean": normalize_mean,
-      "normalize_std": normalize_std
+      "normalize_std": normalize_std,
+      "convert_to_black_and_white": convert_to_black_and_white,
   }
 
   def make_python_iter(split: str) -> Iterator[Batch]:
@@ -454,10 +475,13 @@ def tfrecord_image_classification_datasets(
     ds = ds.prefetch(prefetch_batches)
     return ThreadSafeIterator(LazyIterator(ds.as_numpy_iterator))
 
-  if stack_channels == 1:
+  if convert_to_black_and_white:
+    shape = (batch_size,) + image_size + (1,)
+  elif stack_channels == 1:
     shape = (batch_size,) + image_size + (image_shapes_map[datasetname][-1],)
   else:
     shape = (batch_size,) + image_size + (stack_channels,)
+
   abstract_batch = {
       "image": jax.ShapedArray(shape, jnp.float32),
       "label": jax.ShapedArray((batch_size,), jnp.int32)

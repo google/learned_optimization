@@ -72,6 +72,14 @@ class _MLPImageTask(base.Task):
 
 
 @gin.configurable
+def ImageMLP_Cifar10BW8_Relu32():
+  """A 1 hidden layer, 32 unit MLP for 8x8 black and white cifar10."""
+  datasets = image.cifar10_datasets(
+      batch_size=128, image_size=(8, 8), convert_to_black_and_white=True)
+  return _MLPImageTask(datasets, [32])
+
+
+@gin.configurable
 def ImageMLP_FashionMnist_Relu128x128():
   """A 2 hidden layer, 128 hidden unit MLP designed for fashion mnist."""
   datasets = image.fashion_mnist_datasets(batch_size=128)

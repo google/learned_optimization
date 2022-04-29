@@ -53,13 +53,12 @@ def fashion_mnist_datasets(batch_size: int,
 
 @base.dataset_lru_cache
 @gin.configurable
-def cifar10_datasets(
-    batch_size: int,
-    image_size: Tuple[int, int] = (32, 32),
-) -> base.Datasets:
+def cifar10_datasets(batch_size: int,
+                     image_size: Tuple[int, int] = (32, 32),
+                     **kwargs) -> base.Datasets:
   splits = ("train[0:80%]", "train[80%:90%]", "train[90%:]", "test")
   return base.preload_tfds_image_classification_datasets(
-      "cifar10", splits, batch_size=batch_size, image_size=image_size)
+      "cifar10", splits, batch_size=batch_size, image_size=image_size, **kwargs)
 
 
 @base.dataset_lru_cache
