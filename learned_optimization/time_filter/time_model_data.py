@@ -120,7 +120,22 @@ def train_test_iterators(
   if len(cfgs_and_timing) < num_test:
     raise ValueError(f"Not enough samples! Found {len(cfgs_and_timing)}")
 
-  def iterator(cfgs) -> Iterator[DataBatch]:
+  def iterator(cfgs, max_length=None) -> Iterator[DataBatch]:
+
+    def do_pad(ind):
+      len_ind = ind.shape[0]
+      if len_ind == max_length:
+        return ind
+      zeros = onp.zeros(
+          [max_length - len_ind] + list(ind.shape[1:]), dtype=ind.dtype)
+      return onp.concatenate([ind, zeros], axis=0)
+
+    def maybe_pad(x):
+      if max_length:
+        return do_pad(x)
+      else:
+        return onp.asarray(x)
+
     for cfg, results in cfgs:
       # We define a model not running or failing with a onp.nan
       if results and "unroll_8x10" in results and results["unroll_8x10"]:
@@ -128,13 +143,19 @@ def train_test_iterators(
       else:
         t = onp.nan
       yield {
-          "feats": tuple([onp.asarray(x) for x in cfgobject.featurize(cfg)]),
+          "feats": tuple([maybe_pad(x) for x in cfgobject.featurize(cfg)]),
           "time": t,
       }
 
+  lead_val = [
+      x["feats"][0].shape[0]
+      for i, x in zip(range(100), iterator(cfgs_and_timing))
+  ]
+  max_length = onp.max(lead_val)
+
   def make_iterator(cfgs):
     dataset = tf.data.Dataset.from_generator(
-        lambda: iterator(cfgs),
+        lambda: iterator(cfgs, max_length),
         output_types={
             "feats": (tf.int32, tf.float32, tf.int32),
             "time": tf.float32

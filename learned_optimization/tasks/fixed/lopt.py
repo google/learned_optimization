@@ -35,6 +35,30 @@ from learned_optimization.tasks.fixed import conv
 from learned_optimization.tasks.fixed import image_mlp
 
 
+def unrolled_loss(task, opt, key, datas, num_steps):
+  """Unrolled meta loss function shared across LOpt tasks."""
+  key, key1 = jax.random.split(key)
+  p, s = task.init_with_state(key1)
+  opt_state = opt.init(p, s, num_steps=num_steps)
+
+  @jax.remat
+  def step(opt_state_key, batch):
+    opt_state, key = opt_state_key
+    p, s = opt.get_params_state(opt_state)
+    key, key1, key2 = jax.random.split(key, 3)
+    (l, s), g = jax.value_and_grad(
+        task.loss_with_state, has_aux=True)(p, s, key1, batch)
+    opt_state = opt.update(opt_state, g, loss=l, model_state=s, key=key2)
+    return (opt_state, key), l
+
+  key, key1 = jax.random.split(key)
+  scan_init = (opt_state, key1)
+  (opt_state, _), ls = jax.lax.scan(step, scan_init, datas, length=num_steps)
+  ls = jax.vmap(task.normalizer)(ls)
+  l = jnp.mean(ls)
+  return l
+
+
 class LOptTask(base.Task):
   """A learned optimizer meta-objective based on full length unrolls."""
 
@@ -65,33 +89,58 @@ class LOptTask(base.Task):
 
   def loss(self, params, key, datas):
     opt = self.lopt.opt_fn(params)
+    return unrolled_loss(self.task, opt, key, datas, self.num_steps)
 
-    key, key1 = jax.random.split(key)
-    p, s = self.task.init_with_state(key1)
-    opt_state = opt.init(p, s, num_steps=self.num_steps)
 
-    @jax.remat
-    def step(opt_state_key, batch):
-      opt_state, key = opt_state_key
-      p, s = opt.get_params_state(opt_state)
-      key, key1, key2 = jax.random.split(key, 3)
-      (l, s), g = jax.value_and_grad(
-          self.task.loss_with_state, has_aux=True)(p, s, key1, batch)
-      opt_state = opt.update(opt_state, g, loss=l, model_state=s, key=key2)
-      return (opt_state, key), l
+@gin.configurable
+class LOptTaskFamilyTask(base.Task):
+  """A learned optimizer meta-objective based on full length unrolls."""
 
-    key, key1 = jax.random.split(key)
-    scan_init = (opt_state, key1)
-    (opt_state, _), ls = jax.lax.scan(
-        step, scan_init, datas, length=self.num_steps)
-    ls = jax.vmap(self.task.normalizer)(ls)
-    l = jnp.mean(ls)
-    return l
+  def __init__(self,
+               task_family: base.TaskFamily,
+               lopt: lopt_base.LearnedOptimizer,
+               num_steps: int = 10,
+               outer_batch_size: int = 2):
+    self.task_family = task_family
+    self.lopt = lopt
+    self.num_steps = num_steps
+    self.outer_batch_size = outer_batch_size
+
+    if task_family.datasets:
+
+      def dataset_for_split(split):
+        while True:
+          yield training.get_batches(
+              task_family, [self.outer_batch_size, num_steps],
+              numpy=True,
+              split=split)
+
+      self.datasets = datasets_base.Datasets(
+          train=dataset_for_split("train"),
+          inner_valid=dataset_for_split("inner_valid"),
+          outer_valid=dataset_for_split("outer_valid"),
+          test=dataset_for_split("test"))
+    else:
+      self.datasets = None
+
+  def init(self, key):
+    return self.lopt.init(key)
+
+  def loss(self, params, key, datas):
+    opt = self.lopt.opt_fn(params)
+
+    def one_loss(datas, key):
+      key, key1 = jax.random.split(key)
+      task_param = self.task_family.sample(key1)
+      task = self.task_family.task_fn(task_param)
+      return unrolled_loss(task, opt, key, datas, self.num_steps)
+
+    keys = jax.random.split(key, self.outer_batch_size)
+    losses = jax.vmap(one_loss)(datas, keys)
+    return jnp.mean(losses)
 
 
 # pylint: disable=invalid-name
-
-
 @gin.configurable
 def LOpt_MLPLOpt_FahionMnist_100() -> base.Task:
   task = image_mlp.ImageMLP_FashionMnist8_Relu32()
