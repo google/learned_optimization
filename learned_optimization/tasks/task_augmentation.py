@@ -28,6 +28,7 @@ import chex
 import gin
 import jax
 import jax.numpy as jnp
+from learned_optimization import circular_buffer
 from learned_optimization import summary
 from learned_optimization import tree_utils
 from learned_optimization.tasks import base
@@ -389,3 +390,75 @@ def SubsampleDirectionsTaskGradient(task, directions=1, sign_direction=False):  
     return jax.tree_map(lambda x: jnp.sum(x, axis=0), dirs)
 
   return ModifyTaskGradient(task, subsample_many)
+
+
+@gin.configurable()
+class AsyncDelayedGradients(base.Task):
+  """A task wrapper which simulates stale gradients.
+
+  This is done by storing a circular buffer of past parameter values in the
+  tasks model_state.
+  """
+
+  def __init__(self, task: base.Task, delay_steps: int = 2):
+    """Initializer.
+
+    Args:
+      task: Task to wrap
+      delay_steps: Amount of staleness to use.
+    """
+
+    super().__init__()
+    self.task = task
+    self.delay_steps = delay_steps
+    abstract_shape = jax.eval_shape(self.task.init, jax.random.PRNGKey(0))
+    self.buffer = circular_buffer.CircularBuffer(abstract_shape,
+                                                 self.delay_steps)
+    self.datasets = task.datasets
+
+    self.loss_with_state_and_aux = jax.custom_vjp(self.loss_with_state_and_aux)
+
+    def f_fwd(params, state, key, batch):
+      buffer, state = state
+      last_params = self.buffer.gather_from_present(buffer,
+                                                    -self.delay_steps + 1)
+      buffer = self.buffer.add(buffer, params)
+      (loss, inner_state, aux), f_vjp = jax.vjp(task.loss_with_state_and_aux,
+                                                last_params, state, key, batch)
+      return (loss, (buffer, inner_state), aux), (f_vjp,)
+
+    def f_bwd(args, g):
+      (f_vjp,) = args
+      loss_g, state_g, aux_g = g
+      dparams, dstate, dkey, dbatch = f_vjp((loss_g, state_g[1], aux_g))
+      return (dparams, dstate, dkey, dbatch)
+
+    self.loss_with_state_and_aux.defvjp(f_fwd, f_bwd)
+
+  def init(self, key):
+    raise ValueError("Need to use init_with_state with this wrapper!")
+
+  def init_with_state(self, key):
+    params, state = self.task.init_with_state(key)
+    buffer = self.buffer.init()
+    for _ in range(self.delay_steps):
+      buffer = self.buffer.add(buffer, params)
+    return params, (buffer, state)
+
+  def loss(self, params, key, data):
+    raise ValueError("Need to use loss_with_state with this wrapper!")
+
+  def loss_with_state(self, params, state, key, data):
+    l, s, _ = self.loss_with_state_and_aux(params, state, key, data)
+    return l, s
+
+  def loss_with_aux(self, params, key, data):
+    raise ValueError("Need to use loss_with_state_and_aux with this wrapper!")
+
+  def loss_with_state_and_aux(self, params, state, key, data):
+    buffer, state = state
+    last_entry = self.buffer.gather_from_present(buffer, -self.delay_steps + 1)
+    loss, next_state, aux = self.task.loss_with_state_and_aux(
+        last_entry, state, key, data)
+    buffer = self.buffer.add(buffer, params)
+    return loss, (buffer, next_state), aux

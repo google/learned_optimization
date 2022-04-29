@@ -191,6 +191,10 @@ class TaskAugmentationTest(absltest.TestCase):
     task = task_augmentation.SubsampleDirectionsTaskGradient(task)
     test_utils.smoketest_task(task)
 
+  def test_AsyncDelayedGradients(self):
+    task = DummyTask()
+    task = task_augmentation.AsyncDelayedGradients(task, 4)
+    test_utils.smoketest_task(task)
 
 if __name__ == '__main__':
   absltest.main()
