@@ -16,7 +16,9 @@
 """Utilities for programs written in jax."""
 
 import functools
+
 import jax
+import jax.numpy as jnp
 import numpy as onp
 
 
@@ -31,3 +33,11 @@ def maybe_static_cond(pred, true_fn, false_fn, val):
 @functools.lru_cache(None)
 def cached_jit(fn, *args, **kwargs):
   return jax.jit(fn, *args, **kwargs)
+
+
+def maybe_do(pred, do_fn, operand):
+
+  def body_fn(_, operand):
+    return do_fn(operand)
+
+  return jax.lax.fori_loop(0, jnp.asarray(pred, jnp.int32), body_fn, operand)

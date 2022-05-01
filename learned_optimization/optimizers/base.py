@@ -88,6 +88,12 @@ class GradientClipOptimizer(Optimizer):
     self.opt = opt
     self.grad_clip = grad_clip
 
+  def get_params(self, state):
+    return self.opt.get_params(state)
+
+  def get_state(self, state):
+    return self.opt.get_state(state)
+
   def init(self, *args, **kwargs):
     return self.opt.init(*args, **kwargs)
 

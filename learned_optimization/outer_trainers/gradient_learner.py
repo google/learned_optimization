@@ -238,7 +238,7 @@ class GradientLearner:
     theta_opt_state = jax_utils.cached_jit(self._theta_opt.update)(
         theta_opt_state,
         grads,
-        mean_loss,
+        loss=mean_loss,
         key=key,
         model_state=next_model_state)
 
