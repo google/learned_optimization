@@ -22,9 +22,10 @@ To remedy this, we can "normalize" each different task. These normalizations
 are often built by running hand designed optimizers, and rescaling based on
 these.
 """
+
 from concurrent import futures
 import functools
-import io
+import json
 import os
 from typing import Any, Callable, Mapping, Sequence
 
@@ -35,6 +36,7 @@ from learned_optimization import jax_utils
 from learned_optimization.baselines import utils
 import numpy as onp
 import tqdm
+
 
 NormData = Any
 NormFN = Callable[[jnp.ndarray], jnp.ndarray]
@@ -85,7 +87,7 @@ def _speedup_over_adam_build(task_name: str) -> NormData:
   yp = onp.interp(xp, xs, bottom_env)
 
   yp = onp.minimum.accumulate(yp)
-  return (xp, yp)
+  return (xp.tolist(), yp.tolist())
 
 
 def _speedup_over_adam_make_func(norm_data: NormData) -> NormFN:
@@ -103,9 +105,20 @@ def _speedup_over_adam_make_func(norm_data: NormData) -> NormFN:
   yp = onp.asarray(yp)[::-1]
 
   def fn(x):
-    return jax_utils.cached_jit(jnp.interp)(x, yp, xp)
+    ret = jax_utils.cached_jit(jnp.interp)(x, yp, xp)
+    return jnp.where(jnp.isfinite(ret), ret, 0.0)
 
   return fn
+
+
+def _one_line_dumps(dd):
+  content = "{\n"
+  lines = []
+  for l, n in sorted(dd.items(), key=lambda x: x[0]):
+    lines.append("\"%s\":%s" % (l, json.dumps(n)))
+  content += ",\n".join(lines)
+  content += "\n}"
+  return content
 
 
 def speedup_over_adam_build_and_write(tasks: Sequence[str], output_path: str):
@@ -115,22 +128,19 @@ def speedup_over_adam_build_and_write(tasks: Sequence[str], output_path: str):
   for d, t in zip(flat_norm_datas, tasks):
     norm_datas[t] = d
 
-  ff = io.BytesIO()
-  onp.savez_compressed(ff, **norm_datas)
-  ff.seek(0)
-  ser_data = ff.read()
+  content = _one_line_dumps(norm_datas)
 
-  with filesystem.file_open(output_path, "wb") as f:
-    f.write(ser_data)
+  with filesystem.file_open(output_path, "w") as f:
+    f.write(content)
+  return content
 
 
 @functools.lru_cache(None)
 def speedup_over_adam_normalizer_map() -> Mapping[str, NormFN]:
   """Load the precomputed dictionary mapping from task name to a norm func."""
   path = os.path.join(
-      os.path.dirname(__file__), "data", "speedup_over_adam.pkl")
-  with filesystem.file_open(path, "rb") as f:
-    fileobj = io.BytesIO(bytes(f.read()))
-    data_dict = {k: v for k, v in onp.load(fileobj).items()}
+      os.path.dirname(__file__), "data", "speedup_over_adam.json")
+  with filesystem.file_open(path, "r") as f:
+    data_dict = json.loads(f.read())
 
   return {k: _speedup_over_adam_make_func(d) for k, d in data_dict.items()}

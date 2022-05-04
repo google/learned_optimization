@@ -69,6 +69,7 @@ class LOptTask(base.Task):
     self.task = task
     self.lopt = lopt
     self.num_steps = num_steps
+    self.normalizer = task.normalizer
 
     if task.datasets:
 
@@ -105,6 +106,9 @@ class LOptTaskFamilyTask(base.Task):
     self.lopt = lopt
     self.num_steps = num_steps
     self.outer_batch_size = outer_batch_size
+    with jax.ensure_compile_time_eval():
+      self.normalizer = task_family.sample_task(
+          jax.random.PRNGKey(0)).normalizer
 
     if task_family.datasets:
 

@@ -238,13 +238,15 @@ def _shampoo_make_lr(graft_type, block_size, opt_name):
   def _fn(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
     reps = 5
     cfgs = _lr_cfgs(task_name, "Shampoo", 10000, opt_name_override=opt_name)
+    new_cfgs = []
     for c in cfgs:
       # copy the config to make pytype happy.
       c = {k: v for k, v in c.items()}
       c["Shampoo.graft_type"] = graft_type
       c["Shampoo.block_size"] = block_size
-    paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
-    return list(cfgs) * reps, paths
+      new_cfgs.append(c)
+    paths = [(_save_dir_from_cfg(c), reps) for c in new_cfgs]
+    return list(new_cfgs) * reps, paths
 
   return _fn
 

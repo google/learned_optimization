@@ -45,6 +45,11 @@ class LOptTest(absltest.TestCase):
     obj = cfgobject.object_from_config(cfg1)
     self.assertIsInstance(obj, lopt.ParametricLOpt)
 
+  def test_timed_sample_lopt(self):
+    key = jax.random.PRNGKey(0)
+    sampled_task = lopt.timed_sample_lopt(key)
+    self.assertIsInstance(sampled_task, cfgobject.CFGObject)
+
 
 if __name__ == '__main__':
   absltest.main()

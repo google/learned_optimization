@@ -79,9 +79,12 @@ class SampleActivation:
   """Sample an activation function."""
   acts = [
       jax.nn.relu,
+      jax.nn.relu,
       jax.nn.relu6,
       jax.nn.selu,
-      jax.nn.selu,
+      jnp.tanh,
+      jnp.cos,
+      jnp.sin,
       jax.nn.sigmoid,
       jax.nn.silu,
       jax.nn.swish,

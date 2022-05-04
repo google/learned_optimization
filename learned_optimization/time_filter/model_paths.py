@@ -56,6 +56,12 @@ models = {
     ('sample_lm_transformer', 'valid'):
         'sample_lm_transformer/valid/tpu_TPUv4/20220426_212248.weights',
     # ^^ b'Train: 0.06122135370969772 Test: 0.06380010396242142\n'
+    ('sample_lopt', 'time'):
+        'sample_lopt/time/tpu_TPUv4/20220428_111614.weights',
+    # ^^ b'Train: 0.07645943760871887 Test: 0.07956771552562714\n'
+    ('sample_lopt', 'valid'):
+        'sample_lopt/valid/tpu_TPUv4/20220428_111622.weights',
+    # ^^ b'Train: 0.04880627244710922 Test: 0.05163209140300751\n'
     ('sample_vit', 'time'):
         'sample_vit/time/tpu_TPUv4/20220426_212651.weights',
     # ^^ b'Train: 0.18921709060668945 Test: 0.19060660898685455\n'

@@ -170,6 +170,16 @@ class TaskAugmentationTest(absltest.TestCase):
     self.assertEqual(p.dtype, jnp.bfloat16)
     test_utils.smoketest_task(task)
 
+  def test_ConvertFloatDTypeTaskFamily(self):
+    task_family = DummyTaskFamily()
+    task_family = task_augmentation.ConvertFloatDTypeTaskFamily(
+        task_family, dtype=jnp.bfloat16)
+    task = task_family.sample_task(jax.random.PRNGKey(0))
+    params = task.init(jax.random.PRNGKey(0))
+    p = jax.tree_leaves(params)[0]
+    self.assertEqual(p.dtype, jnp.bfloat16)
+    test_utils.smoketest_task_family(task_family)
+
   def test_ModifyTaskGradient(self):
     task = DummyTask()
     fn = lambda tree, key: jax.tree_map(lambda x: x * 0 + 9, tree)
@@ -186,15 +196,31 @@ class TaskAugmentationTest(absltest.TestCase):
     task = task_augmentation.SubsampleDirectionsTaskGradient(task, directions=4)
     test_utils.smoketest_task(task)
 
+  def test_SubsampleDirectionsTaskGradientTaskFamily(self):
+    task_family = task_augmentation.SubsampleDirectionsTaskGradientTaskFamily(
+        DummyTaskFamily(), directions=4)
+    test_utils.smoketest_task_family(task_family)
+
   def test_NormalizeTaskGradient(self):
     task = DummyTask()
-    task = task_augmentation.SubsampleDirectionsTaskGradient(task)
+    task = task_augmentation.NormalizeTaskGradient(task)
     test_utils.smoketest_task(task)
+
+  def test_NormalizeTaskGradientTaskFamily(self):
+    task_family = task_augmentation.NormalizeTaskGradientTaskFamily(
+        DummyTaskFamily())
+    test_utils.smoketest_task_family(task_family)
 
   def test_AsyncDelayedGradients(self):
     task = DummyTask()
     task = task_augmentation.AsyncDelayedGradients(task, 4)
     test_utils.smoketest_task(task)
+
+  def test_AsyncDelayedGradientsTaskFamily(self):
+    task_family = DummyTaskFamily()
+    task_family = task_augmentation.AsyncDelayedGradientsTaskFamily(
+        task_family, 4)
+    test_utils.smoketest_task_family(task_family)
 
 if __name__ == '__main__':
   absltest.main()

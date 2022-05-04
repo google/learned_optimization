@@ -264,6 +264,26 @@ class ReducedBatchsizeFamily(base.TaskFamily):
     self.sample = task_family.sample
 
 
+class WrappedTaskFamilyWithTaskWrapper(base.TaskFamily):
+  """Wrap a task family with a Task augmentation."""
+
+  def __init__(self, task_family: base.TaskFamily,
+               task_wrapper: Callable[[base.Task], base.Task]):
+    super().__init__()
+    self.task_family = task_family
+    self.datasets = task_family.datasets
+    self.task_wrapper = task_wrapper
+
+  def task_fn(self, cfg: cfgobject.CFGNamed) -> base.Task:
+    task = self.task_family.task_fn(cfg.values["inner_cfg"])
+    return self.task_wrapper(task)
+
+  def sample(self, key: chex.PRNGKey) -> cfgobject.CFGNamed:
+    cfg = self.task_family.sample(key)
+    return cfgobject.CFGNamed("WrappedTaskFamilyWithTaskWrapper",
+                              {"inner_cfg": cfg})
+
+
 class ConvertFloatDType(base.Task):
   """Convert the parameters and data type of a task."""
 
@@ -272,6 +292,7 @@ class ConvertFloatDType(base.Task):
     self.task = task
     self.datasets = self.task.datasets
     self.dtype = dtype
+    self.normalizer = task.normalizer
 
   def loss_with_state(self, params, state, key, data):
     f = lambda x: jnp.asarray(x, self.dtype) if x.dtype == jnp.float32 else x
@@ -290,6 +311,12 @@ class ConvertFloatDType(base.Task):
   def init(self, key):
     params, _ = self.init_with_state(key)
     return params
+
+
+@gin.configurable
+def ConvertFloatDTypeTaskFamily(task_family, dtype=jnp.bfloat16):  # pylint: disable=invalid-name
+  partial = functools.partial(ConvertFloatDType, dtype=dtype)
+  return WrappedTaskFamilyWithTaskWrapper(task_family, partial)
 
 
 @gin.configurable
@@ -348,6 +375,11 @@ def NormalizeTaskGradient(task):  # pylint: disable=invalid-name
   return ModifyTaskGradient(task, norm_fn)
 
 
+@gin.configurable
+def NormalizeTaskGradientTaskFamily(task_family):  # pylint: disable=invalid-name
+  return WrappedTaskFamilyWithTaskWrapper(task_family, NormalizeTaskGradient)
+
+
 def _sample_perturbations(variables: chex.ArrayTree,
                           key: chex.PRNGKey) -> chex.ArrayTree:
   flat, tree_def = jax.tree_flatten(variables)
@@ -392,6 +424,18 @@ def SubsampleDirectionsTaskGradient(task, directions=1, sign_direction=False):  
   return ModifyTaskGradient(task, subsample_many)
 
 
+@gin.configurable
+def SubsampleDirectionsTaskGradientTaskFamily(  # pylint: disable=invalid-name
+    task_family,
+    directions: int = 1,
+    sign_direction: bool = False):
+  partial = functools.partial(
+      SubsampleDirectionsTaskGradient,
+      directions=directions,
+      sign_direction=sign_direction)
+  return WrappedTaskFamilyWithTaskWrapper(task_family, partial)
+
+
 @gin.configurable()
 class AsyncDelayedGradients(base.Task):
   """A task wrapper which simulates stale gradients.
@@ -415,6 +459,7 @@ class AsyncDelayedGradients(base.Task):
     self.buffer = circular_buffer.CircularBuffer(abstract_shape,
                                                  self.delay_steps)
     self.datasets = task.datasets
+    self.normalizer = task.normalizer
 
     self.loss_with_state_and_aux = jax.custom_vjp(self.loss_with_state_and_aux)
 
@@ -462,3 +507,9 @@ class AsyncDelayedGradients(base.Task):
         last_entry, state, key, data)
     buffer = self.buffer.add(buffer, params)
     return loss, (buffer, next_state), aux
+
+
+@gin.configurable
+def AsyncDelayedGradientsTaskFamily(task_family, delay_steps: int = 1):  # pylint: disable=invalid-name
+  partial = functools.partial(AsyncDelayedGradients, delay_steps=delay_steps)
+  return WrappedTaskFamilyWithTaskWrapper(task_family, partial)

@@ -229,9 +229,10 @@ def progress_or_reset_inner_opt_state(
     task_param = task_family.sample(key1)
     s, p = task_family.task_fn(task_param).init_with_state(key2)
 
-    opt_state = opt.init(s, p, num_steps=num_steps, key=key3)
+    next_inner_opt_state = opt.init(s, p, num_steps=num_steps, key=key3)
     summary.summary("opt_init_num_steps", num_steps)
-    return opt_state, task_param, jnp.asarray(0), jnp.asarray(0.)
+
+    return next_inner_opt_state, task_param, jnp.asarray(0), jnp.asarray(0.)
 
   def false_fn(key):
     """Train one step of the inner-problem."""
@@ -272,7 +273,8 @@ def progress_or_reset_inner_opt_state(
         inner_opt_state, g, loss=l, model_state=s, key=key2)
     next_inner_step = inner_step + 1
 
-    return next_inner_opt_state, task_param, next_inner_step, meta_loss
+    return next_inner_opt_state, task_param, next_inner_step, jnp.asarray(
+        meta_loss, dtype=jnp.float32)
 
   next_inner_opt_state, task_param, next_inner_step, meta_loss = cond_fn(
       jnp.logical_not(is_done), false_fn, true_fn, key)

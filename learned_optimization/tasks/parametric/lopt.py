@@ -28,6 +28,8 @@ from learned_optimization.tasks.fixed import lopt as lopt_mod
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import image_mlp as para_image_mlp
 from learned_optimization.tasks.parametric import parametric_utils
+from learned_optimization.time_filter import model_paths
+from learned_optimization.time_filter import time_model
 
 Batch = Any
 Params = Any
@@ -110,3 +112,15 @@ def sample_lopt(key: chex.PRNGKey) -> cfgobject.CFGObject:
           "num_steps": num_steps,
           "outer_batch_size": outer_bs,
       })
+
+
+@gin.configurable()
+def timed_sample_lopt(key: chex.PRNGKey, max_time: float = 1e-4):
+  model_path = model_paths.models[("sample_lopt", "time")]
+  valid_path = model_paths.models[("sample_lopt", "valid")]
+  return time_model.rejection_sample(
+      sample_lopt,
+      model_path,
+      key,
+      max_time,
+      model_path_valid_suffix=valid_path)
