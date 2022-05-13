@@ -57,11 +57,15 @@ def current_summary_prefix():
 
 
 @contextlib.contextmanager
-def summary_scope(val):
+def summary_scope(val: str):
+  """Add a prefix to all summaries computed inside this context manager."""
   if val:
     _summary_scope_stack.append(val)
-    yield
-    _summary_scope_stack.pop(-1)
+    try:
+      yield
+    finally:
+      _summary_scope_stack.pop(-1)
+
   else:
     yield
 
@@ -143,7 +147,9 @@ def sample_value(key: PRNGKey, val: jnp.ndarray) -> jnp.ndarray:
 
 
 def aggregate_metric_list(
-    metric_list: Sequence[Mapping[str, jnp.ndarray]]
+    metric_list: Sequence[Mapping[str, jnp.ndarray]],
+    use_jnp=False,
+    key=None,
 ) -> MutableMapping[str, jnp.ndarray]:
   """Aggregate a list of dict of metrics into a single dict of metrics."""
   all_metrics = collections.defaultdict(list)
@@ -156,28 +162,43 @@ def aggregate_metric_list(
       all_metrics[k].append(v)
 
   metrics = {}
-  for k, vs in all_metrics.items():
-    metrics[k] = aggregate_metric(k, vs)
+  if use_jnp:
+    assert key is not None
+    keys = jax.random.split(key, len(all_metrics))
+  else:
+    keys = [None] * len(all_metrics)
+  for ki, (k, vs) in enumerate(all_metrics.items()):
+    metrics[k] = aggregate_metric(k, vs, use_jnp=use_jnp, key=keys[ki])
   return metrics
 
 
-def aggregate_metric(k: str, vs: Sequence[jnp.ndarray]) -> onp.ndarray:
+def aggregate_metric(k: str,
+                     vs: Sequence[jnp.ndarray],
+                     use_jnp=False,
+                     key=None) -> onp.ndarray:
   """Combine a sequence of metrics into a single value."""
+  xnp = jnp if use_jnp else onp
   assert "||" in k, f"bad summary -- {k}"
   agg, _ = k.split("||")
-  # summaries don't have to be the same length. lets ensure there all onp though
-  vs = [onp.asarray(v) for v in vs]
+  # summaries don't have to be the same length. lets ensure there all xnp though
+  vs = [xnp.asarray(v) for v in vs]
 
   if agg == AggregationType.mean:
+    # size is known at compile time.
     size = onp.sum([onp.prod(v.shape) for v in vs])
-    return onp.sum([onp.sum(v) / size for v in vs])
+    return xnp.sum(xnp.asarray([xnp.sum(v) / size for v in vs]))
   elif agg == AggregationType.sample:
-    vs = onp.concatenate([onp.asarray(v).ravel() for v in vs], axis=0)
-    i = onp.random.randint(0, len(vs), dtype=onp.int32)
+    vs = xnp.concatenate([xnp.asarray(v).ravel() for v in vs], axis=0)
+    if use_jnp:
+      assert key is not None
+      i = jax.random.randint(key, [], 0, len(vs))
+    else:
+      i = onp.random.randint(0, len(vs), dtype=xnp.int32)
+
     return vs[i]
   elif agg == AggregationType.collect:
     # This might be multi dim if vmap is used, so ravel first.
-    return onp.concatenate([onp.asarray(v).ravel() for v in vs], axis=0)
+    return xnp.concatenate([xnp.asarray(v).ravel() for v in vs], axis=0)
   elif agg == AggregationType.none:
     if len(vs) != 1:
       raise ValueError("when using no aggregation one must ensure only scalar "
@@ -187,7 +208,7 @@ def aggregate_metric(k: str, vs: Sequence[jnp.ndarray]) -> onp.ndarray:
     if val.size != 1:
       raise ValueError("Value with none aggregation type was not a scalar?"
                        f" Found {val}")
-    return onp.reshape(val, ())
+    return xnp.reshape(val, ())
   else:
     raise ValueError(f"Unsupported Aggregation type {agg}")
 
