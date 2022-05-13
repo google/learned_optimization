@@ -18,6 +18,7 @@ import collections
 import contextlib
 import enum
 import functools
+import inspect
 import typing
 from typing import Any, Callable, Mapping, Sequence, Tuple, TypeVar, Union, MutableMapping
 
@@ -325,6 +326,19 @@ def add_with_summary(fn: F, static_argnums=()) -> G:
         del kwargs["sample_rng_key"]
       return fn(*args, **kwargs), {}
 
+  # We have added a new keyword parameter. Make sure that either the
+  # function has a var-keyword parameter or add a new keyword-only parameter to
+  # its signature. JAX looks at the signature when validating things like
+  # static_argnames on jax.jit, so it is important that it is accurate.
+  sig = inspect.signature(fn)
+  has_var_kwarg = inspect.Parameter.VAR_KEYWORD in (
+      p.kind for p in sig.parameters.values())
+  if not has_var_kwarg and "with_summary" not in sig.parameters.keys():
+    params = list(sig.parameters.values())
+    params.append(inspect.Parameter(
+        "with_summary", inspect.Parameter.KEYWORD_ONLY, default=False))
+    sig = sig.replace(parameters=tuple(params))
+  _fn.__signature__ = sig
   return _fn
 
 
