@@ -105,13 +105,23 @@ def map_named(function: Callable[[str, Any], Any],
     Struct with the same pytree.
   """
   if isinstance(val, Mapping):
-    return type(val)(**{
-        key + "/" + k: map_named(function, v, key + "/" + k)
-        for k, v in val.items()
-    })
+    return type(val)(
+        **{k: map_named(function, v, key + "/" + k) for k, v in val.items()})
   elif isinstance(val, tuple) or isinstance(val, list):
     return type(val)(
         *
         [map_named(function, v, key + "/" + str(i)) for i, v in enumerate(val)])
   else:
     return function(key, val)
+
+
+def strip_weak_type(pytree):
+
+  def maybe_remove_weak(x):
+    if not isinstance(x, jnp.ndarray):
+      x = jnp.asarray(x)
+    if x.weak_type:
+      x.weak_type = False
+    return x
+
+  return jax.tree_map(maybe_remove_weak, pytree)
