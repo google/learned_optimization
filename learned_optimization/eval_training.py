@@ -24,6 +24,7 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 from learned_optimization import profile
+from learned_optimization import jax_utils
 from learned_optimization import summary
 from learned_optimization import training
 from learned_optimization import tree_utils
@@ -154,8 +155,10 @@ def single_task_training_curves(
     key = jax.device_put(key, device)
 
     key, key1 = jax.random.split(key)
-    p, s = task.init_with_state(key)
-    opt_state = opt.init(p, s, num_steps=num_steps)
+    p, s = jax_utils.cached_jit(task.init_with_state)(key)
+    opt_state = jax_utils.cached_jit(
+        opt.init, static_argnames=("num_steps",))(
+            p, s, num_steps=num_steps)
 
     losses = []
     eval_auxs = []
