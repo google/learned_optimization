@@ -18,6 +18,8 @@
 This is useful for loading optimizers created with the code in
 `learned_optimization/outer_train.py`.
 """
+
+import functools
 from typing import Optional
 import uuid
 
@@ -26,6 +28,7 @@ import gin
 import jax
 from learned_optimization import checkpoints
 from learned_optimization import filesystem
+from learned_optimization import outer_train  # pylint: disable=unused-import
 from learned_optimization import summary
 from learned_optimization.optimizers import base as opt_base
 from learned_optimization.outer_trainers import gradient_learner
@@ -58,6 +61,9 @@ class _GinScopeClass:
 
     return _fn
 
+  # wrap with lru_cache so that the methods returned are always the same and
+  # thus will be cached properly when jit.
+  @functools.lru_cache(None)
   def __getattr__(self, *args):
     if self.has_locked:
       ret = self.ginned.__getattribute__(*args)  # pytype: disable=attribute-error
@@ -102,9 +108,6 @@ def opt_from_checkpoint(
 
   logging.info("Restoring configs from: %s", config_path)
   with gin.unlock_config():
-
-    from learned_optimization import outer_train as _  # pylint: disable=g-import-not-at-top
-
     scope = f"opt_from_checkpoint__{str(uuid.uuid4()).replace('-', '_')}"
     with gin.config_scope(None):
       with gin.config_scope(scope):
@@ -134,6 +137,9 @@ def opt_from_checkpoint(
           gin.parse_config(bindings, skip_unknown=True)
 
         configurable = gin.query_parameter(f"{scope}/run_train.lopt")
+        if isinstance(configurable, gin.config._UnknownConfigurableReference):  # pylint: disable=protected-access
+          raise ValueError("Gin couldn't find the learned optimizer in current"
+                           " imports. Did you forget to import the module?")
 
         with summary.summary_scope("opt_from_checkpoint"):
           lopt = configurable.configurable.wrapped()
@@ -142,4 +148,8 @@ def opt_from_checkpoint(
           ckpt = gradient_learner.ParameterCheckpoint(theta, "", 0)
           ckpt = checkpoints.load_state(checkpoint_path, ckpt)
           opt = lopt.opt_fn(ckpt.params)
-          return _GinScopeClass(opt, scope)  # type: ignore
+          wrapped = _GinScopeClass(opt, scope)
+          # For now, just add the lopt to the returned class.
+          # TODO(lmetz) change this api to return a more structured class?
+          wrapped.lopt = lopt
+          return wrapped  # type: ignore
