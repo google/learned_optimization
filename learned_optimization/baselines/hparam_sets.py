@@ -232,6 +232,16 @@ for n in _names:
   gin.external_configurable(locals()[_set_name], _set_name)
 
 
+@gin.configurable
+def SM3beta2_999_LR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "SM3", 10000, opt_name_override="SM3beta2_999")
+  for c in cfgs:
+    c["SM3.b2"] = 0.999  # pytype: disable=unsupported-operands
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
 def _shampoo_make_lr(graft_type, block_size, opt_name):
   """Make learning rate sweep for the shampoo optimizer."""
 

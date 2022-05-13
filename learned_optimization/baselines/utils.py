@@ -133,6 +133,16 @@ def delete_saved_task_data(task_name):
     filesystem.remove(p)
 
 
+def delete_archive(archive_name, task_name):
+  p = os.path.join(get_baseline_archive_rootdir(), task_name,
+                   archive_name + ".npz")
+  try:
+    filesystem.remove(p)
+    print("Deleted", p)
+  except Exception as e:  # pylint: disable=broad-except
+    pass
+
+
 def get_save_dir(task_name: str,
                  opt_name: str,
                  num_steps: int,

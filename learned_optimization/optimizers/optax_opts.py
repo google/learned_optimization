@@ -356,12 +356,26 @@ def _expand_scalar(x, r):
   return jnp.expand_dims(x, 0) if r else x
 
 
+def _sm3(
+    learning_rate: float,
+    momentum: float = 0.9,
+    b2: float = 1.0,
+):
+  return optax.chain(
+      optax.scale_by_sm3(momentum, b2=b2),
+      optax.scale(-learning_rate),
+  )
+
+
 @gin.configurable
 class SM3(OptaxOptimizer):
   """SM3 optimizer."""
 
-  def __init__(self, learning_rate: float, momentum: float = 0.9):
-    opt = optax.sm3(learning_rate=learning_rate, momentum=momentum)
+  def __init__(self,
+               learning_rate: float,
+               momentum: float = 0.9,
+               b2: float = 1.0):
+    opt = _sm3(learning_rate=learning_rate, momentum=momentum, b2=b2)
     super().__init__(opt)
 
   # SM3 doesn't support scalars, so we have to reshape the params and grads.
