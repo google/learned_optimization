@@ -130,8 +130,9 @@ class TaskGroupChief(threading.Thread):
 
       try:
         hash(task_group)
-      except Exception:
-        raise ValueError("Must be able to hash the task_group!")
+      except Exception as unused_e:
+        raise ValueError(f"Must be able to hash the task_group!"  # pylint: disable=raise-missing-from
+                         f" Got: {task_group}")
 
       self._tasks_in_taskgroup[task_group] = [
           TaskAndResult(eval_task=t, result=None) for t in eval_tasks

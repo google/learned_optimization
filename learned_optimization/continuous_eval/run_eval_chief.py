@@ -64,13 +64,16 @@ def _retry_copy(src, target):
   filesystem.copy(src, target)
 
 
+@gin.configurable()
 def monitor_checkpoint_dir(
     log_dir: str,
     monitor_dir: str,
     copy_name: str = "default",
     prefix_to_monitor: str = "params_",
     prefix_to_copy: Sequence[str] = ("params_", "checkpoint_"),
-    sleep_time: float = 10.) -> Iterator[Tuple[int, Mapping[str, str]]]:
+    sleep_time: float = 10.,
+    only_return_latest: bool = True,
+) -> Iterator[Tuple[int, Mapping[str, str]]]:
   """Monitor a directory for checkpoints.
 
   This function blocks until a new checkpoint is found. This function then
@@ -92,6 +95,8 @@ def monitor_checkpoint_dir(
       checkpoint exists.
     prefix_to_copy: Sequence of prefix to copy.
     sleep_time: Number of seconds to wait before searching.
+    only_return_latest: Only return the latest checkpoint, or always return
+      the next checkpoint in the sequence.
 
   Yields:
     a tuple containing the index, and a dictionary mapping prefix to coppied
@@ -105,14 +110,25 @@ def monitor_checkpoint_dir(
 
   while True:
     with profile.Profile("waiting"):
-      last_idx = _last_checkpoint_idx(monitor_dir, prefix_to_monitor)
-      logging.info(f"Last checkpoint found: {last_idx}. But on current {step}")  # pylint: disable=logging-fstring-interpolation
-      if last_idx is None or last_idx <= step:
-        time.sleep(sleep_time)
-        continue
+      if only_return_latest:
+        next_ckpt_idx = _last_checkpoint_idx(monitor_dir, prefix_to_monitor)
+        logging.info(  # pylint: disable=logging-fstring-interpolation
+            f"Last checkpoint found: {next_ckpt_idx}. But on current {step}")  # pylint: disable=logging-fstring-interpolation
+        if next_ckpt_idx is None or next_ckpt_idx <= step:
+          time.sleep(sleep_time)
+          continue
+      else:
+        # check if the next idx exists.
+        next_path = os.path.join(monitor_dir,
+                                 f"{prefix_to_monitor}{int(step)+1}")
+        if filesystem.exists(next_path):
+          next_ckpt_idx = int(step) + 1
+        else:
+          time.sleep(sleep_time)
+          continue
 
     with profile.Profile("writing evaluation worker chief ckpt"):
-      step = last_idx
+      step = next_ckpt_idx
       checkpoints.save_checkpoint(
           log_dir,
           step,
@@ -125,13 +141,14 @@ def monitor_checkpoint_dir(
       fs = []
       prefix_to_copy_path = {}
       for prefix in prefix_to_copy:
-        got_path = os.path.join(monitor_dir, f"{prefix}{last_idx}")
-        copy_path = os.path.join(monitor_dir, f"{copy_name}_{prefix}{last_idx}")
+        got_path = os.path.join(monitor_dir, f"{prefix}{next_ckpt_idx}")
+        copy_path = os.path.join(monitor_dir,
+                                 f"{copy_name}_{prefix}{next_ckpt_idx}")
         prefix_to_copy_path[prefix] = copy_path
         fs.append(executor.submit(_retry_copy, got_path, copy_path))
       # block until all copy are done.
       _ = [f.result() for f in fs]
-    yield (last_idx, flax.core.FrozenDict(prefix_to_copy_path))
+    yield (next_ckpt_idx, flax.core.FrozenDict(prefix_to_copy_path))
 
 
 @profile.wrap()
@@ -470,7 +487,8 @@ GinRequired = Any
 @gin.configurable
 def run_evaluation_chief(train_log_dir: str,
                          evaluation_set: Union[Sequence[EvalTaskConfig],
-                                               GinRequired] = gin.REQUIRED):
+                                               GinRequired] = gin.REQUIRED,
+                         skip_checkpoints_if_busy=True):
   """Run the evaluation chief.
 
   This starts the task queue, a thread to monitor it and write, and monitors
@@ -481,6 +499,10 @@ def run_evaluation_chief(train_log_dir: str,
     evaluation_set: The evaluation set to compute evaluations on. These are
       lists of tuples, where the first element of the tuple is a list of gin
       config strings, and the second is the name of the task.
+    skip_checkpoints_if_busy: If all evaluation workers are busy, skip the
+      checkpoint. Otherwise, add the checkpoint to the list of checkpoints
+      to eval. If this flag is set to false, one runs the risk that eval jobs
+      will lag behind the training jobs.
   """
 
   if evaluation_set == gin.REQUIRED:
@@ -524,13 +546,14 @@ def run_evaluation_chief(train_log_dir: str,
                  str(num_tasks), str(worker_active))
     skip = False
 
-    # if there are tasks not yet started, skip
-    if num_tasks > 0:
-      skip = True
+    if skip_checkpoints_if_busy:
+      # if there are tasks not yet started, skip
+      if num_tasks > 0:
+        skip = True
 
-    # if >99% of the workers are busy, skip
-    if float(worker_active) / float(num_workers) > .99:
-      skip = True
+      # if >99% of the workers are busy, skip
+      if float(worker_active) / float(num_workers) > .99:
+        skip = True
 
     if not skip:
       with profile.Profile("add_task_group"):

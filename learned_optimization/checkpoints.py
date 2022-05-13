@@ -36,6 +36,7 @@ from flax.training import checkpoints
 import gin
 import haiku as hk
 import jax
+import jax.numpy as jnp
 from learned_optimization import filesystem
 from learned_optimization import profile
 
@@ -83,7 +84,11 @@ def restore_checkpoint(ckpt_dir: str, value: T, prefix: str) -> T:
 
 
 @profile.wrap()
-def save_checkpoint(ckpt_dir: str, prefix: str, value: Any, step: int) -> str:
+def save_checkpoint(ckpt_dir: str,
+                    prefix: str,
+                    value: Any,
+                    step: int,
+                    keep: int = 20) -> str:
   """Saves a checkpoint.
 
   Args:
@@ -91,6 +96,7 @@ def save_checkpoint(ckpt_dir: str, prefix: str, value: Any, step: int) -> str:
     prefix: prefix of checkpoint.
     value: a pytree to save
     step: the step of the checkpoint.
+    keep: number of checkpoints to keep
 
   Returns:
     the path of the saved checkpoint.
@@ -101,7 +107,7 @@ def save_checkpoint(ckpt_dir: str, prefix: str, value: Any, step: int) -> str:
     filesystem.remove(path)
 
   path = checkpoints.save_checkpoint(
-      ckpt_dir, value, step, keep=5, prefix=prefix, overwrite=True)
+      ckpt_dir, value, step, keep=keep, prefix=prefix, overwrite=True)
   return path
 
 
@@ -111,17 +117,25 @@ _last_checkpoint_time = collections.defaultdict(lambda: -1)
 @gin.configurable
 def periodically_save_checkpoint(
     train_log_dir: str,
+    current_iteration: Union[jnp.ndarray, int],
     checkpoint_state_map: Mapping[str, Union[Any, Callable[[], Any]]],
-    time_interval: int = 10 * 60) -> Optional[Mapping[str, str]]:
-  """Maybe a checkpoint based on how much time has elapsed.
+    time_interval: Optional[int] = 10 * 60,
+    step_interval: Optional[int] = None,
+    keep: int = 20,
+) -> Optional[Mapping[str, str]]:
+  """Maybe a checkpoint based on how much time or steps have elapsed.
 
   If a checkpoint is saved, return the paths otherwise return None.
+  Either time_interval or step_interval must be set.
 
   Args:
-    train_log_dir: directory to save checkpoints
+    train_log_dir: directory to save checkpoints.
+    current_iteration: current iteration of the training loop.
     checkpoint_state_map: A dictionary mapping from prefix to pytree value to be
       saved OR prefix to a callable returning a pytree value to be saved.
-    time_interval: number of seconds between checkpoint
+    time_interval: number of seconds between checkpoint or None.
+    step_interval: number of steps between checkpoint or None.
+    keep: number of checkpoints to keep before deleting old checkpoints.
 
   Returns:
     If a checkpoint was saved, a map from prefix to filename. Otherwise None.
@@ -130,7 +144,15 @@ def periodically_save_checkpoint(
 
   prefix = sorted(checkpoint_state_map.keys())[0]
 
-  if time.time() - _last_checkpoint_time[prefix] > time_interval:
+  if time_interval is not None and step_interval is not None:
+    raise ValueError("Only one interval can be active!")
+
+  if time_interval is not None:
+    do_save = time.time() - _last_checkpoint_time[prefix] > time_interval
+  elif step_interval is not None:
+    do_save = (current_iteration % step_interval == 0)
+
+  if do_save:
     # if a checkpoint exists already, delete it.
     paths = {}
 
@@ -151,7 +173,7 @@ def periodically_save_checkpoint(
       else:
         value = value_or_fn
 
-      path = save_checkpoint(train_log_dir, prefix, value, step)
+      path = save_checkpoint(train_log_dir, prefix, value, step, keep=keep)
       paths[prefix] = path
       _last_checkpoint_time[prefix] = time.time()
 

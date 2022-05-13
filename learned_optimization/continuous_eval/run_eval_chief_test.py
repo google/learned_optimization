@@ -206,6 +206,51 @@ class RunEvalChiefTest(absltest.TestCase):
     self.assertEqual(gen_id, "my_genid")
     self.assertEqual(params_path, "path/blah_checkpoint_123")
 
+  def test_monitor_checkpoint_dir_return_all(self):
+    # Timeouts here mean failure / locking!
+    log_dir = os.path.join(tempfile.gettempdir(), "log_dir")
+    monitor_dir = os.path.join(tempfile.gettempdir(), "monitor_dir")
+
+    if os.path.exists(monitor_dir):
+      shutil.rmtree(monitor_dir)
+    if os.path.exists(log_dir):
+      shutil.rmtree(log_dir)
+
+    monitor_iter = run_eval_chief.monitor_checkpoint_dir(
+        log_dir,
+        monitor_dir,
+        sleep_time=1,
+        prefix_to_copy=("params_",),
+        prefix_to_monitor="params_",
+        copy_name="default",
+        only_return_latest=False)
+
+    with futures.ThreadPoolExecutor(4) as ex:
+      # start to grab the next directory.
+      future = ex.submit(lambda: next(monitor_iter))
+      time.sleep(1)
+      os.makedirs(monitor_dir)
+
+      # simulated creating a new checkpoint.
+      p = os.path.join(monitor_dir, "params_1")
+      with open(p, "w") as f:
+        f.write("hi")
+      # Check that the monitor picked it up.
+      checkpoint_idx, mapping = future.result()
+      self.assertEqual(checkpoint_idx, 1)
+      self.assertEqual(mapping["params_"],
+                       os.path.join(monitor_dir, "default_params_1"))
+
+      # Now make 8 more checkpoints before poping them off iterator.
+      for i in range(2, 10):
+        p = os.path.join(monitor_dir, f"params_{i}")
+        with open(p, "w") as f:
+          f.write("hi")
+
+      for i in range(2, 10):
+        checkpoint_idx, mapping = next(monitor_iter)
+        self.assertEqual(checkpoint_idx, i)
+
   def test_write_results_thread_main(self):
     chief = FakeChief()
     summary_writer = summary.InMemorySummaryWriter()

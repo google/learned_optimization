@@ -191,6 +191,43 @@ class OuterTrainTest(parameterized.TestCase):
           stochastic_resample_frequency=200,
       )
 
+  def test_local_train_truncated_pes_fixed_tasks(self):
+    gin.clear_config()
+
+    with tempfile.TemporaryDirectory() as train_log_dir:
+      lopt = lopt_base.LearnableSGD()
+
+      task_family = lambda: quadratics.FixedDimQuadraticFamilyData(10)
+      gin.bind_parameter(
+          "build_gradient_estimators_fixed.list_of_task_family_per_machine",
+          [[task_family]])
+
+      gin.bind_parameter(
+          "build_gradient_estimators_fixed.gradient_estimator_fn",
+          truncated_pes.TruncatedPES)
+
+      sched = truncation_schedule.ConstantTruncationSchedule(10)
+      gin.bind_parameter(
+          "build_gradient_estimators_fixed.truncated_step_fn",
+          functools.partial(
+              lopt_truncated_step.VectorizedLOptTruncatedStep,
+              num_tasks=2,
+              trunc_sched=sched))
+
+      outer_learner = gradient_learner.GradientLearner(lopt, optax_opts.Adam())
+
+      outer_train.local_train(
+          train_log_dir,
+          outer_learner=outer_learner,
+          num_estimators=1,
+          summary_every_n=3,
+          num_steps=10,
+          num_seconds=0,
+          lopt=lopt,
+          stochastic_resample_frequency=200,
+          sample_estimators_fn=outer_train.build_gradient_estimators_fixed,
+      )
+
 
 if __name__ == "__main__":
   absltest.main()

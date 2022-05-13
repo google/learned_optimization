@@ -81,6 +81,7 @@ def build_gradient_estimators(
     .VectorizedLOptTruncatedStep,
     key: PRNGKey,
     num_gradient_estimators: int,
+    worker_id: int,
 ) -> Sequence[gradient_learner.GradientEstimator]:
   """Build gradient estimators.
 
@@ -99,15 +100,72 @@ def build_gradient_estimators(
     num_gradient_estimators: number of gradient estimators to construct. This is
       for averaging multiple gradient estimators (or the same type of gradient
       estimator but computing gradients over different task family).
+    worker_id: Id of the worker. Unused in this version.
 
   Returns:
     A sequence of gradient estimators for use in meta-training.
   """
+  del worker_id
   estimators = []
   for _ in range(num_gradient_estimators):
     key, key1 = jax.random.split(key)
     task_family = sample_task_family_fn(key1)
     truncated_step = truncated_step_fn(task_family, learned_opt)
+    gradient_estimator = gradient_estimator_fn(truncated_step)
+    estimators.append(gradient_estimator)
+  return estimators
+
+
+ListListTaskFamilyFn = Sequence[Sequence[Callable[[], tasks_base.TaskFamily]]]
+
+
+@profile.wrap()
+@gin.configurable
+def build_gradient_estimators_fixed(
+    *,
+    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,
+    list_of_task_family_per_machine: ListListTaskFamilyFn = gin.REQUIRED,
+    gradient_estimator_fn: Callable[
+        [truncated_step_mod.VectorizedTruncatedStep],
+        gradient_learner.GradientLearner] = gin.REQUIRED,
+    truncated_step_fn: Callable[
+        [tasks_base.TaskFamily, lopt_base.LearnedOptimizer],
+        truncated_step_mod.VectorizedTruncatedStep] = lopt_truncated_step
+    .VectorizedLOptTruncatedStep,
+    key: PRNGKey,
+    num_gradient_estimators: int,
+    worker_id: int,
+) -> Sequence[gradient_learner.GradientEstimator]:
+  """Build gradient estimators from a fixed list of task family fn.
+
+  This is used for meta-training on a fixed set of tasks.
+  This function is meant to be configured with gin.
+
+  Args:
+    learned_opt: Learned optimizer instance to estimate gradients of.
+    list_of_task_family_per_machine: List of lists with tasks each worker should
+      run.
+    gradient_estimator_fn: Callable that returns the GradientEstimator to
+      estimate gradients with. This function is often just the class of the
+      gradient estimator.
+    truncated_step_fn: Callable that returns a TruncatedStep for use in the
+      gradient estimator.
+    key: jax rng
+    num_gradient_estimators: number of gradient estimators to construct. This is
+      for averaging multiple gradient estimators (or the same type of gradient
+      estimator but computing gradients over different task family).
+    worker_id: idx of the current worker.
+
+  Returns:
+    A sequence of gradient estimators for use in meta-training.
+  """
+  del key
+  estimators = []
+  task_families = list_of_task_family_per_machine[worker_id]
+  assert len(task_families) == num_gradient_estimators
+
+  for task_family_fn in task_families:
+    truncated_step = truncated_step_fn(task_family_fn(), learned_opt)
     gradient_estimator = gradient_estimator_fn(truncated_step)
     estimators.append(gradient_estimator)
   return estimators
@@ -179,7 +237,9 @@ def maybe_resample_gradient_estimators(
     unroll_states: Sequence[gradient_learner.GradientEstimatorState],
     worker_weights: Sequence[gradient_learner.WorkerWeights],
     key: PRNGKey,
-    stochastic_resample_frequency: int = 100
+    stochastic_resample_frequency: int = 100,
+    sample_estimators_fn=build_gradient_estimators,
+    worker_id: Optional[int] = None,
 ) -> Tuple[Sequence[gradient_learner.GradientEstimator],
            Sequence[gradient_learner.GradientEstimatorState]]:
   """Possibly resample a gradient estimator randomly.
@@ -193,6 +253,8 @@ def maybe_resample_gradient_estimators(
     stochastic_resample_frequency: The frequency or estimate of how many updates
       to perform before resampling. We sample a new estimator with the 1 over
       this number.
+    sample_estimators_fn: function which returns list of GradientEstimator.
+    worker_id: id of current worker
 
   Returns:
     gradient_estimators: The new gradient estimator list
@@ -209,8 +271,11 @@ def maybe_resample_gradient_estimators(
       with profile.Profile("Resample_in_maybe_resample_gradient_estimators"):
         logging.info("Resampling Static")
         key, key1, key2 = jax.random.split(key, 3)
-        ests = build_gradient_estimators(
-            learned_opt=learned_opt, key=key1, num_gradient_estimators=1)
+        ests = sample_estimators_fn(
+            learned_opt=learned_opt,
+            key=key1,
+            num_gradient_estimators=1,
+            worker_id=worker_id)
         gradient_estimators[j] = ests[0]
         unroll_states[j] = gradient_estimators[j].init_worker_state(
             worker_weights, key2)
@@ -218,15 +283,18 @@ def maybe_resample_gradient_estimators(
   return gradient_estimators, unroll_states
 
 
-def train_worker(lopt: lopt_base.LearnedOptimizer,
-                 num_estimators: int = 2,
-                 summary_every_n: int = 10,
-                 worker_id: Optional[int] = None,
-                 stochastic_resample_frequency: int = 200,
-                 device: Optional[jax.lib.xla_client.Device] = None,
-                 train_log_dir: Optional[str] = None,
-                 num_steps: Optional[int] = None,
-                 learner_address: Optional[str] = None):
+def train_worker(
+    lopt: lopt_base.LearnedOptimizer,
+    num_estimators: int = 2,
+    summary_every_n: int = 10,
+    worker_id: Optional[int] = None,
+    stochastic_resample_frequency: int = 200,
+    device: Optional[jax.lib.xla_client.Device] = None,
+    train_log_dir: Optional[str] = None,
+    num_steps: Optional[int] = None,
+    learner_address: Optional[str] = None,
+    sample_estimators_fn=build_gradient_estimators,
+):
   """Distributed training loop for the worker.
 
   This computes gradient estimates, and sends updates to central learner.
@@ -240,7 +308,8 @@ def train_worker(lopt: lopt_base.LearnedOptimizer,
     device: Device to run on. This is experimental.
     train_log_dir: Directory where logs are stored.
     num_steps: number of steps to run worker for.
-    learner_address: location of learner courier server
+    learner_address: location of learner courier server.
+    sample_estimators_fn: Function which returns list of gradient estimators.
   """
 
   seed = onp.random.randint(0, 10000000)
@@ -254,8 +323,11 @@ def train_worker(lopt: lopt_base.LearnedOptimizer,
   ) -> Tuple[Sequence[gradient_learner.GradientEstimator],
              Sequence[gradient_learner.GradientEstimatorState]]:
     key, key1 = jax.random.split(key)
-    estimators = build_gradient_estimators(
-        learned_opt=lopt, key=key1, num_gradient_estimators=num_estimators)
+    estimators = sample_estimators_fn(
+        learned_opt=lopt,
+        key=key1,
+        num_gradient_estimators=num_estimators,
+        worker_id=worker_id)
 
     keys = jax.random.split(key, num_estimators)
     unroll_states = [
@@ -264,7 +336,7 @@ def train_worker(lopt: lopt_base.LearnedOptimizer,
     ]
     return estimators, unroll_states
 
-  distributed_worker = distributed.AsyncWorker(
+  distributed_worker = distributed.DistributedWorker(
       train_log_dir, worker_id, learner_address=learner_address)
   last_outer_cfg = None
   grad_estimators = None
@@ -331,7 +403,9 @@ def train_worker(lopt: lopt_base.LearnedOptimizer,
         unroll_states,
         worker_weights=worker_weights,
         key=next(rng),
-        stochastic_resample_frequency=stochastic_resample_frequency)
+        stochastic_resample_frequency=stochastic_resample_frequency,
+        sample_estimators_fn=sample_estimators_fn,
+        worker_id=worker_id)
 
 
 @profile.wrap()
@@ -410,7 +484,7 @@ def summarize_learner(step: int, metrics: Mapping[str, float],
 def _threaded_write_summary(
     summary_writer: Any, to_write: Mapping[str, Union[float, onp.ndarray]],
     step: int, summary_thread_pool: futures.ThreadPoolExecutor,
-    summary_future: Optional[futures.Future]) -> futures.Future:
+    summary_future: Optional[futures.Future[None]]) -> futures.Future[None]:
   """Write summaries out in the background in a thread pool."""
 
   def write_summary(to_write):
@@ -469,7 +543,9 @@ def train_learner(
     population: Optional[population_mod.PopulationController] = None,
     population_worker_id: int = 0,
     learner_port: Optional[int] = None,
-) -> distributed.AsyncLearner:
+    learner_mode: str = "async",
+    num_workers: Optional[int] = None,
+) -> Union[distributed.AsyncLearner, distributed.SyncLearner]:
   """Distributed training loop for the learner.
 
   Args:
@@ -493,9 +569,11 @@ def train_learner(
     population_worker_id: index of the current training experiment in the
       population. 0 if not using a population.
     learner_port: port of courier server to create for learner.
+    learner_mode: Either sync or async to control how training is done.
+    num_workers: Number of workers this class should expect.
 
   Returns:
-    the asyncronous learner created by this function.
+    The asyncronous, or syncronous learner created by this function.
   """
   train_start_time = time.time()
   elapsed_time = 0.
@@ -562,15 +640,24 @@ def train_learner(
 
   # delay construction of this to it is created after new configuration is
   # fetched
-  dist_learner = distributed.AsyncLearner(
-      experiment_name=train_log_dir,
-      weights=DataForWorker(worker_weights, gen_id, outer_cfg),
-      current_iteration=step,
-      batch_size=trainer_batch_size,
-      staleness=staleness,
-      block_when_buffer_full=block_when_grad_buffer_full,
-      start_server=False,
-      port=learner_port)
+  if learner_mode == "async":
+    dist_learner = distributed.AsyncLearner(
+        experiment_name=train_log_dir,
+        weights=DataForWorker(worker_weights, gen_id, outer_cfg),
+        current_iteration=step,
+        batch_size=trainer_batch_size,
+        staleness=staleness,
+        block_when_buffer_full=block_when_grad_buffer_full,
+        start_server=False,
+        port=learner_port)
+  else:
+    dist_learner = distributed.SyncLearner(
+        experiment_name=train_log_dir,
+        weights=DataForWorker(worker_weights, gen_id, outer_cfg),
+        current_iteration=step,
+        num_workers=num_workers,
+        start_server=False,
+        port=learner_port)
 
   if not population:
     dist_learner.start_server()
@@ -624,7 +711,7 @@ def train_learner(
         total_inner_steps)
     param_checkpoint = gradient_learner.ParameterCheckpoint(
         outer_learner.get_meta_params(gradient_learner_state), gen_id, step)
-    paths = checkpoints.periodically_save_checkpoint(train_log_dir, {
+    paths = checkpoints.periodically_save_checkpoint(train_log_dir, step, {
         "checkpoint_": opt_checkpoint,
         "params_": param_checkpoint
     })
@@ -732,6 +819,7 @@ def local_train(
     num_steps: int = 10000,
     num_seconds: float = 0.,
     stochastic_resample_frequency: int = 200,
+    sample_estimators_fn=build_gradient_estimators,
 ):
   """Train a learned optimizer in a single process.
 
@@ -745,6 +833,7 @@ def local_train(
     num_seconds: max number of seconds to train for
     stochastic_resample_frequency: How frequently to resample gradient estimator
       we resample at a rate of 1 over this number randomly.
+    sample_estimators_fn: Function which returns list of GradientEstimators.
   """
   train_start_time = time.time()
   elapsed_time = 0.
@@ -783,8 +872,11 @@ def local_train(
   summary_future = None
 
   def build_static_and_init_unroll_state(worker_weights, key):
-    gradient_estimators = build_gradient_estimators(
-        learned_opt=lopt, key=key, num_gradient_estimators=num_estimators)
+    gradient_estimators = sample_estimators_fn(
+        learned_opt=lopt,
+        key=key,
+        num_gradient_estimators=num_estimators,
+        worker_id=0)
 
     key, key1 = jax.random.split(key)
     keys = jax.random.split(key1, num_estimators)
@@ -812,7 +904,7 @@ def local_train(
 
   for i in tqdm.trange(num_steps):
     checkpoints.periodically_save_checkpoint(
-        train_log_dir, {
+        train_log_dir, i, {
             "checkpoint_":
                 gradient_learner.OptCheckpoint(
                     gradient_learner_state,
@@ -867,7 +959,9 @@ def local_train(
         unroll_states,
         worker_weights=worker_weights,
         key=next(rng),
-        stochastic_resample_frequency=stochastic_resample_frequency)
+        stochastic_resample_frequency=stochastic_resample_frequency,
+        sample_estimators_fn=sample_estimators_fn,
+        worker_id=0)
 
     #### Start of summary code ####
 
@@ -970,8 +1064,11 @@ def run_train(
     trainer_batch_size: int = 1,
     staleness: int = 1,
     stochastic_resample_frequency: int = 200,
+    sample_estimator_fn=build_gradient_estimators,
     population_worker_id: int = 0,
     population_root_dir: Optional[str] = None,
+    num_workers: Optional[int] = None,
+    learner_mode="async",
 ):
   """Kick off training!
 
@@ -995,10 +1092,13 @@ def run_train(
     staleness: how stale gradients can bee before throwing them out.
     stochastic_resample_frequency: how frequently to resample gradient
       estimators.
+    sample_estimator_fn: Function which returns a list of GradientEstimators.
     population_worker_id: the index of the current collection of workers for
       population based training. 0 if not using population based training.
     population_root_dir: root directory of the population. None if not using
       population based training.
+    num_workers: Number of workers being used to train.
+    learner_mode: either sync or async. Represents the kind of learning done.
   """
   if outer_learner_fn == gin.REQUIRED:
     raise ValueError("Must set run_train.outer_learner_fn in gin")
@@ -1021,12 +1121,15 @@ def run_train(
           stochastic_resample_frequency=stochastic_resample_frequency,
           num_steps=num_steps,
           num_seconds=num_seconds,
+          sample_estimators_fn=sample_estimator_fn,
       )
     elif is_trainer:
       if population_root_dir is not None:
         server_name = population_mod.uniquify_server_name(
             population_root_dir, "population_controller")
         population = population_mod.get_courier_client(server_name)
+        assert learner_mode == "async", (
+            "only async training is supported with population based training.")
       else:
         population = None
       train_learner(
@@ -1039,6 +1142,8 @@ def run_train(
           staleness=staleness,
           population_worker_id=population_worker_id,
           population=population,
+          num_workers=num_workers,
+          learner_mode=learner_mode,
       )
     elif is_worker:
       # If the worker ever crashes,
@@ -1053,6 +1158,7 @@ def run_train(
               summary_every_n=summary_every_n,
               stochastic_resample_frequency=stochastic_resample_frequency,
               train_log_dir=train_log_dir,
+              sample_estimators_fn=sample_estimator_fn,
           )
           break
         except RuntimeError as e:

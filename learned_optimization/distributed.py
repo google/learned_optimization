@@ -24,10 +24,11 @@ Batches of this info can be grabbed from the learner and used to compute
 meta-weight updates. The resulting update can then be used to update the
 meta-weights. Once updated, the meta-weights can wet back on the learner.
 """
+from concurrent import futures
 import hashlib
 import threading
 import time
-from typing import Optional, Any, TypeVar, Generic, Tuple, Callable, Sequence
+from typing import Any, Callable, Generic, Optional, Sequence, Tuple, TypeVar
 
 from absl import logging
 import courier
@@ -234,10 +235,11 @@ class AsyncLearner(Generic[T, W]):
       return before - after
 
 
-class AsyncWorker(Generic[T, W]):
-  """Async worker used to compute gradients.
+class DistributedWorker(Generic[T, W]):
+  """Distributed worker used to compute gradients.
 
-  This can be run on a large number of workers concurrently.
+  This can be run on a large number of workers concurrently and can be used with
+  either AsyncLearner or SyncLearner.
   """
 
   def __init__(self,
@@ -266,3 +268,159 @@ class AsyncWorker(Generic[T, W]):
   def put_grads(self, step: int, grad: T):
     """Send the computed gradient from the given step to the learner."""
     return self._client.put_grads(self._worker_id, step, grad)
+
+
+class SyncLearner(Generic[T, W]):
+  """Centralized syncronous learner for distributed training.
+
+  This class creates a server and provides interfaces to get batches of
+  meta-gradients.
+
+  WARNING: This class does not yet work with population based training.
+  """
+
+  def __init__(self,
+               experiment_name: str,
+               weights: W,
+               current_iteration: int,
+               num_workers: int = 4,
+               start_server: bool = True,
+               port: Optional[int] = None,
+               monitor_state: bool = False):
+    """Initializer.
+
+    Args:
+      experiment_name: Name of experiment. Shared across all jobs in same model
+        being trained.
+      weights: PyTree of weights / values to be fetched by the worker.
+      current_iteration: Current step / update number.
+      num_workers: Number of sync workers.
+      start_server: Option to not start the courier server.
+      port: int port to host server at.
+      monitor_state: Debug flag. Start a thread which prints the learner's
+        state.
+    """
+    self._outer_gradients = {i: None for i in range(num_workers)}
+
+    self._weights = weights
+    self._num_workers = num_workers
+    self._experiment_name = experiment_name
+
+    self._current_iteration = current_iteration
+
+    self._lock = threading.Lock()
+    self._cv = threading.Condition()
+    self._server = None
+    self._port = port
+
+    if start_server:
+      self.start_server()
+
+    if monitor_state:
+      self._pool = futures.ThreadPoolExecutor(1)
+      self._pool.submit(self.monitor)
+
+  def monitor(self):
+    while True:
+      print("Monitor")
+      print("current iter", self._current_iteration)
+      print(self._outer_gradients)
+      print("EndMonitor")
+      time.sleep(2)
+
+  def start_server(self):
+    if not self._server:
+      self._server = courier.Server(
+          uniquify_server_name("learner", self._experiment_name),
+          port=self._port)
+      self._server.Bind("put_grads", self.put_grads)
+      self._server.Bind("get_weights", self.get_weights)
+      logging.info("Started Sync Server!")
+      self._server.Start()
+
+  def put_grads(self, worker_id: Any, step: int, value: T):
+    """Put computed gradients into learner."""
+    with self._cv:
+      self._lock.acquire(blocking=True)
+      assert worker_id < self._num_workers
+      if step == self._current_iteration:
+        self._outer_gradients[worker_id] = (step, value)
+      self._lock.release()
+      self._cv.notify_all()
+
+  @profile.wrap()
+  def get_weights(self, worker_id: Any) -> Tuple[int, W]:  # pylint: disable=unused-argument
+    """Get the weights from learner."""
+    while True:
+      self._lock.acquire(blocking=True)
+      if self._outer_gradients[worker_id] is None:
+        ret = self._current_iteration, self._weights
+      else:
+        ret = None
+      self._lock.release()
+      if ret:
+        return ret
+
+      with self._cv:
+        self._cv.wait_for(lambda: self._outer_gradients[worker_id] is None)
+
+  @profile.wrap()
+  def gather_grads(
+      self,
+      filter_fn: Callable[[W], bool] = lambda x: True
+  ) -> Tuple[Sequence[int], Sequence[W]]:
+    """Grab a batch of gradients from the learner.
+
+    If gradients are not yet avalible, block.
+
+    Args:
+      filter_fn: Function to filter gradients / gradients that should not be
+        included in the batch.
+
+    Returns:
+      steps: A batch of steps for which gradients had been computed.
+      gradients: A list of gradients computed from workers.
+    """
+    # TODO(lmetz) use filter_fn so that this works with population based
+    # training
+    del filter_fn
+
+    while True:
+      self._lock.acquire(blocking=True)
+      if all(self._outer_gradients.values()):
+        steps_grads = list(self._outer_gradients.values())
+        self._lock.release()
+        steps, grads = zip(*steps_grads)
+        return steps, grads
+      else:
+        self._lock.release()
+
+      with self._cv:
+        self._cv.wait_for(lambda: all(self._outer_gradients.values()))
+
+  @profile.wrap()
+  def set_weights(self,
+                  current_iteration: int,
+                  weights: W,
+                  clear_buffer: bool = False) -> int:
+    """Set the current weights on the learner.
+
+    Args:
+      current_iteration: The iteration these weights come from.
+      weights: Value of the weights.
+      clear_buffer: To clear the remaining weights. This is unused for sync
+        training.
+
+    Returns:
+      number of gradients which have been removed.
+    """
+    # in sync training, buffer is always clear.
+    del clear_buffer
+    with self._lock, self._cv:
+      self._weights = weights
+      self._current_iteration = onp.asarray(current_iteration)
+      self._outer_gradients = {k: None for k in self._outer_gradients.keys()}
+      self._cv.notify_all()
+
+    # no samples where deleted.
+    return 0
