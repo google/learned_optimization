@@ -136,9 +136,54 @@ def get_task_family(
   raise NotImplementedError()
 
 
+@gin.configurable()
+def lopt_eval(learned_optimizer, theta, eval_cfg, gen_id,
+              step) -> Mapping[str, Any]:
+  """Evaluation function used by evaluation worker.
+
+  This function specifies how to evaluate a learned optimizer.
+  Args:
+    learned_optimizer: Learned optimizer to eval
+    theta: Meta-parameters of lopt to eval.
+    eval_cfg: A squence of gin bindings.
+    gen_id: generation id for population based training.
+    step: outer-iteration for the theta we are evaluating.
+
+  Returns:
+    a dictionary containing metrics we want to eval.
+  """
+  # Our goal here is to avoid needing to recompile for every new task family.
+  # By default, when we construct a new task family instance, jax has no way
+  # of knowing this was already used.
+  # Instead of reloading a new task family everytime, we cache based on the
+  # gin config received from the task queue.
+  # This causes the same instance of the task family to be returned, and thus
+  # we get less compiles.
+  gin_key = hash(tuple(eval_cfg))
+  if gin_key in _task_family_cache:
+    task_family = _task_family_cache[gin_key]
+  else:
+    task_family = get_task_family()
+    _task_family_cache[gin_key] = task_family
+
+  # Finally, we do the actual training!
+  with profile.Profile("inner_train"):
+    stime = time.time()
+    losses = eval_training.multi_task_training_curves(
+        task_family, learned_optimizer, theta=theta)
+    total_time = time.time() - stime
+    result = {"total_time": total_time, "gen_id": gen_id, "step": step}
+    for k, v in losses.items():
+      result[k] = v
+    return result
+
+
+@gin.configurable
 def load_gin_and_run(
-    train_log_dir: str, task: task_group_server.EvalTask,
-    learned_optimizer: lopt_base.LearnedOptimizer
+    train_log_dir: str,
+    task: task_group_server.EvalTask,
+    learned_optimizer: lopt_base.LearnedOptimizer,
+    eval_fn=lopt_eval,
 ) -> Mapping[str, Union[float, onp.ndarray, str]]:
   """Load the configuration for task then compute values."""
   task_idx, saved_paths = task.task_group
@@ -189,30 +234,7 @@ def load_gin_and_run(
     theta, gen_id, step = (param_checkpoint.params, param_checkpoint.gen_id,
                            param_checkpoint.step)
 
-  # Our goal here is to avoid needing to recompile for every new task family.
-  # By default, when we construct a new task family instance, jax has no way
-  # of knowing this was already used.
-  # Instead of reloading a new task family everytime, we cache based on the
-  # gin config received from the task queue.
-  # This causes the same instance of the task family to be returned, and thus
-  # we get less compiles.
-  gin_key = hash(tuple(eval_cfg))
-  if gin_key in _task_family_cache:
-    task_family = _task_family_cache[gin_key]
-  else:
-    task_family = get_task_family()
-    _task_family_cache[gin_key] = task_family
-
-  # Finally, we do the actual training!
-  with profile.Profile("inner_train"):
-    stime = time.time()
-    losses = eval_training.multi_task_training_curves(
-        task_family, learned_optimizer, theta=theta)
-    total_time = time.time() - stime
-    result = {"total_time": total_time, "gen_id": gen_id, "step": step}
-    for k, v in losses.items():
-      result[k] = v
-    return result
+  return eval_fn(learned_optimizer, theta, eval_cfg, gen_id=gen_id, step=step)
 
 
 def connect_to_server_and_do_tasks(train_log_dir: str):

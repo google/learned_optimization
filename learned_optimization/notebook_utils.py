@@ -140,6 +140,8 @@ def similar_colors(
   colors = []
   for f in folders:
     key = sep(f)
+    if remove_trailing_subfolder_number:
+      key = key.split("/")[-int(remove_trailing_subfolder_number)]
     colors.append(cc[key])
   return colors, labels
 

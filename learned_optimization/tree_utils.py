@@ -45,8 +45,27 @@ def tree_norm(val):
 
 
 @jax.jit
-def tree_div(treea, scalar):
-  return jax.tree_multimap(lambda a: a / scalar, treea)
+def tree_div(treea, scalar_or_treeb):
+  if _is_scalar(scalar_or_treeb):
+    return jax.tree_map(lambda a: a / scalar_or_treeb, treea)
+  else:
+    return jax.tree_map(lambda a, b: a / b, treea, scalar_or_treeb)
+
+
+def _is_scalar(x):
+  try:
+    jnp.asarray(x)
+    return True
+  except Exception:  # pylint: disable=broad-except
+    return False
+
+
+@jax.jit
+def tree_mul(treea, scalar_or_treeb):
+  if _is_scalar(scalar_or_treeb):
+    return jax.tree_map(lambda a: a * scalar_or_treeb, treea)
+  else:
+    return jax.tree_map(lambda a, b: a * b, treea, scalar_or_treeb)
 
 
 @jax.jit

@@ -14,15 +14,19 @@
 # limitations under the License.
 
 """Base class for Optimizer and a couple hand designed optimizer."""
+
 import abc
 import collections
 from typing import Any, Optional, Tuple
 import warnings
 
 import chex
+import flax
 import gin
 import jax
 import jax.numpy as jnp
+from learned_optimization import tree_utils
+
 
 # pytree containing jax types
 ModelState = Any
@@ -101,6 +105,67 @@ class GradientClipOptimizer(Optimizer):
     grad = jax.tree_map(lambda x: jnp.clip(x, -self.grad_clip, self.grad_clip),
                         grad)
     return self.opt.update(opt_state, grad, *args, **kwargs)
+
+
+@flax.struct.dataclass
+class GraftedOptimizerState:
+  iteration: jnp.ndarray
+  params: chex.ArrayTree
+  state: chex.ArrayTree
+  mag_opt_state: chex.ArrayTree
+  dir_opt_state: chex.ArrayTree
+
+
+@gin.configurable()
+class GraftedOptimizer(Optimizer):
+  """Implements Learning Rate Grafting.
+
+  Reference: https://openreview.net/forum?id=FpKgG31Z_i9
+  """
+
+  def __init__(self, magnitude_opt: Optimizer, direction_opt: Optimizer):
+    self.magnitude_opt = magnitude_opt
+    self.direction_opt = direction_opt
+
+  def init(self, params, model_state=None, num_steps=None, **kwargs):
+    return GraftedOptimizerState(
+        iteration=jnp.asarray(0, dtype=jnp.int32),
+        params=params,
+        state=model_state,
+        mag_opt_state=self.magnitude_opt.init(
+            params, model_state=model_state, num_steps=num_steps, **kwargs),
+        dir_opt_state=self.direction_opt.init(
+            params, model_state=model_state, num_steps=num_steps, **kwargs))
+
+  def update(self, opt_state, grad, model_state=None, **kwargs):
+    base_params = opt_state.params
+
+    next_mag_opt_state = self.magnitude_opt.update(
+        opt_state.mag_opt_state, grad, model_state=model_state, **kwargs)
+    next_mag_params = self.magnitude_opt.get_params(next_mag_opt_state)
+
+    next_dir_opt_state = self.direction_opt.update(
+        opt_state.dir_opt_state, grad, model_state=model_state, **kwargs)
+    next_dir_params = self.direction_opt.get_params(next_dir_opt_state)
+
+    mag_step = tree_utils.tree_sub(next_mag_params, base_params)
+    dir_step = tree_utils.tree_sub(next_dir_params, base_params)
+
+    step_size = tree_utils.tree_norm(mag_step) / tree_utils.tree_norm(dir_step)
+
+    next_params = tree_utils.tree_add(base_params,
+                                      tree_utils.tree_mul(dir_step, step_size))
+
+    next_dir_opt_state = next_dir_opt_state.replace(params=next_params)
+    next_mag_opt_state = next_mag_opt_state.replace(params=next_params)
+
+    return GraftedOptimizerState(
+        iteration=opt_state.iteration + 1,
+        params=next_params,
+        state=model_state,
+        mag_opt_state=next_mag_opt_state,
+        dir_opt_state=next_dir_opt_state,
+    )
 
 
 # TODO(lmetz) remove these in May 2022.

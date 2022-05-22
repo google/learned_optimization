@@ -31,6 +31,7 @@ import flax
 import jax
 import jax.numpy as jnp
 from learned_optimization import tree_utils
+import gin
 
 MetaParams = Any
 OuterState = Any
@@ -195,7 +196,17 @@ class VectorizedTruncatedStep(TruncatedStep):
                   outer_state,
                   theta_is_vector=False,
                   **kwargs):
+    # Guess if we are using stacked antithetic steps
+    num_tasks_in_state = tree_utils.first_dim(unroll_state)
+    if num_tasks_in_state == self.num_tasks * 2:
+      stack_antithetic_samples = True
+    else:
+      stack_antithetic_samples = False
+
     keys = jax.random.split(key, self.num_tasks)
+    if stack_antithetic_samples:
+      keys = jax.tree_map(lambda x: jnp.concatenate([x, x], axis=0), keys)
+
     in_axes = (0 if theta_is_vector else None, 0, 0, 0, None)
     return jax.vmap(
         functools.partial(self.truncated_step.unroll_step, **kwargs),

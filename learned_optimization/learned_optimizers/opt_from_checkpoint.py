@@ -74,7 +74,7 @@ class _GinScopeClass:
         self.has_locked = True
         with gin.config_scope(None):
           with gin.config_scope(self.scope):
-            ret = self.ginned.__getattribute__(*args)
+            ret = self.ginned.__getattribute__(*args)  # pytype: disable=attribute-error
         self.has_locked = False
     if callable(ret):
       ret = self.__wrap(ret, self.scope)

@@ -16,15 +16,15 @@
 """Utilities for evaluating optimizers and learned optimizers on tasks."""
 import dataclasses
 import functools
-from typing import Any, Callable, Iterator, Mapping, Optional, Tuple, Sequence
+from typing import Any, Callable, Iterator, Mapping, Optional, Sequence, Tuple
 
 from absl import logging
 import gin
 import jax
 from jax import lax
 import jax.numpy as jnp
-from learned_optimization import profile
 from learned_optimization import jax_utils
+from learned_optimization import profile
 from learned_optimization import summary
 from learned_optimization import training
 from learned_optimization import tree_utils
@@ -158,7 +158,7 @@ def single_task_training_curves(
     p, s = jax_utils.cached_jit(task.init_with_state)(key)
     opt_state = jax_utils.cached_jit(
         opt.init, static_argnames=("num_steps",))(
-            p, s, num_steps=num_steps)
+            p, model_state=s, num_steps=num_steps)
 
     losses = []
     eval_auxs = []
@@ -168,7 +168,7 @@ def single_task_training_curves(
   for i in tqdm.trange(num_steps + 1, position=0):
     with profile.Profile("eval"):
       m = {}
-      if i % eval_every == 0:
+      if i % eval_every == 0 and eval_batches:
         on_last = (i == num_steps)
         for s in splits:
           key, key1 = jax.random.split(key)
@@ -201,16 +201,18 @@ def single_task_training_curves(
       losses.append(l)
       train_xs.append(i)
 
-  stacked_metrics = tree_utils.tree_zip_onp(eval_auxs)
-
-  return {
+  ret = {
       "train/xs": onp.asarray(train_xs),
       "train/loss": onp.asarray(losses),
-      "eval/xs": onp.asarray(eval_xs),
-      "eval/last_eval_batches": onp.asarray(last_eval_batches),
-      "eval/eval_batches": onp.asarray(eval_batches),
-      **stacked_metrics
   }
+
+  if eval_batches:
+    stacked_metrics = tree_utils.tree_zip_onp(eval_auxs)
+    ret["eval/xs"] = onp.asarray(eval_xs)
+    ret["eval/last_eval_batches"] = onp.asarray(last_eval_batches)
+    ret["eval/eval_batches"] = onp.asarray(eval_batches)
+    ret = {**ret, **stacked_metrics}
+  return ret
 
 
 @functools.partial(jax.pmap, static_broadcasted_argnums=(1,))
@@ -271,7 +273,8 @@ def _cached_vectorize_train_fns(
       task_param = task_family.sample(key1)
       inner_param, inner_state = task_family.task_fn(
           task_param).init_with_state(key2)
-      opt_state = opt.init(inner_param, inner_state, num_steps, key=key3)
+      opt_state = opt.init(
+          inner_param, model_state=inner_state, num_steps=num_steps, key=key3)
       return opt_state, task_param
 
     return fn(key)
@@ -285,7 +288,8 @@ def _cached_vectorize_train_fns(
       key1, key2 = jax.random.split(key, 2)
       inner_param, inner_state = task_family.task_fn(
           task_param).init_with_state(key1)
-      opt_state = opt.init(inner_param, inner_state, num_steps, key=key2)
+      opt_state = opt.init(
+          inner_param, model_state=inner_state, num_steps=num_steps, key=key2)
       return opt_state
 
     return fn(key, task_params)

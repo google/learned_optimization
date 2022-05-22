@@ -41,3 +41,8 @@ def maybe_do(pred, do_fn, operand):
     return do_fn(operand)
 
   return jax.lax.fori_loop(0, jnp.asarray(pred, jnp.int32), body_fn, operand)
+
+
+def in_jit() -> bool:
+  """Returns true if tracing jit."""
+  return jax.core.cur_sublevel().level > 0
