@@ -222,7 +222,7 @@ states = jax.vmap(init_state)(keys)
 opt_state, trunc_state, keys = states
 import dataclasses
 
-opt_state = opt_state._replace(
+opt_state = opt_state.replace(
     iteration=jax.random.randint(key, [n_tasks], 0, 50))
 states = (opt_state, trunc_state, keys)
 
@@ -261,7 +261,6 @@ for i in range(n_tasks):
 
 # + [markdown] id="7b0d8422"
 # As a demonstration of this, let's define a simple `TruncatedStep` for a learned optimizer. For many cases, this is unnecessary as `VectorizedLOptTruncatedStep` should be used as it supports task family, truncation schedule and a number of different ways to calculate meta-loss.
-
 
 # + executionInfo={"elapsed": 61, "status": "ok", "timestamp": 1647909341952, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="f1106d1b"
 class SimpleLOptTruncStep(truncated_step_mod.TruncatedStep):

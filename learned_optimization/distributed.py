@@ -332,7 +332,8 @@ class SyncLearner(Generic[T, W]):
     if not self._server:
       self._server = courier.Server(
           uniquify_server_name("learner", self._experiment_name),
-          port=self._port)
+          port=self._port,
+          thread_pool_size=40)
       self._server.Bind("put_grads", self.put_grads)
       self._server.Bind("get_weights", self.get_weights)
       logging.info("Started Sync Server!")

@@ -24,8 +24,8 @@ import flax
 import gin
 import jax
 import jax.numpy as jnp
+import time
 from learned_optimization import checkpoints
-from learned_optimization import jax_utils
 from learned_optimization import profile
 from learned_optimization import summary
 from learned_optimization import tree_utils
@@ -120,6 +120,18 @@ class MetaInitializer(Protocol):
 @jax.jit
 def _tree_mean(stack):
   return jax.tree_map(lambda x: jnp.mean(x, axis=0), stack)
+
+
+@functools.lru_cache(None)
+def _get_theta_update_fn(theta_opt: opt_base.Optimizer):
+
+  def update(theta_opt_state, grads, loss, key, model_state):
+    with summary.summary_scope("outer_opt"):
+      return theta_opt.update(
+          theta_opt_state, grads, loss=loss, key=key, model_state=model_state)
+
+  fn = summary.add_with_summary(update)
+  return jax.jit(fn, static_argnames=("with_summary",))
 
 
 @gin.configurable
@@ -235,12 +247,17 @@ class GradientLearner:
       mean_loss = jnp.mean(losses)
       min_loss = jnp.min(losses)
 
-    theta_opt_state = jax_utils.cached_jit(self._theta_opt.update)(
+    fn = _get_theta_update_fn(self._theta_opt)
+    key1, key2 = jax.random.split(key)
+    theta_opt_state, theta_update_metrics = fn(
         theta_opt_state,
         grads,
-        loss=mean_loss,
-        key=key,
-        model_state=next_model_state)
+        mean_loss,
+        key1,
+        next_model_state,
+        sample_rng_key=key2,
+        with_summary=with_metrics)
+    metrics = summary.aggregate_metric_list([metrics, theta_update_metrics])
 
     # Create fast summaries for all steps, and slower summaries occasionally
     metrics["none||mean_loss"] = mean_loss
@@ -300,6 +317,7 @@ def gradient_worker_compute(
     unroll_states: Sequence[GradientEstimatorState],
     key: PRNGKey,
     with_metrics: bool,
+    clip_nan_loss_to_value: Optional[float] = 20.0,
     device: Optional[jax.lib.xla_client.Device] = None) -> WorkerComputeOut:
   """Compute a gradient signal to meta-train with.
 
@@ -341,6 +359,7 @@ def gradient_worker_compute(
   for si, (estimator,
            unroll_state) in enumerate(zip(gradient_estimators, unroll_states)):
     with profile.Profile(f"estimator{si}"):
+      stime = time.time()
       key, rng = jax.random.split(key)
 
       with profile.Profile(f"unroll__metrics{with_metrics}"):
@@ -374,13 +393,12 @@ def gradient_worker_compute(
         logging.warn("No out specified by learner. "
                      "Not logging any events data.")
 
+      metrics = {k: v for k, v in metrics.items()}
+      family_name = estimator.task_name()
       if with_metrics:
-        metrics = {k: v for k, v in metrics.items()}
-
         # Metrics don't take into account which task they are comming from.
         # Let's add additional metrics with the task name pulled out.
         with profile.Profile("metric_computation"):
-          family_name = estimator.task_name()
           keys = list(metrics.keys())
           for k in keys:
             v = metrics[k]
@@ -393,8 +411,8 @@ def gradient_worker_compute(
 
           norm = tree_utils.tree_norm(estimator_out.grad)
           metrics[f"mean||{family_name}/grad_norm"] = norm
-
-          metrics[f"mean||{family_name}/mean_loss"] = estimator_out.mean_loss
+      metrics[f"mean||{family_name}/mean_loss"] = estimator_out.mean_loss
+      metrics[f"sample||{family_name}/time"] = time.time() - stime
 
       metrics_list.append(metrics)
 
@@ -404,18 +422,20 @@ def gradient_worker_compute(
 
   # block here to better account for costs with profile profiling.
   with profile.Profile("blocking"):
+    stime = time.time()
     mean_loss.block_until_ready()
+    block_time = time.time() - stime
 
   with profile.Profile("summary_aggregation"):
     metrics = summary.aggregate_metric_list(metrics_list)
+  metrics["mean||block_time"] = block_time
 
   with profile.Profile("strip_nan"):
     # this should ideally never be NAN
     # TODO(lmetz) check if we need these checks.
     grads_accum = _nan_to_num(grads_accum, 0.0)
-    # assume things are roughly scaled to 0-10. So 20 should be a big value.
-    # this doesn't effect gradient calculations.
-    mean_loss = _nan_to_num(mean_loss, 20.0, use_jnp=True)
+    if clip_nan_loss_to_value:
+      mean_loss = _nan_to_num(mean_loss, clip_nan_loss_to_value, use_jnp=True)
 
   with profile.Profile("grads_to_onp"):
     to_put = AggregatedGradient(
@@ -519,7 +539,9 @@ class SingleMachineGradientLearner:
     next_gradient_estimator_states = worker_compute_out.unroll_states
 
     next_theta_state, metrics = self.gradient_learner.update(
-        state.gradient_learner_state, [worker_compute_out.to_put], key=key2)
+        state.gradient_learner_state, [worker_compute_out.to_put],
+        key=key2,
+        with_metrics=with_metrics)
 
     metrics = summary.aggregate_metric_list(
         [worker_compute_out.metrics, metrics])

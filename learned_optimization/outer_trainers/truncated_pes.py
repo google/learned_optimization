@@ -19,7 +19,8 @@ import functools
 from typing import Any, Mapping, Sequence, Tuple, Optional
 
 import flax
-from flax import jax_utils
+from flax import jax_utils as flax_jax_utils
+from learned_optimization import jax_utils
 import gin
 import haiku as hk
 import jax
@@ -166,6 +167,9 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       raise ValueError("Pass a trunc_length and steps_per_jit that are"
                        " multiples of each other.")
 
+  def task_name(self) -> str:
+    return self.truncated_step.task_name()
+
   @profile.wrap()
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
                         key: PRNGKey) -> PESWorkerState:
@@ -185,14 +189,21 @@ class TruncatedPES(gradient_learner.GradientEstimator):
         accumulator=accumulator)
 
   @profile.wrap()
+  def get_datas(self):
+    return [
+        self.truncated_step.get_batch(self.steps_per_jit)
+        for _ in range(self.trunc_length // self.steps_per_jit)
+    ]
+
+  @profile.wrap()
   def compute_gradient_estimate(
       self,
       worker_weights: gradient_learner.WorkerWeights,
       key: PRNGKey,
       state: PESWorkerState,
-      with_summary: bool = False
+      with_summary: bool = False,
+      datas_list: Optional[Sequence[Any]] = None,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
-
     p_state = state.pos_state
     n_state = state.neg_state
     accumulator = state.accumulator
@@ -207,8 +218,14 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     n_yses = []
     metrics = []
 
-    for _ in range(self.trunc_length // self.steps_per_jit):
-      datas = self.truncated_step.get_batch(self.steps_per_jit)
+    # TODO(lmetz) consider switching this to be a jax.lax.scan when inside jit.
+    for i in range(self.trunc_length // self.steps_per_jit):
+      if datas_list is None:
+        if jax_utils.in_jit():
+          raise ValueError("Must pass data in when using a jit gradient est.")
+        datas = self.truncated_step.get_batch(self.steps_per_jit)
+      else:
+        datas = datas_list[i]
 
       # force all to be non weak type. This is for cache hit reasons.
       # TODO(lmetz) consider instead just setting the weak type flag?
@@ -255,7 +272,8 @@ class TruncatedPES(gradient_learner.GradientEstimator):
         unroll_state=PESWorkerState(p_state, n_state, new_accumulator),
         unroll_info=unroll_info)
 
-    metrics = summary.aggregate_metric_list(metrics)
+    metrics = summary.aggregate_metric_list(
+        metrics, use_jnp=jax_utils.in_jit(), key=next(rng))
     if with_summary:
       metrics["sample||delta_loss_sample"] = summary.sample_value(
           key, jnp.abs(delta_loss))
@@ -350,7 +368,7 @@ class TruncatedPESPMAP(TruncatedPES):
     accumulator = jax.tree_multimap(
         lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),
         theta)
-    accumulator = jax_utils.replicate(accumulator)
+    accumulator = flax_jax_utils.replicate(accumulator)
 
     return PESWorkerState(
         pos_state=pos_unroll_state,
@@ -384,7 +402,7 @@ class TruncatedPESPMAP(TruncatedPES):
       """Get batch with leading dims [num_devices, steps_per_jit, num_tasks]."""
       if self.replicate_data_across_devices:
         b = self.truncated_step.get_batch(self.steps_per_jit)
-        return jax_utils.replicate(b)
+        return flax_jax_utils.replicate(b)
       else:
         # Use different data across the devices
         batches = [
@@ -415,7 +433,7 @@ class TruncatedPESPMAP(TruncatedPES):
     loss, es_grad, new_accumulator, p_ys, delta_loss = self.pmap_compute_pes_grad(
         p_yses, n_yses, accumulator, vec_pos)
 
-    es_grad, loss = jax_utils.unreplicate(_pmap_reduce((es_grad, loss)))
+    es_grad, loss = flax_jax_utils.unreplicate(_pmap_reduce((es_grad, loss)))
 
     unroll_info = gradient_learner.UnrollInfo(
         loss=p_ys.loss,

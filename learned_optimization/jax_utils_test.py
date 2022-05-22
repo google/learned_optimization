@@ -13,22 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for learned_optimizers.optimizers.base."""
+"""Tests for jax_utils."""
+
 from absl.testing import absltest
-from learned_optimization.optimizers import base
-from learned_optimization.optimizers import optax_opts
-from learned_optimization.optimizers import test_utils
+import jax
+from learned_optimization import jax_utils
 
 
-class BaseTest(absltest.TestCase):
+class JaxUtilsTest(absltest.TestCase):
 
-  def test_gradient_clip_adam(self):
-    test_utils.smoketest_optimizer(
-        base.GradientClipOptimizer(optax_opts.Adam(1e-4)))
+  def test_in_jit(self):
+    state = []
 
-  def test_grafted_optimizer(self):
-    test_utils.smoketest_optimizer(
-        base.GraftedOptimizer(optax_opts.SGDM(1e-2), optax_opts.Adam(1e-4)))
+    def fn(x):
+      if jax_utils.in_jit():
+        state.append(None)
+      return x * 2
+
+    _ = fn(1)
+    self.assertEmpty(state)
+
+    _ = jax.jit(fn)(1)
+    self.assertLen(state, 1)
+
 
 if __name__ == '__main__':
   absltest.main()

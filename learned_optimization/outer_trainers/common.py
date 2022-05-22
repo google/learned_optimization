@@ -59,6 +59,29 @@ def vector_sample_perturbations(theta: T, key: chex.PRNGKey, std: float,
   return vec_pos, vec_p_theta, vec_n_theta
 
 
+# TODO(lmetz) buffer dontation here, and in the next function is not
+# taken use of by XLA meaning 1 additional copy is happening.
+@functools.partial(jax.jit, donate_argnums=(0,), static_argnames=("axis",))
+def _split_tree(tree, axis=0):
+  """Split the provided tree in half along `axis`."""
+  assert axis in [0, 1]
+  if axis == 0:
+    num_tasks = tree_utils.first_dim(tree) // 2
+    a = jax.tree_map(lambda x: x[0:num_tasks], tree)
+    b = jax.tree_map(lambda x: x[num_tasks:], tree)
+    return a, b
+  elif axis == 1:
+    num_tasks = jax.tree_leaves(tree)[0].shape[1] // 2
+    a = jax.tree_map(lambda x: x[:, 0:num_tasks], tree)
+    b = jax.tree_map(lambda x: x[:, num_tasks:], tree)
+    return a, b
+
+
+@functools.partial(jax.jit, donate_argnums=(0, 1), static_argnames=("axis",))
+def _stack(a, b, axis=0):
+  return jax.tree_map(lambda x, y: jnp.concatenate([x, y], axis=axis), a, b)
+
+
 @functools.partial(
     jax.jit,
     static_argnames=("truncated_step", "with_summary", "unroll_length",
@@ -138,26 +161,23 @@ def maybe_stacked_es_unroll(
   # of tasks. Somehow assert this.
   if stack_antithetic_samples:
 
-    def stack(a, b, axis=0):
-      return jax.tree_map(lambda x, y: jnp.concatenate([x, y], axis=axis), a, b)
-
     (pn_state, pn_ys), m = truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking,unexpected-keyword-arg,redundant-keyword-arg
         *(static_args + [
-            stack(vec_p_theta, vec_n_theta),
+            _stack(vec_p_theta, vec_n_theta),
             key,
-            stack(p_state, n_state),
-            stack(datas, datas, axis=1),
+            _stack(p_state, n_state),
+            _stack(datas, datas, axis=1),
             outer_state,
             override_num_steps,
         ]),
         with_summary=with_summary,
         sample_rng_key=sample_rng_key)
-
-    num_tasks = tree_utils.first_dim(vec_n_theta)
-    p_state = jax.tree_map(lambda x: x[0:num_tasks], pn_state)
-    n_state = jax.tree_map(lambda x: x[num_tasks:], pn_state)
-    p_ys = jax.tree_map(lambda x: x[:, 0:num_tasks], pn_ys)
-    n_ys = jax.tree_map(lambda x: x[:, num_tasks:], pn_ys)
+    # p_state = jax.tree_map(lambda x: x[0:num_tasks], pn_state)
+    # n_state = jax.tree_map(lambda x: x[num_tasks:], pn_state)
+    # p_ys = jax.tree_map(lambda x: x[:, 0:num_tasks], pn_ys)
+    # n_ys = jax.tree_map(lambda x: x[:, num_tasks:], pn_ys)
+    p_state, n_state = _split_tree(pn_state)
+    p_ys, n_ys = _split_tree(pn_ys, axis=1)
   else:
     (p_state, p_ys), m = truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking,unexpected-keyword-arg
         *(static_args +

@@ -24,6 +24,7 @@ import haiku as hk
 import jax
 import jax.numpy as jnp
 from learned_optimization import profile
+from learned_optimization import jax_utils
 from learned_optimization import summary
 from learned_optimization import tree_utils
 from learned_optimization.outer_trainers import common
@@ -72,8 +73,32 @@ class UnrollState(gradient_learner.GradientEstimatorState):
   pass
 
 
-@functools.partial(
-    jax.jit, static_argnames=("std", "clip_loss_diff", "loss_type"))
+@jax.jit
+def _es_grad(vec_pos, pos_loss, neg_loss, sign_delta_loss_scalar,
+             clip_loss_diff, std):
+  delta_loss = (pos_loss - neg_loss)
+
+  delta_loss = jnp.nan_to_num(delta_loss, posinf=0., neginf=0.)
+
+  if clip_loss_diff is not None:
+    delta_loss = jnp.clip(delta_loss, -clip_loss_diff, clip_loss_diff)  # pylint: disable=invalid-unary-operand-type
+
+  if sign_delta_loss_scalar is not None:
+    delta_loss = jnp.sign(delta_loss) * sign_delta_loss_scalar
+
+  # The actual ES update done for each vectorized task
+  contrib = delta_loss / (2 * std**2)
+  vec_es_grad = jax.vmap(lambda c, p: jax.tree_map(lambda e: e * c, p))(contrib,
+                                                                        vec_pos)
+  # average over tasks
+  es_grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
+
+  return jnp.mean((pos_loss + neg_loss) / 2.0), es_grad
+
+
+# TODO(lmetz) consider jitting this? If variable length, this will cause many cache misses.
+# @functools.partial(
+#     jax.jit, static_argnames=("std", "clip_loss_diff", "loss_type"))
 def traj_loss_antithetic_es(
     p_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
     n_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
@@ -104,8 +129,13 @@ def traj_loss_antithetic_es(
   def flat_first(x):
     return x.reshape([x.shape[0] * x.shape[1]] + list(x.shape[2:]))
 
-  p_ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(p_yses))
-  n_ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(n_yses))
+  if jax_utils.in_jit():
+    tree_zip = tree_utils.tree_zip_jnp
+  else:
+    # use numpy here to prevent an expensive jit.
+    tree_zip = tree_utils.tree_zip_onp
+  p_ys = jax.tree_map(flat_first, tree_zip(p_yses))
+  n_ys = jax.tree_map(flat_first, tree_zip(n_yses))
 
   # mean over the num steps axis.
   if loss_type == "avg":
@@ -117,24 +147,9 @@ def traj_loss_antithetic_es(
   else:
     raise ValueError(f"Unsupported loss type {loss_type}.")
 
-  delta_loss = (pos_loss - neg_loss)
-
-  delta_loss = jnp.nan_to_num(delta_loss, posinf=0., neginf=0.)
-
-  if clip_loss_diff:
-    delta_loss = jnp.clip(delta_loss, -clip_loss_diff, clip_loss_diff)  # pylint: disable=invalid-unary-operand-type
-
-  if sign_delta_loss_scalar:
-    delta_loss = jnp.sign(delta_loss) * sign_delta_loss_scalar
-
-  # The actual ES update done for each vectorized task
-  contrib = delta_loss / (2 * std**2)
-  vec_es_grad = jax.vmap(lambda c, p: jax.tree_map(lambda e: e * c, p))(contrib,
-                                                                        vec_pos)
-  # average over tasks
-  es_grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
-
-  return jnp.mean((pos_loss + neg_loss) / 2.0), es_grad, p_ys
+  loss, grad = _es_grad(vec_pos, pos_loss, neg_loss, sign_delta_loss_scalar,
+                        clip_loss_diff, std)
+  return loss, grad, p_ys
 
 
 @functools.partial(
@@ -310,9 +325,14 @@ class FullES(gradient_learner.GradientEstimator):
           "TruncatedStep must implement"
           " `OverrideStepVectorizedTruncatedStep` when used with FulES.")
 
+  def task_name(self) -> str:
+    return self.truncated_step.task_name()
+
+
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
                         key: PRNGKey) -> UnrollState:
     return UnrollState()
+
 
   def compute_gradient_estimate(
       self,
@@ -367,8 +387,9 @@ class FullES(gradient_learner.GradientEstimator):
       with profile.Profile("step"):
         # Because we are training with antithetic sampling we need to unroll
         # both models using the same random key and same data.
-        key = next(rng)
         datas = jax.tree_map(jnp.asarray, datas)
+
+        p_state, n_state = tree_utils.strip_weak_type((p_state, n_state))
 
         p_state, n_state, p_ys, n_ys, m = common.maybe_stacked_es_unroll(
             self.truncated_step,
@@ -378,7 +399,7 @@ class FullES(gradient_learner.GradientEstimator):
             vec_n_theta,
             p_state,
             n_state,
-            key,
+            next(rng),
             datas,
             worker_weights.outer_state,
             with_summary=with_summary,
@@ -425,7 +446,7 @@ class FullES(gradient_learner.GradientEstimator):
               p_state,
               n_state,
               vec_pos,
-              key,
+              next(rng),
               self.std,
               recompute_samples=self.recompute_samples,
               clip_loss_diff=self.clip_loss_diff,

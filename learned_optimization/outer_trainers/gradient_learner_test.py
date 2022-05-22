@@ -70,7 +70,8 @@ class GradientLearnerTest(absltest.TestCase):
 
     grads_list = [ones_g, zeros_g]
 
-    next_grad_learner_state, _ = learner.update(grad_learner_state, grads_list)
+    next_grad_learner_state, _ = learner.update(
+        grad_learner_state, grads_list, key=key)
     theta = theta_opt.get_params(next_grad_learner_state.theta_opt_state)
 
     # avg gradient will be 0.5. SGD udate is 0 - 3 * 0.5.
