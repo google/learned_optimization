@@ -209,7 +209,7 @@ def tfds_image_classification_datasets(
     batch_size: int,
     image_size: Tuple[int, int],
     stack_channels: int = 1,
-    prefetch_batches: int = 300,
+    prefetch_batches: int = 1000,
     shuffle_buffer_size: int = 10000,
     normalize_mean: Optional[Tuple[int, int, int]] = None,
     normalize_std: Optional[Tuple[int, int, int]] = None,
@@ -251,7 +251,7 @@ def tfds_image_classification_datasets(
     ds = ds.map(functools.partial(_image_map_fn, cfg))
     ds = ds.shuffle(shuffle_buffer_size)
     ds = ds.batch(batch_size, drop_remainder=True)
-    ds = ds.prefetch(128)
+    ds = ds.prefetch(prefetch_batches)
     return ThreadSafeIterator(LazyIterator(ds.as_numpy_iterator))
 
   builder = tfds.builder(datasetname)
@@ -278,13 +278,19 @@ def tfds_image_classification_datasets(
       abstract_batch=abstract_batch)
 
 
+@functools.lru_cache(None)
+def _cached_tfds_load(datasetname, split, batch_size):
+  assert batch_size == -1
+  return tfds.load(datasetname, split=split, batch_size=-1)
+
+
 def preload_tfds_image_classification_datasets(
     datasetname: str,
     splits: Tuple[str, str, str, str],
     batch_size: int,
     image_size: Tuple[int, int],
     stack_channels: int = 1,
-    prefetch_batches: int = 300,
+    prefetch_batches: int = 1000,
     normalize_mean: Optional[Tuple[int, int, int]] = None,
     normalize_std: Optional[Tuple[int, int, int]] = None,
     convert_to_black_and_white: Optional[bool] = False,
@@ -321,7 +327,7 @@ def preload_tfds_image_classification_datasets(
   def make_python_iter(split: str) -> Iterator[Batch]:
     # load the entire dataset into memory
     with profile.Profile(f"tfds.load({datasetname})"):
-      dataset = tfds.load(datasetname, split=split, batch_size=-1)
+      dataset = _cached_tfds_load(datasetname, split=split, batch_size=-1)
     data = tfds.as_numpy(_image_map_fn(cfg, dataset))
 
     # use a python iterator as this is faster than TFDS.
@@ -391,7 +397,7 @@ def tfrecord_image_classification_datasets(
     image_size: Tuple[int, int],
     decode_image_shape: Sequence[int],
     stack_channels: int = 1,
-    prefetch_batches: int = 300,
+    prefetch_batches: int = 1000,
     shuffle_buffer_size: int = 10000,
     aug_flip_left_right: bool = False,
     aug_flip_up_down: bool = False,
