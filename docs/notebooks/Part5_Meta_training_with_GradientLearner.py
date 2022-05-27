@@ -233,8 +233,10 @@ out = gradient_learner.gradient_worker_compute(
 # Now with more than one worker, we would pass back a list of these gradients. In this demo, we will just use a single one, and pass this directly into the central learner to get the next meta-iteration. With more workers, this would contain a different gradient estimator from each worker.
 
 # + id="pne3-Yy147tW"
+key1, key = jax.random.split(key)
 grads_list = [out.to_put]
-central_state, metrics = central_learner.update(central_state, grads_list)
+central_state, metrics = central_learner.update(
+    central_state, grads_list, key=key1)
 
 # + [markdown] id="i0H_re9cVW1b"
 # And we can do this over and over again. This time let's do it with more than one gradient estimate.
@@ -257,7 +259,9 @@ for i in tqdm.trange(outer_train_steps):
   # extract the next unroll state output for the next iteration.
   unroll_states = out.unroll_states
 
-  central_state, metrics = central_learner.update(central_state, [out.to_put])
+  key1, key = jax.random.split(key)
+  central_state, metrics = central_learner.update(
+      central_state, [out.to_put], key=key1)
   losses.append(out.to_put.mean_loss)
 
 # + colab={"height": 296} executionInfo={"elapsed": 177, "status": "ok", "timestamp": 1647563002848, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="WszEeLOBJw0x" outputId="d548cd42-aa08-407b-e65c-a2e3bacb7b91"

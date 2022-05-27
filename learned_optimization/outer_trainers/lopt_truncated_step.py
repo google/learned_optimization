@@ -514,13 +514,17 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     else:
       data_shape = (self.num_tasks,)
     tr_batch = training.get_batches(
-        self.task_family, data_shape, numpy=False, split="train")
+        #self.task_family, data_shape, numpy=False, split="train")
+        self.task_family,
+        data_shape,
+        numpy=True,
+        split="train")
 
     if self.meta_loss_split == "same_data" or self.meta_loss_split is None:
       return tr_batch
     else:
       outer_batch = training.get_batches(
-          self.task_family, data_shape, numpy=False, split=self.meta_loss_split)
+          self.task_family, data_shape, numpy=True, split=self.meta_loss_split)
       return (tr_batch, outer_batch)
 
   def get_outer_batch(self, steps: Optional[int] = None):

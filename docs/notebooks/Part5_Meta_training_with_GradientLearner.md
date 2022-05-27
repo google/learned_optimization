@@ -378,8 +378,9 @@ Now with more than one worker, we would pass back a list of these gradients. In 
 ```{code-cell}
 :id: pne3-Yy147tW
 
+key1, key = jax.random.split(key)
 grads_list = [out.to_put]
-central_state, metrics = central_learner.update(central_state, grads_list)
+central_state, metrics = central_learner.update(central_state, grads_list, key=key1)
 ```
 
 +++ {"id": "i0H_re9cVW1b"}
@@ -417,7 +418,9 @@ for i in tqdm.trange(outer_train_steps):
   # extract the next unroll state output for the next iteration.
   unroll_states = out.unroll_states
 
-  central_state, metrics = central_learner.update(central_state, [out.to_put])
+  key1, key = jax.random.split(key)
+  central_state, metrics = central_learner.update(
+      central_state, [out.to_put], key=key1)
   losses.append(out.to_put.mean_loss)
 ```
 

@@ -448,10 +448,11 @@ def summarize_learner(step: int, metrics: Mapping[str, float],
                i] = onp.sum(flatten_ids == i) / float(len(flatten_ids))
 
     def fn(k, v):
-      mean_v = jnp.mean(v)
-      mean_abs_v = jnp.mean(jnp.abs(v))
-      to_write["theta_mean/" + k] = mean_v
-      to_write["theta_mean_abs/" + k] = mean_abs_v
+      if v is not None:
+        mean_v = jnp.mean(v)
+        mean_abs_v = jnp.mean(jnp.abs(v))
+        to_write["theta_mean/" + k] = mean_v
+        to_write["theta_mean_abs/" + k] = mean_abs_v
 
     tree_utils.map_named(fn, theta)
 
@@ -484,7 +485,7 @@ def summarize_learner(step: int, metrics: Mapping[str, float],
 def _threaded_write_summary(
     summary_writer: Any, to_write: Mapping[str, Union[float, onp.ndarray]],
     step: int, summary_thread_pool: futures.ThreadPoolExecutor,
-    summary_future: Optional[futures.Future[None]]) -> futures.Future[None]:
+    summary_future: Optional[futures.Future]) -> futures.Future:
   """Write summaries out in the background in a thread pool."""
 
   def write_summary(to_write):
