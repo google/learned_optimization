@@ -91,7 +91,7 @@ class CFGObject:
   kwargs: Mapping[str, Any] = flax.struct.field(default_factory=dict)
 
   def __repr__(self):
-    return f"CFGObject(obj={self.obj}, kwargs={self.kwargs})"
+    return f"CFGObject(obj='{self.obj}', kwargs={self.kwargs})"
 
 
 @flax.struct.dataclass
