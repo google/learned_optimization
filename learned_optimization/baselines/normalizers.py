@@ -121,14 +121,25 @@ def _one_line_dumps(dd):
   return content
 
 
-def speedup_over_adam_build_and_write(tasks: Sequence[str], output_path: str):
-  """Build and write the normalization data for the provided set of tasks."""
+def speedup_over_adam_build_and_write(tasks: Sequence[str],
+                                      output_path: str,
+                                      overwrite: bool = False):
+  """Build and append the normalization data for the provided set of tasks."""
   flat_norm_datas = threaded_tqdm_map(32, _speedup_over_adam_build, tasks)
-  norm_datas = {}
-  for d, t in zip(flat_norm_datas, tasks):
-    norm_datas[t] = d
 
-  content = _one_line_dumps(norm_datas)
+  if filesystem.exists(output_path):
+    with filesystem.file_open(output_path, "r") as f:
+      data_dict = json.loads(f.read())
+  else:
+    data_dict = {}
+
+  for d, t in zip(flat_norm_datas, tasks):
+    if t not in data_dict or overwrite:
+      data_dict[t] = d
+    else:
+      raise ValueError(f"Duplicate found for {t}")
+
+  content = _one_line_dumps(data_dict)
 
   with filesystem.file_open(output_path, "w") as f:
     f.write(content)
