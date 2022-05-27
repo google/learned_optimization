@@ -18,7 +18,6 @@
 For these optimizers, see optax's implementation / docs for more details.
 """
 
-import collections
 import functools
 from typing import Any, Callable, Optional, Sequence, Union
 
@@ -35,9 +34,13 @@ Params = Any
 Gradient = Params
 OptState = Any
 
-# Internal-ish states
-OptaxState = collections.namedtuple(
-    "OptaxState", ["params", "state", "optax_opt_state", "iteration"])
+
+@struct.dataclass
+class OptaxState:
+  params: chex.ArrayTree
+  state: chex.ArrayTree
+  optax_opt_state: chex.ArrayTree
+  iteration: jnp.ndarray
 
 
 class OptaxOptimizer(base.Optimizer):

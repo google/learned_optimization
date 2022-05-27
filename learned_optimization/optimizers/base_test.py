@@ -26,5 +26,9 @@ class BaseTest(absltest.TestCase):
     test_utils.smoketest_optimizer(
         base.GradientClipOptimizer(optax_opts.Adam(1e-4)))
 
+  def test_grafted_optimizer(self):
+    test_utils.smoketest_optimizer(
+        base.GraftedOptimizer(optax_opts.SGDM(1e-2), optax_opts.Adam(1e-4)))
+
 if __name__ == '__main__':
   absltest.main()

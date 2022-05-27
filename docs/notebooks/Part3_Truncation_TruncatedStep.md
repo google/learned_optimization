@@ -70,7 +70,7 @@ from learned_optimization.optimizers import base as opt_base
 from learned_optimization import optimizers
 from learned_optimization import training
 from learned_optimization import eval_training
-  
+
 import haiku as hk
 import tqdm
 ```
@@ -324,7 +324,7 @@ states = jax.vmap(init_state)(keys)
 opt_state, trunc_state, keys = states
 import dataclasses
 
-opt_state = opt_state._replace(
+opt_state = opt_state.replace(
     iteration=jax.random.randint(key, [n_tasks], 0, 50))
 states = (opt_state, trunc_state, keys)
 
@@ -397,6 +397,7 @@ executionInfo:
 id: f1106d1b
 ---
 class SimpleLOptTruncStep(truncated_step_mod.TruncatedStep):
+
   def __init__(self, lopt, task, unroll_length=5):
     self.lopt = lopt
     self.task = task
@@ -408,24 +409,36 @@ class SimpleLOptTruncStep(truncated_step_mod.TruncatedStep):
   def init_step_state(self, theta, outer_state, key):
     params = self.task.init(key)
     return self.lopt.opt_fn(theta).init(params)
-  
+
   @functools.partial(jax.jit, static_argnums=(0,))
   def unroll_step(self, theta, unroll_state, key, data, outer_state):
     opt = self.lopt.opt_fn(theta)
+
     def train(unroll_state):
       params = opt.get_params(unroll_state)
       loss, grad = jax.value_and_grad(task.loss)(params, key, data)
       unroll_state = opt.update(unroll_state, grad, loss=loss)
-      out = truncated_step_mod.TruncatedUnrollOut(loss=loss, is_done=False, task_param=None, iteration=unroll_state.iteration, mask=True)
+      out = truncated_step_mod.TruncatedUnrollOut(
+          loss=loss,
+          is_done=False,
+          task_param=None,
+          iteration=unroll_state.iteration,
+          mask=True)
       return unroll_state, out
 
     def reset(unroll_state):
-      params = self.task.init(key) # Modify this
+      params = self.task.init(key)  # Modify this
       unroll_state = self.lopt.opt_fn(theta).init(params)
-      out = truncated_step_mod.TruncatedUnrollOut(loss=0.0, is_done=True, task_param=None, iteration=unroll_state.iteration, mask=False)
+      out = truncated_step_mod.TruncatedUnrollOut(
+          loss=0.0,
+          is_done=True,
+          task_param=None,
+          iteration=unroll_state.iteration,
+          mask=False)
       return unroll_state, out
 
-    return jax.lax.cond(unroll_state.iteration < self.unroll_length, train, reset, unroll_state)
+    return jax.lax.cond(unroll_state.iteration < self.unroll_length, train,
+                        reset, unroll_state)
 
   def meta_loss_batch(self, theta, unroll_state, key, data, outer_state):
     params = self.lopt.opt_fn(theta).get_params(unroll_state)
@@ -474,8 +487,10 @@ print("Iteration=", unroll_state.iteration)
 
 for i in range(10):
   batch = jax.tree_map(lambda x: x[0], truncated_step.get_batch(1))
-  unroll_state, out = truncated_step.unroll_step(theta, unroll_state, key, batch, None)
-  print("Iteration=", unroll_state.iteration, "Loss=", out.loss, "Mask=", out.mask)
+  unroll_state, out = truncated_step.unroll_step(theta, unroll_state, key,
+                                                 batch, None)
+  print("Iteration=", unroll_state.iteration, "Loss=", out.loss, "Mask=",
+        out.mask)
 ```
 
 +++ {"id": "acaece93"}
@@ -508,8 +523,10 @@ print("Iteration=", unroll_state.iteration)
 
 for i in range(10):
   batch = jax.tree_map(lambda x: x[0], truncated_step.get_batch(1))
-  unroll_state, out = truncated_step.unroll_step(theta, unroll_state, key, batch, None)
-  print("Iteration=", unroll_state.iteration, "Loss=", out.loss, "Mask=", out.mask)
+  unroll_state, out = truncated_step.unroll_step(theta, unroll_state, key,
+                                                 batch, None)
+  print("Iteration=", unroll_state.iteration, "Loss=", out.loss, "Mask=",
+        out.mask)
 ```
 
 +++ {"id": "38fe30c7"}
@@ -536,8 +553,12 @@ outputId: 5404e568-1aa5-404c-9113-b70a1254ee8c
 task_family = quadratics.FixedDimQuadraticFamilyData(10)
 lopt = lopt_base.LearnableSGDM()
 trunc_sched = truncation_schedule.ConstantTruncationSchedule(5)
-truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(task_family, lopt, trunc_sched, num_tasks=3,
-                                                       random_initial_iteration_offset=5)
+truncated_step = lopt_truncated_step.VectorizedLOptTruncatedStep(
+    task_family,
+    lopt,
+    trunc_sched,
+    num_tasks=3,
+    random_initial_iteration_offset=5)
 
 key = jax.random.PRNGKey(1)
 theta = truncated_step.outer_init(key)
@@ -547,6 +568,8 @@ print("Iteration=", unroll_state.inner_step)
 
 for i in range(10):
   batch = jax.tree_map(lambda x: x[0], truncated_step.get_batch(1))
-  unroll_state, out = truncated_step.unroll_step(theta, unroll_state, key, batch, None)
-  print("Iteration=", unroll_state.inner_step, "Loss=", out.loss, "Mask=", out.mask)
+  unroll_state, out = truncated_step.unroll_step(theta, unroll_state, key,
+                                                 batch, None)
+  print("Iteration=", unroll_state.inner_step, "Loss=", out.loss, "Mask=",
+        out.mask)
 ```
