@@ -55,7 +55,7 @@ class OuterState:
 class WorkerWeights:
   theta: MetaParams
   theta_model_state: Any
-  outer_state: OuterState
+  outer_state: Optional[OuterState]
 
 
 @flax.struct.dataclass
@@ -279,13 +279,20 @@ class GradientEstimator(abc.ABC):
     raise NotImplementedError()
 
   def compute_gradient_estimate(
-      self, worker_weights: WorkerWeights, key: PRNGKey,
-      state: GradientEstimatorState, with_summary: Optional[bool]
+      self,
+      worker_weights: WorkerWeights,
+      key: PRNGKey,
+      state: GradientEstimatorState,
+      with_summary: Optional[bool],
+      datas_list: Any = None,
   ) -> Tuple[GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
     raise NotImplementedError()
 
   def task_name(self):
     return "default_task"
+
+  def get_datas(self) -> Any:
+    raise NotImplementedError()
 
 
 def _nan_to_num(vals, replace, use_jnp=False):

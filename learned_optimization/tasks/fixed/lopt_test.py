@@ -22,15 +22,15 @@ from learned_optimization.tasks.fixed import lopt
 
 tasks = [
     "LOpt_MLPLOpt_FahionMnist_10",
-    "LOpt_MLPLOpt_Cifar10_16_10",
     "LOpt_MLPLOpt_Cifar10_8_50",
-    "LOpt_AdafacMLPLOpt_Cifar10_8_10",
     "LOpt_AdafacMLPLOpt_FashionMnist_50",
     "LOpt_AdafacMLPLOpt_FashionMnist_20",
     "LOpt_LearnableAdam_Cifar10_8_50",
     "LOpt_ES4_AdafacMLPLOpt_FashionMnist_20",
     "LOpt_ES4_LOpt_MLPLOpt_FahionMnist_50",
     "LOpt_ES4_LOpt_MLPLOpt_Cifar10_16_10",
+    "LOptPES_Adafac_Fashion_OuterBS8_Length50_Trunc5",
+    "LOptPES_Adafac_Cifar_OuterBS8_Length50_Trunc5",
 ]
 
 
