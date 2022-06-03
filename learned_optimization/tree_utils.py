@@ -14,8 +14,11 @@
 # limitations under the License.
 
 """Utilities for working with jax pytree."""
-from typing import Any, Callable, Mapping, Optional
 
+from typing import Any, Callable, Mapping, Optional, Sequence
+
+import chex
+import flax
 import jax
 import jax.numpy as jnp
 import numpy as onp
@@ -130,6 +133,13 @@ def map_named(function: Callable[[str, Any], Any],
     return type(val)(
         *
         [map_named(function, v, key + "/" + str(i)) for i, v in enumerate(val)])
+  # check if it's a flax dataclass
+  elif hasattr(val, "__dataclass_fields__"):
+    classname = repr(val).split("(")[0]
+    return type(val)(**{
+        k: map_named(function, v, f"{key}/{classname}.{k}")
+        for k, v in val.__dataclass_fields__.items()
+    })
   else:
     return function(key, val)
 
@@ -144,3 +154,82 @@ def strip_weak_type(pytree):
     return x
 
   return jax.tree_map(maybe_remove_weak, pytree)
+
+
+FilterFN = Callable[[str, chex.Array], bool]
+
+
+@flax.struct.dataclass
+class PartitionUnflatten:
+  data: Any
+
+  def __call__(self, partitioned_vals):
+    return partition_unflatten(self, partitioned_vals)
+
+
+def partition(functions: Sequence[FilterFN],
+              values: chex.ArrayTree,
+              strict: bool = False):
+  """Split a pytree up into disjoint lists of values.
+
+  The resulting data can then be manipulated and combined again by either
+    calling the unflattener, or `partition_unflatten`.
+
+  Args:
+    functions: list of boolean functions which to filter. We always partition
+      based on the first true function if more than one returns true.
+    values: The pytree to be partitioned.
+    strict: If set to False, an additional partition is returned.
+
+  Returns:
+    partitions: List of lists containing partitioned values
+    unflattener: A pytree which can be used to unflatten values.
+  """
+
+  vals, struct = jax.tree_flatten(values)
+
+  def get_name(k, v):
+    del v
+    return k
+
+  keys = jax.tree_leaves(map_named(get_name, "", values))
+  keys = [str(i) for i, v in enumerate(vals)]
+  if not strict:
+    functions = list(functions) + [lambda k, v: True]
+
+  partitions = [[] for _ in functions]
+  names = [[] for _ in functions]
+
+  for k, v in zip(keys, vals):
+    has_got = False
+    for fi, f in enumerate(functions):
+      if f(k, v):
+        partitions[fi].append(v)
+        names[fi].append(k)
+        has_got = True
+        break
+    assert has_got, f"No matching found for: {k}"
+  data_to_restore = (tuple(keys), tuple(names), struct)
+  return partitions, PartitionUnflatten(data_to_restore)
+
+
+def partition_unflatten(unflattener: PartitionUnflatten,
+                        part_values: Sequence[jnp.ndarray]) -> Any:
+  """Unflatten the paritioned values from `partition`.
+
+  Args:
+    unflattener: The unflattener object from `partition`.
+    part_values: The partitioned values.
+
+  Returns:
+    tree: The original pytree of values.
+  """
+
+  keys, names, struct = unflattener.data
+  unmap = {k: i for i, k in enumerate(keys)}
+  to_fill = [None for _ in keys]
+  for name, part in zip(names, part_values):
+    for n, p in zip(name, part):
+      to_fill[unmap[n]] = p
+
+  return jax.tree_unflatten(struct, to_fill)
