@@ -26,6 +26,7 @@ This module also contains functions to save and restore state directly to a
 given filename.
 """
 import collections
+from concurrent import futures
 import os
 import time
 from typing import Any, Callable, Mapping, Optional, TypeVar, Union
@@ -112,6 +113,8 @@ def save_checkpoint(ckpt_dir: str,
 
 
 _last_checkpoint_time = collections.defaultdict(lambda: -1)
+_last_checkpoint_futures = {}
+_checkpoint_thread_pool = futures.ThreadPoolExecutor(1)
 
 
 @gin.configurable
@@ -122,7 +125,8 @@ def periodically_save_checkpoint(
     time_interval: Optional[int] = 10 * 60,
     step_interval: Optional[int] = None,
     keep: int = 20,
-) -> Optional[Mapping[str, str]]:
+    background: bool = False,
+) -> Optional[Union[futures.Future[Mapping[str, str]], Mapping[str, str]]]:
   """Maybe a checkpoint based on how much time or steps have elapsed.
 
   If a checkpoint is saved, return the paths otherwise return None.
@@ -136,11 +140,11 @@ def periodically_save_checkpoint(
     time_interval: number of seconds between checkpoint or None.
     step_interval: number of steps between checkpoint or None.
     keep: number of checkpoints to keep before deleting old checkpoints.
+    background: Write the checkpoint in a background thread.
 
   Returns:
     If a checkpoint was saved, a map from prefix to filename. Otherwise None.
   """
-  global _last_checkpoint_time
 
   prefix = sorted(checkpoint_state_map.keys())[0]
 
@@ -154,31 +158,43 @@ def periodically_save_checkpoint(
 
   if do_save:
     # if a checkpoint exists already, delete it.
-    paths = {}
 
     # get the last step
-
-    checkpoint = checkpoints.latest_checkpoint(train_log_dir, prefix)
-    if checkpoint is not None:
-      last_step = int(checkpoint.split(prefix)[-1])
-      step = last_step + 1
-      logging.info(f"Last Step found {last_step}, saving to {step}")  # pylint: disable=logging-fstring-interpolation
-    else:
-      step = 0
-      logging.info(f"No last checkpoint found. Waving to {step}")  # pylint: disable=logging-fstring-interpolation
-
-    for prefix, value_or_fn in checkpoint_state_map.items():
-      if callable(value_or_fn):
-        value = value_or_fn()
+    def do_save_fn():
+      paths = {}
+      prefix = sorted(checkpoint_state_map.keys())[0]
+      checkpoint = checkpoints.latest_checkpoint(train_log_dir, prefix)
+      if checkpoint is not None:
+        last_step = int(checkpoint.split(prefix)[-1])
+        step = last_step + 1
+        logging.info(f"Last Step found {last_step}, saving to {step}")  # pylint: disable=logging-fstring-interpolation
       else:
-        value = value_or_fn
+        step = 0
+        logging.info(f"No last checkpoint found. Waving to {step}")  # pylint: disable=logging-fstring-interpolation
 
-      path = save_checkpoint(train_log_dir, prefix, value, step, keep=keep)
-      paths[prefix] = path
-      _last_checkpoint_time[prefix] = time.time()
+      for prefix, value_or_fn in checkpoint_state_map.items():
+        if callable(value_or_fn):
+          value = value_or_fn()
+        else:
+          value = value_or_fn
 
-    paths = hk.data_structures.to_immutable_dict(paths)
-    return paths
+        path = save_checkpoint(train_log_dir, prefix, value, step, keep=keep)
+        paths[prefix] = path
+        _last_checkpoint_time[prefix] = time.time()
+
+      paths = hk.data_structures.to_immutable_dict(paths)
+      return paths
+
+    if background:
+      ckpt_keys = tuple(sorted(checkpoint_state_map.keys()))
+      fs = _last_checkpoint_futures.get(ckpt_keys, None)
+      if fs:
+        _ = fs.result()
+      fs = _checkpoint_thread_pool.submit(do_save_fn)
+      _last_checkpoint_futures[ckpt_keys] = fs
+      return fs
+    else:
+      return do_save_fn()
   else:
     return None
 
