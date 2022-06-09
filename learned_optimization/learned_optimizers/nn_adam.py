@@ -66,7 +66,7 @@ class MeanAndMeanSquareAccumulator:
 class NNAdamState:
   """State of the NN adam optimizer.
 
-  Args:
+  Attributes:
     params: Parameter pytree of the problem being optimized
     state: The state / non-learnable params of the problem being optimized
     iteration: Number of inner-steps applied.
@@ -164,12 +164,15 @@ class NNAdam(lopt_base.LearnedOptimizer):
   See module level docstring for more info.
   """
 
-  def __init__(self,
-               output_scale: float = 0.01,
-               initial_learning_rate: float = 1e-4,
-               initial_beta1: float = 0.9,
-               initial_beta2: float = 0.999,
-               initial_epsilon: float = 1e-8):
+  def __init__(
+      self,
+      output_scale: float = 0.01,
+      initial_learning_rate: float = 1e-4,
+      initial_beta1: float = 0.9,
+      initial_beta2: float = 0.999,
+      initial_epsilon: float = 1e-8,
+      decay_strength: float = 0.0,
+  ):
     """Initalizer.
 
     Args:
@@ -178,6 +181,9 @@ class NNAdam(lopt_base.LearnedOptimizer):
       initial_beta1: Initialization of beta1 in meta-params.
       initial_beta2: Initialization of beta2 in meta-params.
       initial_epsilon: Initialization of epsilon in meta-params.
+      decay_strength: Decay term which pulls the current per layer hparams
+        to the initial hparam values. This prevents exploding or vanishing
+        values.
     """
 
     super().__init__()
@@ -187,6 +193,7 @@ class NNAdam(lopt_base.LearnedOptimizer):
     self.initial_epsilon = initial_epsilon
     self.output_scale = output_scale
     self.lstm_hidden_size = 32
+    self.decay_strength = decay_strength
 
     # This hardcoded value matches the number of features created by the
     # lstm_features_for_tensor function.
@@ -421,6 +428,24 @@ class NNAdam(lopt_base.LearnedOptimizer):
         new_b1 = tree_add(opt_state.per_layer_beta1, beta1)
         new_b2 = tree_add(opt_state.per_layer_beta2, beta2)
         new_epsilon = tree_add(opt_state.per_layer_epsilon, epsilon)
+
+        # Decay back to the initial value.
+        if parent.decay_strength > 0:
+          offset = tree_utils.tree_sub(new_lr, theta["per_layer_lr"])
+          new_lr = tree_utils.tree_sub(
+              new_lr, tree_utils.tree_mul(offset, parent.decay_strength))
+
+          offset = tree_utils.tree_sub(new_b1, theta["per_layer_beta1"])
+          new_b1 = tree_utils.tree_sub(
+              new_b1, tree_utils.tree_mul(offset, parent.decay_strength))
+
+          offset = tree_utils.tree_sub(new_b2, theta["per_layer_beta2"])
+          new_b2 = tree_utils.tree_sub(
+              new_b2, tree_utils.tree_mul(offset, parent.decay_strength))
+
+          offset = tree_utils.tree_sub(new_epsilon, theta["per_layer_epsilon"])
+          new_epsilon = tree_utils.tree_sub(
+              new_epsilon, tree_utils.tree_mul(offset, parent.decay_strength))
 
         # Clip the hparams by running a inverse and forward of transforms.
         # This ensures only valid values are used.
