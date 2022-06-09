@@ -196,6 +196,7 @@ class OuterState:
   outer_iteration: int
 
 
+@profile.wrap()
 def metrics_and_info_from_gradients(
     gathered_grads: Sequence[GradientsFromWorker],
     steps: Sequence[int],
@@ -482,6 +483,7 @@ def summarize_learner(step: int, metrics: Mapping[str, float],
   return to_write
 
 
+@profile.wrap()
 def _threaded_write_summary(
     summary_writer: Any, to_write: Mapping[str, Union[float, onp.ndarray]],
     step: int, summary_thread_pool: futures.ThreadPoolExecutor,
@@ -489,11 +491,14 @@ def _threaded_write_summary(
   """Write summaries out in the background in a thread pool."""
 
   def write_summary(to_write):
-    for k, v in to_write.items():
-      if _is_scalar(v):
-        summary_writer.scalar(k, float(v), step=step)
-      else:
-        summary_writer.histogram(k, v, step=step)
+    with profile.Profile("summary.add_scalar_and_hist"):
+      for k, v in to_write.items():
+        if _is_scalar(v):
+          summary_writer.scalar(k, float(v), step=step)
+        else:
+          summary_writer.histogram(k, v, step=step)
+    with profile.Profile("summary.flush"):
+      summary_writer.flush()
 
   if summary_future:
     summary_future.result()
@@ -532,6 +537,7 @@ def summarize_outer_cfg(outer_cfg: Sequence[str]) -> Mapping[str, float]:
   return to_write
 
 
+@profile.wrap()
 def train_learner(
     train_log_dir: str,
     outer_learner_fn: Callable[[], gradient_learner.GradientLearner],
@@ -707,18 +713,25 @@ def train_learner(
 
         dist_learner.start_server()
 
-    opt_checkpoint = gradient_learner.OptCheckpoint(
-        gradient_learner_state, jnp.asarray(elapsed_time, dtype=jnp.float64),
-        total_inner_steps)
-    param_checkpoint = gradient_learner.ParameterCheckpoint(
-        outer_learner.get_meta_params(gradient_learner_state), gen_id, step)
-    paths = checkpoints.periodically_save_checkpoint(train_log_dir, step, {
-        "checkpoint_": opt_checkpoint,
-        "params_": param_checkpoint
-    })
+    with profile.Profile("checkpoints"):
+      opt_checkpoint = gradient_learner.OptCheckpoint(
+          gradient_learner_state, jnp.asarray(elapsed_time, dtype=jnp.float64),
+          total_inner_steps)
+      param_checkpoint = gradient_learner.ParameterCheckpoint(
+          outer_learner.get_meta_params(gradient_learner_state), gen_id, step)
+      paths = checkpoints.periodically_save_checkpoint(
+          train_log_dir,
+          step, {
+              "checkpoint_": opt_checkpoint,
+              "params_": param_checkpoint
+          },
+          background=True)
 
     if population and paths:
       # If we did save a checkpoint, log it out to the population
+      # If using population based training, we will fallback to sync writing.
+      # TODO(lmetz): move this to happen async as well...
+      paths = paths.result()
       population.set_eval(
           worker_id=population_worker_id,
           generation_id=gen_id,
@@ -727,69 +740,76 @@ def train_learner(
           value=None)
 
     filter_fn = lambda x: x.gen_id == gen_id if gen_id else lambda x: True
-    steps, mix_t_grads = dist_learner.gather_grads(filter_fn)
+    steps, mix_t_grads, buffer_size = dist_learner.gather_grads(filter_fn)
+
     logging.info("Applying grad for generation=%s", gen_id)
 
     with_m = True if (summary_every_n and i % summary_every_n == 0) else False
 
     # This actually does the actual updates to the learned optimizer weights.
-    gradient_learner_state, metrics = outer_learner.update(
-        gradient_learner_state, [g.outer_trainer_grads for g in mix_t_grads],
-        with_metrics=with_m,
-        key=key)
+    with profile.Profile("outer_learner.update"):
+      gradient_learner_state, metrics = outer_learner.update(
+          gradient_learner_state, [g.outer_trainer_grads for g in mix_t_grads],
+          with_metrics=with_m,
+          key=key)
 
     step = gradient_learner_state.theta_opt_state.iteration
 
     # Then we set the new set of weights.
-    logging.info("Setting weights for generation=%s", gen_id)
-    worker_weights = outer_learner.get_state_for_worker(gradient_learner_state)
+    with profile.Profile("outer_learner.get_state_for_worker"):
+      logging.info("Setting weights for generation=%s", gen_id)
+      worker_weights = outer_learner.get_state_for_worker(
+          gradient_learner_state)
+
     removed_grads = dist_learner.set_weights(
         step, DataForWorker(worker_weights, gen_id, outer_cfg))
 
     #### Summary code ####
-    # aggregate metrics from each of the workers
-    metrics_update = summary.aggregate_metric_list(
-        [m.metrics for m in mix_t_grads])
-    metrics = {**metrics, **metrics_update}
+    with profile.Profile("summary"):
+      # aggregate metrics from each of the workers
+      metrics_update = summary.aggregate_metric_list(
+          [m.metrics for m in mix_t_grads])
+      metrics = {**metrics, **metrics_update}
 
-    # compute metrics based on the passed in gradients
-    metrics_update, single_worker_ids, applied_inner_steps = metrics_and_info_from_gradients(
-        mix_t_grads, steps, current_step=step)
-    total_inner_steps = total_inner_steps + applied_inner_steps
+      # compute metrics based on the passed in gradients
+      metrics_update, single_worker_ids, applied_inner_steps = metrics_and_info_from_gradients(
+          mix_t_grads, steps, current_step=step)
+      total_inner_steps = total_inner_steps + applied_inner_steps
 
-    metrics = {**metrics, **metrics_update}
+      metrics = {**metrics, **metrics_update}
 
-    metrics["removed_stale_grads"] = float(removed_grads)
+      metrics["buffer_size"] = buffer_size
+      metrics["removed_stale_grads"] = float(removed_grads)
 
-    worker_ids.append(single_worker_ids)
+      worker_ids.append(single_worker_ids)
 
-    delta_time = time.time() - learner_time
-    learner_time = time.time()
+      delta_time = time.time() - learner_time
+      learner_time = time.time()
 
-    to_write = summarize_learner(
-        step=step,
-        metrics=metrics,
-        worker_ids=worker_ids,
-        with_metrics=with_m,
-        theta=outer_learner.get_meta_params(gradient_learner_state),
-        delta_time=delta_time,
-        total_inner_steps=total_inner_steps,
-        delta_inner_steps=applied_inner_steps,
-    )
+      to_write = summarize_learner(
+          step=step,
+          metrics=metrics,
+          worker_ids=worker_ids,
+          with_metrics=with_m,
+          theta=outer_learner.get_meta_params(gradient_learner_state),
+          delta_time=delta_time,
+          total_inner_steps=total_inner_steps,
+          delta_inner_steps=applied_inner_steps,
+      )
 
-    to_write = dict(**to_write, **summarize_outer_cfg(outer_cfg))
+      to_write = dict(**to_write, **summarize_outer_cfg(outer_cfg))
 
-    if i % 5 == 0:
-      elapsed_time = elapsed_time + time.time() - train_start_time
-      to_write["elapsed_time"] = elapsed_time
-      train_start_time = time.time()
-      logging.info(f"Elapsed time: {elapsed_time} seconds.")  #  pylint: disable=logging-fstring-interpolation
+      if i % 5 == 0:
+        elapsed_time = elapsed_time + time.time() - train_start_time
+        to_write["elapsed_time"] = elapsed_time
+        train_start_time = time.time()
+        logging.info(f"Elapsed time: {elapsed_time} seconds.")  #  pylint: disable=logging-fstring-interpolation
 
-    summary_future = _threaded_write_summary(summary_writer, to_write, step,
-                                             summary_thread_pool,
-                                             summary_future)
+      summary_future = _threaded_write_summary(summary_writer, to_write, step,
+                                               summary_thread_pool,
+                                               summary_future)
 
-    #### end of summary code ####
+      #### end of summary code ####
 
     # Finally, exit if one of the 2 conditions has been met.
     if int(step) >= num_steps:
@@ -905,7 +925,8 @@ def local_train(
 
   for i in tqdm.trange(num_steps):
     checkpoints.periodically_save_checkpoint(
-        train_log_dir, i, {
+        train_log_dir,
+        i, {
             "checkpoint_":
                 gradient_learner.OptCheckpoint(
                     gradient_learner_state,
@@ -915,7 +936,8 @@ def local_train(
                 gradient_learner.ParameterCheckpoint(
                     outer_learner.get_meta_params(gradient_learner_state),
                     "no_gen_id", step)
-        })
+        },
+        background=True)
 
     if summary_every_n and i % summary_every_n == 0:
       with_metrics = True

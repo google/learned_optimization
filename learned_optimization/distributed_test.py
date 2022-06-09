@@ -50,7 +50,7 @@ class DistributedTest(parameterized.TestCase):
               functools.partial(self.submit_one, trainer, 0, 0, "a")))
 
     _ = [f.result() for f in ff]
-    _, grads = executor.submit(trainer.gather_grads).result()
+    _, grads, _ = executor.submit(trainer.gather_grads).result()
     self.assertLen(grads, 5)
     self.assertEqual(grads, ("a",) * 5)
 
@@ -65,7 +65,7 @@ class DistributedTest(parameterized.TestCase):
     step = 0
     for _ in range(10):
       time.sleep(delay)
-      _, grads = trainer.gather_grads()
+      _, grads, _ = trainer.gather_grads()
       step += 1
       weights = trainer._weights + [grads]
       trainer.set_weights(step, weights)

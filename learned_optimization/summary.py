@@ -19,16 +19,18 @@ import contextlib
 import enum
 import functools
 import inspect
+import os
+import threading
 import typing
-from typing import Any, Callable, Mapping, Sequence, Tuple, TypeVar, Union, MutableMapping
+from typing import Any, Callable, Mapping, MutableMapping, Sequence, Tuple, TypeVar, Union
 
 from absl import logging
-from flax.metrics import tensorboard
 import jax
 import jax.numpy as jnp
+from learned_optimization import profile
 import numpy as onp
-
 import tensorflow.compat.v2 as tf
+
 
 # Oryx can be a bit tricky to install. Turning off summaries
 try:
@@ -95,10 +97,10 @@ def reset_summary_counter():
 
 
 class AggregationType(str, enum.Enum):
-  mean = "mean"
-  sample = "sample"
-  collect = "collect"
-  none = "none"
+  mean = "mean"  # pylint: disable=invalid-name
+  sample = "sample"  # pylint: disable=invalid-name
+  collect = "collect"  # pylint: disable=invalid-name
+  none = "none"  # pylint: disable=invalid-name
 
 
 def summary(
@@ -147,6 +149,7 @@ def sample_value(key: PRNGKey, val: jnp.ndarray) -> jnp.ndarray:
   return val.ravel()[i]
 
 
+@profile.wrap()
 def aggregate_metric_list(
     metric_list: Sequence[Mapping[str, jnp.ndarray]],
     use_jnp=False,
@@ -378,10 +381,10 @@ def summarize_inner_params(params: Any):
 
 class SummaryWriterBase:
 
-  def scalar(self, tag, value, step):
+  def scalar(self, name, value, step):
     raise NotImplementedError()
 
-  def histogram(self, tag, value, step):
+  def histogram(self, name, value, step):
     raise NotImplementedError()
 
   def flush(self):
@@ -394,13 +397,13 @@ class InMemorySummaryWriter(SummaryWriterBase):
   def __init__(self):
     self.data = collections.defaultdict(lambda: ([], []))
 
-  def scalar(self, tag, value, step):
-    self.data[tag][0].append(onp.asarray(step))
-    self.data[tag][1].append(onp.asarray(value))
+  def scalar(self, name, value, step):
+    self.data[name][0].append(onp.asarray(step))
+    self.data[name][1].append(onp.asarray(value))
 
-  def histogram(self, tag, value, step):
-    self.data[tag][0].append(onp.asarray(step))
-    self.data[tag][1].append(onp.asarray(value))
+  def histogram(self, name, value, step):
+    self.data[name][0].append(onp.asarray(step))
+    self.data[name][1].append(onp.asarray(value))
 
   def flush(self):
     pass
@@ -412,13 +415,13 @@ class PrintWriter(SummaryWriterBase):
   def __init__(self, filter_fn=lambda tag: True):
     self.filter_fn = filter_fn
 
-  def scalar(self, name, val, step):
+  def scalar(self, name, value, step):
     if self.filter_fn(name):
-      print(f"{step}] {name}={val}")
+      print(f"{step}] {name}={value}")
 
-  def histogram(self, name, val, step):
+  def histogram(self, name, value, step):
     if self.filter_fn(name):
-      print(f"{step}] {name}={val}")
+      print(f"{step}] {name}={value}")
 
   def flush(self):
     pass
@@ -430,18 +433,101 @@ class MultiWriter(SummaryWriterBase):
   def __init__(self, *writers):
     self.writers = writers
 
-  def scalar(self, name, val, step):
-    print(name, val)
-    _ = [w.scalar(name, val, step) for w in self.writers]
+  def scalar(self, name, value, step):
+    _ = [w.scalar(name, value, step) for w in self.writers]
 
   def flush(self):
     _ = [w.flush() for w in self.writers]
 
-  def histogram(self, name, val, step):
-    _ = [w.histogram(name, val, step) for w in self.writers]
+  def histogram(self, name, value, step):
+    _ = [w.histogram(name, value, step) for w in self.writers]
 
 
-TensorboardWriter = tensorboard.SummaryWriter
-# TODO(lmetz) implement / bring in summary writer that doesn't use TF.
-JaxboardWriter = tensorboard.SummaryWriter
+class _SummaryState(threading.local):
+
+  def __init__(self):
+    super().__init__()
+    self.is_default = False
+
+
+_thread_state = _SummaryState()
+
+
+class TensorboardWriter(SummaryWriterBase):
+  """Saves data in event and summary protos for tensorboard."""
+
+  def __init__(self, log_dir):
+    """Create a new SummaryWriter.
+
+    Args:
+      log_dir: path to record tfevents files in.
+    """
+    log_dir = os.fspath(log_dir)
+
+    # If needed, create log_dir directory as well as missing parent directories.
+    if not tf.io.gfile.isdir(log_dir):
+      tf.io.gfile.makedirs(log_dir)
+
+    self._event_writer = tf.summary.create_file_writer(log_dir, 100, 60, None)
+    self._event_writer.set_as_default()
+    self._closed = False
+
+  def close(self):
+    """Close SummaryWriter. Final!"""
+    if not self._closed:
+      self._event_writer.close()
+      self._closed = True
+      del self._event_writer
+
+  def _ensure_default(self):
+    if not _thread_state.is_default:
+      self._event_writer.set_as_default()
+      _thread_state.is_default = True
+
+  def flush(self):
+    self._event_writer.flush()
+
+  def scalar(self, name, value, step):
+    """Saves scalar value.
+
+    Args:
+      name: str: label for this data
+      value: int/float: number to log
+      step: int: training step
+    """
+    value = float(onp.array(value))
+    self._ensure_default()
+    tf.summary.scalar(name=name, data=value, step=step)
+
+  def histogram(self, name, value, step, bins=None):
+    """Saves histogram of values.
+
+    Args:
+      name: str: label for this data
+      value: ndarray: will be flattened by this routine
+      step: int: training step
+      bins: number of bins in histogram
+    """
+    value = onp.array(value)
+    value = onp.reshape(value, -1)
+    self._ensure_default()
+    tf.summary.histogram(name=name, data=value, step=step, buckets=bins)
+
+  def text(self, name, textdata, step):
+    """Saves a text summary.
+
+    Args:
+      name: str: label for this data
+      textdata: string
+      step: int: training step
+    Note: markdown formatting is rendered by tensorboard.
+    """
+    if not isinstance(textdata, (str, bytes)):
+      raise ValueError("`textdata` should be of the type `str` or `bytes`.")
+    self._ensure_default()
+
+    tf.summary.text(name=name, data=tf.constant(textdata), step=step)
+
+
+JaxboardWriter = TensorboardWriter
 

@@ -167,7 +167,7 @@ class AsyncLearner(Generic[T, W]):
   def gather_grads(
       self,
       filter_fn: Callable[[W], bool] = lambda x: True
-  ) -> Tuple[Sequence[int], Sequence[W]]:
+  ) -> Tuple[Sequence[int], Sequence[W], int]:
     """Grab a batch of gradients from the learner.
 
     If gradients are not yet avalible, block.
@@ -179,6 +179,8 @@ class AsyncLearner(Generic[T, W]):
     Returns:
       steps: A batch of steps for which gradients had been computed.
       gradients: A list of gradients computed from workers.
+      buffer_size: Number of elements in the gradient buffer before a batch
+        was taken.
     """
     with self._cv:
 
@@ -194,7 +196,8 @@ class AsyncLearner(Generic[T, W]):
         # get a batch. the first lets say.
         with self._lock:
           self._outer_gradients = filtered_grads()
-          if len(self._outer_gradients) < self._batch_size:
+          buffer_size = len(self._outer_gradients)
+          if buffer_size < self._batch_size:
             continue
 
         steps, grads = zip(*self._outer_gradients[0:self._batch_size])
@@ -202,7 +205,7 @@ class AsyncLearner(Generic[T, W]):
         with self._lock:
           self._outer_gradients = self._outer_gradients[self._batch_size:]
 
-        return steps, grads
+        return steps, grads, buffer_size
 
   @profile.wrap()
   def set_weights(self,
@@ -369,7 +372,7 @@ class SyncLearner(Generic[T, W]):
   def gather_grads(
       self,
       filter_fn: Callable[[W], bool] = lambda x: True
-  ) -> Tuple[Sequence[int], Sequence[W]]:
+  ) -> Tuple[Sequence[int], Sequence[W], int]:
     """Grab a batch of gradients from the learner.
 
     If gradients are not yet avalible, block.
@@ -392,7 +395,8 @@ class SyncLearner(Generic[T, W]):
         steps_grads = list(self._outer_gradients.values())
         self._lock.release()
         steps, grads = zip(*steps_grads)
-        return steps, grads
+        buffer_size = 0
+        return steps, grads, buffer_size
       else:
         self._lock.release()
 
