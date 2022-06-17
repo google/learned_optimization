@@ -243,7 +243,7 @@ class ESTaskFamily(base.TaskFamily):
 
     self._std = std
     self._n_pairs = n_pairs
-    self._name = "ES{task_family.name()}"
+    self._name = f"ES_{task_family.name}"
 
   def task_fn(self, cfg: cfgobject.CFGNamed) -> base.Task:
     return ESTask(
