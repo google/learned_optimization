@@ -22,7 +22,7 @@ operate on Task and TaskFamiliy resulting in new Task and TaskFamily.
 """
 
 import functools
-from typing import Any, Callable, Mapping, Tuple, Union
+from typing import Any, Callable, Mapping, Tuple, Union, Optional
 
 import chex
 import gin
@@ -124,6 +124,7 @@ class ReparamWeightsFamily(base.TaskFamily):
     self.task_family = task_family
     self._param_scale_range = tuple(param_scale_range)
     self.datasets = task_family.datasets
+    self._name = f"ReparamWeights{level}_{task_family.name}"
 
   def _single_random(self, key):
     min_val, max_val = self._param_scale_range
@@ -262,17 +263,24 @@ class ReducedBatchsizeFamily(base.TaskFamily):
 
     self.task_fn = task_family.task_fn
     self.sample = task_family.sample
+    self._name = f"ReducedBatchsize_{task_family.name}"
 
 
 class WrappedTaskFamilyWithTaskWrapper(base.TaskFamily):
   """Wrap a task family with a Task augmentation."""
 
-  def __init__(self, task_family: base.TaskFamily,
-               task_wrapper: Callable[[base.Task], base.Task]):
+  def __init__(
+      self,
+      task_family: base.TaskFamily,
+      task_wrapper: Callable[[base.Task], base.Task],
+      name: Optional[str] = None,
+  ):
     super().__init__()
     self.task_family = task_family
     self.datasets = task_family.datasets
     self.task_wrapper = task_wrapper
+    if name:
+      self._name = name
 
   def task_fn(self, cfg: cfgobject.CFGNamed) -> base.Task:
     task = self.task_family.task_fn(cfg.values["inner_cfg"])
@@ -316,7 +324,8 @@ class ConvertFloatDType(base.Task):
 @gin.configurable
 def ConvertFloatDTypeTaskFamily(task_family, dtype=jnp.bfloat16):  # pylint: disable=invalid-name
   partial = functools.partial(ConvertFloatDType, dtype=dtype)
-  return WrappedTaskFamilyWithTaskWrapper(task_family, partial)
+  return WrappedTaskFamilyWithTaskWrapper(
+      task_family, partial, name=f"ConvertFloatDType_{task_family.name}")
 
 
 @gin.configurable
@@ -377,7 +386,10 @@ def NormalizeTaskGradient(task):  # pylint: disable=invalid-name
 
 @gin.configurable
 def NormalizeTaskGradientTaskFamily(task_family):  # pylint: disable=invalid-name
-  return WrappedTaskFamilyWithTaskWrapper(task_family, NormalizeTaskGradient)
+  return WrappedTaskFamilyWithTaskWrapper(
+      task_family,
+      NormalizeTaskGradient,
+      name=f"NormalizeTaskGradient_{task_family.name}")
 
 
 def _sample_perturbations(variables: chex.ArrayTree,
@@ -433,7 +445,10 @@ def SubsampleDirectionsTaskGradientTaskFamily(  # pylint: disable=invalid-name
       SubsampleDirectionsTaskGradient,
       directions=directions,
       sign_direction=sign_direction)
-  return WrappedTaskFamilyWithTaskWrapper(task_family, partial)
+  return WrappedTaskFamilyWithTaskWrapper(
+      task_family,
+      partial,
+      name=f"SubsampleDirectionsTaskGradient_{task_family.name}")
 
 
 @gin.configurable()
@@ -512,4 +527,5 @@ class AsyncDelayedGradients(base.Task):
 @gin.configurable
 def AsyncDelayedGradientsTaskFamily(task_family, delay_steps: int = 1):  # pylint: disable=invalid-name
   partial = functools.partial(AsyncDelayedGradients, delay_steps=delay_steps)
-  return WrappedTaskFamilyWithTaskWrapper(task_family, partial)
+  return WrappedTaskFamilyWithTaskWrapper(
+      task_family, partial, name=f"AsyncDelayedGradients_{task_family.name}")
