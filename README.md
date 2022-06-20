@@ -15,7 +15,7 @@ Our [documentation](https://learned-optimization.readthedocs.io/en/latest/) can 
 
 1. Introduction : <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/docs/notebooks/Part1_Introduction.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 2. Creating custom tasks: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/docs/notebooks/Part2_CustomTasks.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
-3. Creating custom tasks: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/docs/notebooks/Part3_Truncation_TruncatedStep.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+3. Truncated Steps: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/docs/notebooks/Part3_Truncation_TruncatedStep.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 4. Gradient estimators: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/docs/notebooks/Part4_GradientEstimators.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 5. Meta training: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/docs/notebooks/Part5_Meta_training_with_GradientLearner.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 9. Custom learned optimizers: <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/docs/notebooks/Part6_custom_learned_optimizers.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
@@ -29,14 +29,14 @@ Simple, self-contained, learned optimizer example that does not depend on the *l
 ## Local Installation
 We strongly recommend using virtualenv to work with this package.
 
-``
+```
 pip3 install virtualenv
 git clone git@github.com:google/learned_optimization.git
 cd learned_optimization
 python3 -m venv env
 source env/bin/activate
 pip install -e .
-``
+```
 
 ## Train a learned optimizer example
 To train a learned optimizer on a simple inner-problem, run the following:
