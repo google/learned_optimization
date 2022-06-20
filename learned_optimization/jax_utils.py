@@ -16,6 +16,7 @@
 """Utilities for programs written in jax."""
 
 import functools
+from typing import Callable, Optional, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -46,3 +47,62 @@ def maybe_do(pred, do_fn, operand):
 def in_jit() -> bool:
   """Returns true if tracing jit."""
   return jax.core.cur_sublevel().level > 0
+
+
+Carry = TypeVar("Carry")
+X = TypeVar("X")
+Y = TypeVar("Y")
+
+
+@functools.partial(jax.jit, static_argnames=("reverse",))
+def _stack(ys, reverse=False):
+  maybe_reversed = reversed if reverse else lambda x: x
+  return jax.tree_map(lambda *y: jnp.vstack(y), *maybe_reversed(ys))
+
+
+def scan(f: Callable[[Carry, X], Tuple[Carry, Y]],
+         init: Carry,
+         xs: X,
+         length: Optional[int] = None,
+         reverse: bool = False,
+         unroll: int = 1) -> Tuple[Carry, Y]:
+  """If not in jit, use a python for loop -- otherwise jax.lax.scan."""
+  if in_jit():
+    return jax.lax.scan(f, init, xs, length, reverse, unroll)
+  else:
+    xs_flat, xs_tree = jax.tree_flatten(xs)
+    if length is None:
+      length = jax.tree_leaves(xs)[0].shape[0]
+    carry = init
+    ys = []
+    maybe_reversed = reversed if reverse else lambda x: x
+    for i in maybe_reversed(range(length)):
+      xs_slice = [x[i] for x in xs_flat]
+      carry, y = f(carry, jax.tree_unflatten(xs_tree, xs_slice))
+      ys.append(y)
+    stacked_y = _stack(ys, reverse=reverse)
+    return carry, stacked_y
+
+
+def _print_aval(a):
+  try:
+    aval = jnp.asarray(a).aval
+    return aval
+  except:  # pylint: disable=bare-except
+    return str(a)
+
+
+def print_arg_shapes(fn):
+  """Debug decorator to print abstract values of the function."""
+
+  @functools.wraps(fn)
+  def f(*args, **kwargs):
+    print("Called:", fn.__name__)
+    print("\t Args:")
+    for a in args:
+      print("\t\t", jax.tree_map(_print_aval, a))
+    for k, v in kwargs.values():
+      print(f"\t\t {k}={jax.tree_map(_print_aval, v)}")
+    return fn(*args, **kwargs)
+
+  return f
