@@ -24,14 +24,25 @@ import jax.numpy as jnp
 import numpy as onp
 
 
+def _is_scalar(x):
+  try:
+    jnp.asarray(x)
+    return True
+  except Exception:  # pylint: disable=broad-except
+    return False
+
+
 @jax.jit
 def tree_add(treea, treeb):
   return jax.tree_multimap(lambda a, b: a + b, treea, treeb)
 
 
 @jax.jit
-def tree_sub(treea, treeb):
-  return jax.tree_multimap(lambda a, b: a - b, treea, treeb)
+def tree_sub(treea, scalar_or_treeb):
+  if _is_scalar(scalar_or_treeb):
+    return jax.tree_map(lambda a: a - scalar_or_treeb, treea)
+  else:
+    return jax.tree_map(lambda a, b: a - b, treea, scalar_or_treeb)
 
 
 @jax.jit
@@ -39,6 +50,12 @@ def tree_mean_abs(val):
   num_entry = sum(map(lambda x: onp.prod(x.shape), jax.tree_leaves(val)))
   sum_abs = sum(map(lambda x: jnp.sum(jnp.abs(x)), jax.tree_leaves(val)))
   return sum_abs / num_entry
+
+
+@jax.jit
+def tree_mean(val):
+  num_entry = sum(map(lambda x: onp.prod(x.shape), jax.tree_leaves(val)))
+  return sum(map(jnp.sum, jax.tree_leaves(val))) / num_entry
 
 
 @jax.jit
@@ -53,14 +70,6 @@ def tree_div(treea, scalar_or_treeb):
     return jax.tree_map(lambda a: a / scalar_or_treeb, treea)
   else:
     return jax.tree_map(lambda a, b: a / b, treea, scalar_or_treeb)
-
-
-def _is_scalar(x):
-  try:
-    jnp.asarray(x)
-    return True
-  except Exception:  # pylint: disable=broad-except
-    return False
 
 
 @jax.jit
