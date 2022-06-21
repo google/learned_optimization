@@ -18,11 +18,12 @@
 See TruncatedGrad for more info.
 """
 
-from typing import Any, Mapping, Tuple
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 import gin
 import jax
 import jax.numpy as jnp
+from learned_optimization import jax_utils
 from learned_optimization import profile
 from learned_optimization import summary
 from learned_optimization import tree_utils
@@ -92,18 +93,32 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
         theta_is_vector=False)
 
   @profile.wrap()
+  def get_datas(self):
+    return [
+        self.truncated_step.get_batch(self.steps_per_jit)
+        for _ in range(self.unroll_length // self.steps_per_jit)
+    ]
+
+  @profile.wrap()
   def compute_gradient_estimate(
       self,
       worker_weights,
       key,
       state: UnrollState,
       with_summary=False,
+      datas_list: Optional[Sequence[Any]] = None,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
     def meta_loss(theta, key, state):
       metrics = []
       outputs = []
       for i in range(self.unroll_length // self.steps_per_jit):
-        datas = self.truncated_step.get_batch(self.steps_per_jit)
+        if datas_list is None:
+          if jax_utils.in_jit():
+            raise ValueError("Must pass data in when using a jit gradient est.")
+          datas = self.truncated_step.get_batch(self.steps_per_jit)
+        else:
+          datas = datas_list[i]
+
         key_i = jax.random.fold_in(key, i)
         key1, key2 = jax.random.split(key_i)
 

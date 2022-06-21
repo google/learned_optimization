@@ -16,16 +16,16 @@
 """A vetorized, truncated, PES based gradient estimator."""
 
 import functools
-from typing import Any, Mapping, Sequence, Tuple, Optional
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 import flax
 from flax import jax_utils as flax_jax_utils
-from learned_optimization import jax_utils
 import gin
 import haiku as hk
 import jax
 from jax import lax
 import jax.numpy as jnp
+from learned_optimization import jax_utils
 from learned_optimization import profile
 from learned_optimization import summary
 from learned_optimization import tree_utils

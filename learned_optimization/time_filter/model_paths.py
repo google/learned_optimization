@@ -68,4 +68,10 @@ models = {
     ('sample_vit', 'valid'):
         'sample_vit/valid/tpu_TPUv4/20220426_212717.weights',
     # ^^ b'Train: 0.013442251831293106 Test: 0.011234406381845474\n'
+    ('sample_lopt_trunc', 'time'):
+        'sample_lopt_trunc/time/tpu_TPUv4/20220616_211607.weights',
+    # ^^ b'Train: 0.14942896366119385 Test: 0.16248002648353577\n'
+    ('sample_lopt_trunc', 'valid'):
+        'sample_lopt_trunc/valid/tpu_TPUv4/20220616_211317.weights',
+    # ^^ b'Train: 0.23299428820610046 Test: 0.24598242342472076\n'
 }

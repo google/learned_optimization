@@ -19,12 +19,13 @@ See TruncatedES for more info.
 """
 
 import functools
-from typing import Mapping, Sequence, Tuple, Any, Optional
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 import gin
 import haiku as hk
 import jax
 import jax.numpy as jnp
+from learned_optimization import jax_utils
 from learned_optimization import profile
 from learned_optimization import summary
 from learned_optimization import tree_utils
@@ -144,12 +145,20 @@ class TruncatedES(gradient_learner.GradientEstimator):
         theta_is_vector=False)
 
   @profile.wrap()
+  def get_datas(self):
+    return [
+        self.truncated_step.get_batch(self.steps_per_jit)
+        for _ in range(self.unroll_length // self.steps_per_jit)
+    ]
+
+  @profile.wrap()
   def compute_gradient_estimate(
       self,
       worker_weights,
       key,
       state,
       with_summary=False,
+      datas_list: Optional[Sequence[Any]] = None,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
     rng = hk.PRNGSequence(key)
 
@@ -168,8 +177,13 @@ class TruncatedES(gradient_learner.GradientEstimator):
     p_state = state
     n_state = state
 
-    for _ in range(self.unroll_length // self.steps_per_jit):
-      datas = self.truncated_step.get_batch(self.steps_per_jit)
+    for i in range(self.unroll_length // self.steps_per_jit):
+      if datas_list is None:
+        if jax_utils.in_jit():
+          raise ValueError("Must pass data in when using a jit gradient est.")
+        datas = self.truncated_step.get_batch(self.steps_per_jit)
+      else:
+        datas = datas_list[i]
 
       # force all to be non weak type. This is for cache hit reasons.
       # TODO(lmetz) consider instead just setting the weak type flag?
