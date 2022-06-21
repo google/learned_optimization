@@ -16,6 +16,7 @@
 """Train a learned optimizer with gradients."""
 import abc
 import functools
+import time
 from typing import Any, Mapping, Optional, Sequence, Tuple, Union
 
 from absl import logging
@@ -24,7 +25,6 @@ import flax
 import gin
 import jax
 import jax.numpy as jnp
-import time
 from learned_optimization import checkpoints
 from learned_optimization import profile
 from learned_optimization import summary
@@ -91,7 +91,7 @@ class GradientEstimatorOut:
   mean_loss: jnp.ndarray
   grad: Any
   unroll_state: GradientEstimatorState
-  unroll_info: UnrollInfo
+  unroll_info: Optional[UnrollInfo]
 
 
 @flax.struct.dataclass
@@ -138,17 +138,21 @@ def _get_theta_update_fn(theta_opt: opt_base.Optimizer):
 class GradientLearner:
   """Learner is responsible for training the weights of the learned opt."""
 
-  def __init__(self,
-               meta_init: MetaInitializer,
-               theta_opt: opt_base.Optimizer,
-               init_theta_from_path: Optional[str] = None,
-               init_outer_state_from_path: Optional[str] = None,
-               num_steps: Optional[int] = None):
+  def __init__(
+      self,
+      meta_init: MetaInitializer,
+      theta_opt: opt_base.Optimizer,
+      init_theta_from_path: Optional[str] = None,
+      init_outer_state_from_path: Optional[str] = None,
+      num_steps: Optional[int] = None,
+      init_seed: Optional[int] = None,
+  ):
     self._theta_opt = theta_opt
     self._meta_init = meta_init
     self._init_theta_from_path = init_theta_from_path
     self._init_outer_state_from_path = init_outer_state_from_path
     self._num_steps = num_steps
+    self._init_seed = init_seed
 
   def get_meta_params(self, state: GradientLearnerState) -> MetaParams:
     return self._theta_opt.get_params(state.theta_opt_state)
@@ -174,6 +178,8 @@ class GradientLearner:
     Returns:
       gradient_learner_state: A new initial state of the gradient learner.
     """
+    if self._init_seed is not None:
+      key = jax.random.PRNGKey(self._init_seed)
 
     theta_init = self._meta_init.init(key)
     # TODO(lmetz) hook up model state for learned optimizers
@@ -295,11 +301,16 @@ class GradientEstimator(abc.ABC):
     raise NotImplementedError()
 
 
+@functools.partial(jax.jit, donate_argnums=(0,))
+def _jit_nan_to_num(vals, replace):
+  return jax.tree_map(
+      functools.partial(
+          jnp.nan_to_num, nan=replace, posinf=replace, neginf=replace), vals)
+
+
 def _nan_to_num(vals, replace, use_jnp=False):
   if use_jnp:
-    return jax.tree_map(
-        functools.partial(
-            jnp.nan_to_num, nan=replace, posinf=replace, neginf=replace), vals)
+    return _jit_nan_to_num(vals, replace)
   else:
     return jax.tree_map(onp.nan_to_num, vals)
 
@@ -340,6 +351,7 @@ def gradient_worker_compute(
     unroll_states: state of the gradient estimator (e.g. inner problem weights)
     key: jax rng
     with_metrics: compute with summary metrics or not
+    clip_nan_loss_to_value: float, value to set nan losses to
     device: The jax device to run the computation on
 
   Returns:
@@ -369,6 +381,8 @@ def gradient_worker_compute(
       stime = time.time()
       key, rng = jax.random.split(key)
 
+      logging.info("compute_gradient_estimate for estimator name %s.",
+                   estimator.task_name())
       with profile.Profile(f"unroll__metrics{with_metrics}"):
         estimator_out, metrics = estimator.compute_gradient_estimate(
             worker_weights, rng, unroll_state, with_summary=with_metrics)
@@ -440,7 +454,7 @@ def gradient_worker_compute(
   with profile.Profile("strip_nan"):
     # this should ideally never be NAN
     # TODO(lmetz) check if we need these checks.
-    grads_accum = _nan_to_num(grads_accum, 0.0)
+    grads_accum = _nan_to_num(grads_accum, 0.0, use_jnp=True)
     if clip_nan_loss_to_value:
       mean_loss = _nan_to_num(mean_loss, clip_nan_loss_to_value, use_jnp=True)
 

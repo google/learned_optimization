@@ -43,3 +43,15 @@ def ESWrapped_1pair_ImageMLP_Mnist_128x128x128_Relu():
 def ESWrapped_8pair_ImageMLP_Mnist_128x128x128_Relu():
   return es_wrapper.ESTask(
       image_mlp.ImageMLP_Mnist_128x128x128_Relu(), 0.01, n_pairs=8)
+
+
+@gin.configurable
+def ESWrapped_1pair_ImageMLP_FashionMnist8_Relu32():
+  return es_wrapper.ESTask(
+      image_mlp.ImageMLP_FashionMnist8_Relu32(), 0.01, n_pairs=1)
+
+
+@gin.configurable
+def ESWrapped_1pair_ImageMLP_Cifar10BW8_Relu32():
+  return es_wrapper.ESTask(
+      image_mlp.ImageMLP_Cifar10BW8_Relu32(), 0.01, n_pairs=1)
