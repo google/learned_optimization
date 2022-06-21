@@ -31,7 +31,8 @@ def rolling_mom(decay: float) -> _InitUpdate:
   """Acculator to keep track of momentum."""
 
   def init_fn(p: Any) -> MomAccumulator:
-    return MomAccumulator(m=jax.tree_map(jnp.zeros_like, p), t=jnp.asarray(0))
+    return MomAccumulator(
+        m=jax.tree_map(jnp.zeros_like, p), t=jnp.asarray(0, dtype=jnp.int32))
 
   def update_fn(state: MomAccumulator, grad: Any) -> MomAccumulator:
     m = jax.tree_multimap(lambda a, b: decay * a + (1 - decay) * b, state.m,
@@ -45,7 +46,8 @@ def rolling_rms(decay: float) -> _InitUpdate:
   """Acculator to keep track of second moment accumulators."""
 
   def init_fn(p: Any) -> RMSAccumulator:
-    return RMSAccumulator(rms=jax.tree_map(jnp.zeros_like, p), t=jnp.asarray(0))
+    return RMSAccumulator(
+        rms=jax.tree_map(jnp.zeros_like, p), t=jnp.asarray(0, dtype=jnp.int32))
 
   def update_fn(state: RMSAccumulator, grad: Any) -> RMSAccumulator:
     clip_decay = jnp.clip(decay, 0.0, 1.0)
@@ -135,11 +137,13 @@ def factored_rolling(decay_rate: float, epsilon: float = 1e-30) -> _InitUpdate:
         vc_shape = onp.delete(shape, d1)
         v_row = jnp.zeros(vr_shape, dtype=jnp.float32)
         v_col = jnp.zeros(vc_shape, dtype=jnp.float32)
-        return v_row, v_col, jnp.asarray([])
+        return v_row, v_col, jnp.asarray([], dtype=jnp.float32)
 
       else:
         v = jnp.zeros(param.shape, dtype=jnp.float32)
-        return jnp.asarray([]), jnp.asarray([]), v
+        return jnp.asarray([],
+                           dtype=jnp.float32), jnp.asarray([],
+                                                           dtype=jnp.float32), v
 
     leaves, tree = jax.tree_flatten(params)
     v_rows, v_cols, v_fulls = zip(*[_init_one(l) for l in leaves])
@@ -174,13 +178,14 @@ def factored_rolling(decay_rate: float, epsilon: float = 1e-30) -> _InitUpdate:
         y = (
             g * jnp.expand_dims(row_factor, axis=d0) *
             jnp.expand_dims(col_factor, axis=d1))
-        return new_v_col, new_v_row, jnp.asarray([]), y
+        return new_v_col, new_v_row, jnp.asarray([], jnp.float32), y
 
       else:
         # otherwise precondition with diagonal style preconditioner
         new_v = clip_decay_rate * v_full + mixing_rate * grad_sqr
         y = g * safe_rsqrt(new_v + 1e-9)
-        return jnp.asarray([]), jnp.asarray([]), new_v, y
+        return jnp.asarray([], jnp.float32), jnp.asarray([],
+                                                         jnp.float32), new_v, y
 
     f_v_col, tree = jax.tree_flatten(state.v_col)
     f_v_row = jax.tree_leaves(state.v_row)
