@@ -22,11 +22,12 @@ in this case are the parameters of the policy.
 """
 
 import functools
-from typing import Any, Tuple, Optional
+from typing import Any, Optional, Tuple
 
 import brax.envs
 import chex
 import flax.core
+import gin
 import haiku as hk
 import jax
 import jax.numpy as jnp
@@ -35,20 +36,36 @@ from learned_optimization.outer_trainers import truncated_step
 PolicyParams = Any
 
 
+@gin.configurable
 class BraxEnvPolicy():
   """A simple policy which encapsulates the "meta-parameters"."""
 
-  def __init__(self,
-               obs_size: int,
-               action_size: int,
-               deterministic_output: bool = True):
+  def __init__(
+      self,
+      obs_size: Optional[int] = None,
+      action_size: Optional[int] = None,
+      env_name: Optional[str] = None,
+      deterministic_output: Optional[bool] = True,
+      hidden_size: int = 128,
+  ):
+    if env_name:
+      env = brax.envs.create(
+          env_name, auto_reset=False, episode_length=int(1e6))
+      obs_size = env.observation_size
+      action_size = env.action_size
+
+    assert obs_size is not None
+    assert action_size is not None
+
     self.obs_size = obs_size
     self.action_size = action_size
     self.deterministic_output = deterministic_output
+    self.hidden_size = hidden_size
 
   def _hk_forward(self, obs):
-    net = hk.Linear(128)(obs)
+    net = hk.Linear(self.hidden_size)(obs)
     net = jax.nn.relu(net)
+
     if self.deterministic_output:
       out = hk.Linear(self.action_size)(net)
       return jnp.tanh(out)
