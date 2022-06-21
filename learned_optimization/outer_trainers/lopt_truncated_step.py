@@ -438,6 +438,7 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
       random_initial_iteration_offset: int = 0,
       outer_data_split="train",
       meta_loss_with_aux_key: Optional[str] = None,
+      task_name: Optional[str] = None,
   ):
     """Initializer.
 
@@ -459,6 +460,8 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
       outer_data_split: Split of data to use when computing meta-losses.
       meta_loss_with_aux_key: Instead of using the loss, use a value from the
         returned auxiliary data.
+      task_name: Optional string used to prefix summary.
+        If not set, the name of the task family is used.
     """
     self.task_family = task_family
     self.learned_opt = learned_opt
@@ -468,6 +471,7 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     self.random_initial_iteration_offset = random_initial_iteration_offset
     self.outer_data_split = outer_data_split
     self.meta_loss_with_aux_key = meta_loss_with_aux_key
+    self._task_name = task_name
 
     self.data_shape = jax.tree_map(
         lambda x: jax.ShapedArray(shape=x.shape, dtype=x.dtype),
@@ -477,7 +481,10 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     return self.learned_opt.init(key)
 
   def task_name(self):
-    return self.task_family.name
+    if self._task_name is None:
+      return self.task_family.name
+    else:
+      return self._task_name
 
   def init_step_state(self,
                       theta,
