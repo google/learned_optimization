@@ -36,7 +36,6 @@ UnrollState = Any
 TruncatedUnrollState = Any
 
 import flax
-import ipdb
 
 # this is different from vector_sample_perturbations
 # as we don't need the positive and negatively perturbed thetas
@@ -46,7 +45,7 @@ sample_multiple_perturbations = jax.jit(
 
 
 @flax.struct.dataclass
-class TruncatedESSharedNoiseAttributes:
+class TruncatedESSharedNoiseAttributes(gradient_learner.GradientEstimatorState):
   pos_unroll_states: TruncatedUnrollState
   neg_unroll_states: TruncatedUnrollState
   epsilons: jnp.ndarray
