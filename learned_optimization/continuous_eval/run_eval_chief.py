@@ -57,7 +57,7 @@ def _retry_copy(src, target):
   for _ in range(2):
     try:
       filesystem.copy(src, target)
-      continue
+      return
     except Exception as e:  # pylint: disable=broad-except
       logging.error(str(e))
 

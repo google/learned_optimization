@@ -18,13 +18,14 @@ import dataclasses
 import os
 import threading
 import time
-from typing import Any, Mapping, Optional, Sequence, Tuple, MutableMapping, MutableSequence
+from typing import Any, Mapping, MutableMapping, MutableSequence, Optional, Sequence, Tuple
 
 from absl import logging
 import courier
 import dill
 from learned_optimization import distributed
 from learned_optimization import filesystem
+from learned_optimization import profile
 
 TaskGroup = Any
 TaskConfig = Any
@@ -68,7 +69,8 @@ class TaskGroupChief(threading.Thread):
                chief_name: str,
                log_dir: str,
                num_workers: int,
-               start_server: bool = True):
+               start_server: bool = True,
+               verbose: bool = False):
     super(TaskGroupChief, self).__init__()
 
     filesystem.make_dirs(log_dir)
@@ -76,6 +78,7 @@ class TaskGroupChief(threading.Thread):
 
     self.should_stop = False
     self.chief_name = chief_name
+    self.verbose = verbose
 
     self._log_dir = log_dir
     self._state_file = os.path.join(self._log_dir, "eval_chief_state")
@@ -114,6 +117,7 @@ class TaskGroupChief(threading.Thread):
   def _set_state(self, state):
     (self._tasks, self._worker_state, self._tasks_in_taskgroup) = state
 
+  @profile.wrap()
   def add_task_group(self, task_group: TaskGroup, tasks: Sequence[TaskConfig]):
     """Add a group of tasks corresponding with the corresponding task_group.
 
@@ -149,18 +153,23 @@ class TaskGroupChief(threading.Thread):
         logging.error("Caught a EOFError error. Not restoring.")
         logging.error(str(e))
 
+  @profile.wrap()
   def _save_state(self):
     with self._lock:
       self._unsafe_save_state()
 
+  @profile.wrap()
   def _unsafe_save_state(self):
     # write then move for atomic actions.
     with filesystem.file_open(self._state_file + "_tmp", "wb") as f:
-      logging.info(f"Saving state: {self._get_state()}")  # pylint: disable=logging-fstring-interpolation
-      content = dill.dumps(self._get_state())
+      if self.verbose:
+        logging.info(f"Saving state: {self._get_state()}")  # pylint: disable=logging-fstring-interpolation
+      with profile.Profile("dill_dumps"):
+        content = dill.dumps(self._get_state())
       f.write(content)
     filesystem.rename(self._state_file + "_tmp", self._state_file)
 
+  @profile.wrap()
   def get_work(self, worker_id: Any) -> Optional[EvalTask]:
     """Get a task to do work on."""
     with self._lock:
@@ -190,6 +199,7 @@ class TaskGroupChief(threading.Thread):
       self._schedule_save_state = True
       return self._worker_state[worker_id]
 
+  @profile.wrap()
   def finish_work(self, worker_id: Any, result: Any):
     """Finish a task and record the result with the task queue."""
     with self._lock:
@@ -209,6 +219,7 @@ class TaskGroupChief(threading.Thread):
       logging.info("Worker %d is done with finish_work %s", worker_id,
                    str(result))
 
+  @profile.wrap()
   def get_utilization(self) -> Tuple[int, int, Mapping[Any, int]]:
     """Get an estimate of utilization of the worker pool.
 
@@ -226,6 +237,7 @@ class TaskGroupChief(threading.Thread):
             [1 for i in values if i is not None])
       return len(self._tasks), num_worker_active, active_per_task_group
 
+  @profile.wrap()
   def get_finished_task_group(
       self) -> Optional[Tuple[Any, Sequence[Any], Sequence[Any]]]:
     """Get any finished task group's results.
@@ -245,8 +257,9 @@ class TaskGroupChief(threading.Thread):
         n_done = sum([(i.result is not None) for i in values])
 
         # TODO(lmetz) Put this on a timer so this prints less.
-        logging.info("Values on taskgroup(%s): %d/%d", str(task_group), n_done,
-                     len(values))
+        if self.verbose:
+          logging.info("Values on taskgroup(%s): %d/%d", str(task_group),
+                       n_done, len(values))
 
         # If all tasks have values
         if all([(i.result is not None) for i in values]):
@@ -257,6 +270,7 @@ class TaskGroupChief(threading.Thread):
           return task_group, values, tasks
       return None
 
+  @profile.wrap()
   def run(self):
     """Body of the thread."""
     # Save the current state of this class when requested

@@ -15,6 +15,7 @@
 
 """Worker for continuous evaluation."""
 import os
+import pickle
 import time
 from typing import Any, Callable, Mapping, Optional, TypeVar, Union
 
@@ -266,6 +267,8 @@ def connect_to_server_and_do_tasks(train_log_dir: str):
     with profile.Profile("load_gin_and_run"):
       result = load_gin_and_run(train_log_dir, task, learned_optimizer=lopt)
     logging.info("Finished the task with val %s", str(result))
+    serialized = pickle.dumps(result)
+    logging.info(f"Uncompressed size: {len(serialized)}")  # pylint: disable=logging-fstring-interpolation
     with profile.Profile("finish_work"):
       client.finish_work(FLAGS.task, result)
 

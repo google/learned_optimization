@@ -919,6 +919,7 @@ def local_train(
       step=0)
   summary_writer.text(
       "theta_opt_state_structure", _str_struct(gradient_learner_state), step=0)
+  summary_writer.text("gin_config", gin.config_str(), step=0)
 
   learner_time = time.time()
   worker_ids = collections.deque(maxlen=10)
