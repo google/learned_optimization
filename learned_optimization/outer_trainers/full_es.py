@@ -144,6 +144,9 @@ def traj_loss_antithetic_es(
   elif loss_type == "min":
     pos_loss = jnp.min(p_ys.loss, axis=0)
     neg_loss = jnp.min(n_ys.loss, axis=0)
+  elif loss_type == "last":
+    pos_loss = p_ys.loss[-1, :]
+    neg_loss = n_ys.loss[-1, :]
   else:
     raise ValueError(f"Unsupported loss type {loss_type}.")
 
@@ -414,7 +417,7 @@ class FullES(gradient_learner.GradientEstimator):
       metrics.append({"sample||end_inner_step": p_state.inner_step[0]})
 
     with profile.Profile("computing_loss_and_update"):
-      if self.loss_type in ["avg", "min"]:
+      if self.loss_type in ["avg", "min", "last"]:
         mean_loss, es_grad, p_ys = traj_loss_antithetic_es(
             p_yses,
             n_yses,

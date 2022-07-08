@@ -85,7 +85,7 @@ def _stack(a, b, axis=0):
 @functools.partial(
     jax.jit,
     static_argnames=("truncated_step", "with_summary", "unroll_length",
-                     "theta_is_vector"),
+                     "theta_is_vector", "wrap_step_fn"),
 )
 @functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 9))
 def truncated_unroll(
@@ -99,6 +99,7 @@ def truncated_unroll(
     outer_state: Any,
     override_num_steps: Optional[int] = None,
     with_summary: bool = False,  # used by add_with_summary. pylint: disable=unused-argument
+    wrap_step_fn: Optional[Any] = None,
 ) -> Tuple[Tuple[UnrollState, truncated_step_mod.TruncatedUnrollOut], Mapping[
     str, jnp.ndarray]]:
   """Unroll train a single state some number of steps."""
@@ -126,6 +127,8 @@ def truncated_unroll(
     return state, outs
 
   key_and_data = jax.random.split(key, unroll_length), datas
+  if wrap_step_fn is not None:
+    step_fn = wrap_step_fn(step_fn)
   state, ys = jax.lax.scan(step_fn, state, key_and_data)
   return state, ys
 
