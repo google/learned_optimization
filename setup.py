@@ -34,6 +34,8 @@ setuptools.setup(
     packages=setuptools.find_packages(exclude=['examples']),
     package_data={'learned_optimization': ['py.typed']},
     python_requires='>=3.7',
+    setup_requires=['setuptools_scm'],
+    include_package_data=True,
     # TODO(lmetz) don't fix many versions! Sadly a number of these libraries
     # don't play nice with newer versions of other libraries.
     # TODO(lmetz) add oryx to this!
@@ -43,7 +45,7 @@ setuptools.setup(
         'jax>=0.2.6',
         'jaxlib>=0.1.68',
         'nose',
-        'dm-launchpad-nightly==0.3.0.dev20211105',  # for courier
+        'dm-launchpad-nightly',
         'tqdm>=4.62.3',
         'flax==0.3.3',
         'dm-haiku==0.0.5',
