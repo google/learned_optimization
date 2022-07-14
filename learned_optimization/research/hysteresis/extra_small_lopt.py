@@ -388,12 +388,11 @@ class ExtraSmallLOpt(lopt_base.LearnedOptimizer):
 
         fun = functools.partial(mod_apply, self.theta["nn"], global_features)
 
-        next_params = jax.tree_multimap(fun, opt_state.params, grad,
-                                        next_mom_rolling.m,
-                                        next_rms_rolling.rms, fac_g,
-                                        next_fac_rolling_features.v_col,
-                                        next_fac_rolling_features.v_row,
-                                        next_fac_rolling_features.v_diag)
+        next_params = jax.tree_map(fun, opt_state.params, grad,
+                                   next_mom_rolling.m, next_rms_rolling.rms,
+                                   fac_g, next_fac_rolling_features.v_col,
+                                   next_fac_rolling_features.v_row,
+                                   next_fac_rolling_features.v_diag)
 
         next_opt_state = AdafacMLPLOptState(
             params=next_params,

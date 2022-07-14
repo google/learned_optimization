@@ -923,7 +923,8 @@ def vec_short_segment_pes(meta_param,
     # if we finished one trajectory.
     def _switch_one_accum(a, b):
       return jnp.where(has_finished[-1], a, b)
-    new_accum = jax.tree_multimap(_switch_one_accum, perturbs, new_accum)
+
+    new_accum = jax.tree_map(_switch_one_accum, perturbs, new_accum)
 
     next_pes_state = (new_accum, pos_opt_state, neg_opt_state,
                       next_on_iteration)

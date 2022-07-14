@@ -124,7 +124,7 @@ def compute_pes_grad(
     shape = [num_tasks] + [1] * (len(a.shape) - 1)
     return jnp.where(jnp.reshape(has_finished[-1], shape), a, b)
 
-  new_accumulator = jax.tree_multimap(_switch_one_accum, vec_pos, accumulator)
+  new_accumulator = jax.tree_map(_switch_one_accum, vec_pos, accumulator)
 
   pos_loss = jnp.sum(p_ys.loss * p_ys.mask, axis=0) / jnp.sum(p_ys.mask, axis=0)
   neg_loss = jnp.sum(n_ys.loss * n_ys.mask, axis=0) / jnp.sum(n_ys.mask, axis=0)
@@ -179,7 +179,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
         theta, worker_weights.outer_state, key, theta_is_vector=False)
     neg_unroll_state = pos_unroll_state
 
-    accumulator = jax.tree_multimap(
+    accumulator = jax.tree_map(
         lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),
         theta)
 
@@ -365,7 +365,7 @@ class TruncatedPESPMAP(TruncatedPES):
                                                  keys)
     neg_unroll_state = pos_unroll_state
 
-    accumulator = jax.tree_multimap(
+    accumulator = jax.tree_map(
         lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),
         theta)
     accumulator = flax_jax_utils.replicate(accumulator)

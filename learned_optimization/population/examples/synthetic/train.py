@@ -36,7 +36,7 @@ def loss(parameters):
 @jax.jit
 def update(parameters, meta_parameters):
   dp = jax.grad(gd_loss)(parameters, meta_parameters)
-  new_parameters = jax.tree_multimap(lambda a, b: a - 0.01 * b, parameters, dp)
+  new_parameters = jax.tree_map(lambda a, b: a - 0.01 * b, parameters, dp)
   return new_parameters
 
 

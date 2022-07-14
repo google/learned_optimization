@@ -35,8 +35,7 @@ def rolling_mom(decay: float) -> _InitUpdate:
         m=jax.tree_map(jnp.zeros_like, p), t=jnp.asarray(0, dtype=jnp.int32))
 
   def update_fn(state: MomAccumulator, grad: Any) -> MomAccumulator:
-    m = jax.tree_multimap(lambda a, b: decay * a + (1 - decay) * b, state.m,
-                          grad)
+    m = jax.tree_map(lambda a, b: decay * a + (1 - decay) * b, state.m, grad)
     return MomAccumulator(m=m, t=state.t + 1)
 
   return _InitUpdate(init_fn, update_fn)
@@ -51,9 +50,8 @@ def rolling_rms(decay: float) -> _InitUpdate:
 
   def update_fn(state: RMSAccumulator, grad: Any) -> RMSAccumulator:
     clip_decay = jnp.clip(decay, 0.0, 1.0)
-    rms = jax.tree_multimap(
-        lambda a, b: clip_decay * a + (1 - clip_decay) * (b * b), state.rms,
-        grad)
+    rms = jax.tree_map(lambda a, b: clip_decay * a + (1 - clip_decay) * (b * b),
+                       state.rms, grad)
     return RMSAccumulator(rms=rms, t=state.t + 1)
 
   return _InitUpdate(init_fn, update_fn)

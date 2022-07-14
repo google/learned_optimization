@@ -34,7 +34,7 @@ def _is_scalar(x):
 
 @jax.jit
 def tree_add(treea, treeb):
-  return jax.tree_multimap(lambda a, b: a + b, treea, treeb)
+  return jax.tree_map(lambda a, b: a + b, treea, treeb)
 
 
 @jax.jit
@@ -111,8 +111,8 @@ def match_type(struct1, struct2):
     if not hasattr(l, "dtype"):
       raise ValueError("The target struct doesn't have dtype specified?"
                        f" Value found: {l}")
-  return jax.tree_multimap(lambda a, b: jnp.asarray(a, dtype=b.dtype), struct1,
-                           struct2)
+  return jax.tree_map(lambda a, b: jnp.asarray(a, dtype=b.dtype), struct1,
+                      struct2)
 
 
 def map_named(function: Callable[[str, Any], Any],

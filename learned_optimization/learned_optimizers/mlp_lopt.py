@@ -201,8 +201,8 @@ class MLPLOpt(lopt_base.LearnedOptimizer):
 
           return new_p
 
-        next_params = jax.tree_multimap(_update_tensor, opt_state.params, grad,
-                                        next_rolling_features.m)
+        next_params = jax.tree_map(_update_tensor, opt_state.params, grad,
+                                   next_rolling_features.m)
         next_opt_state = MLPLOptState(
             params=tree_utils.match_type(next_params, opt_state.params),
             rolling_features=tree_utils.match_type(next_rolling_features,

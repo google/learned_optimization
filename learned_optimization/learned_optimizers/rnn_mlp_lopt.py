@@ -556,8 +556,8 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
                                               opt_state.iteration, num_tensors)
 
         # Prep the features
-        ff_feats = jax.tree_multimap(to_map_get_mlp_features, ms, rms, grads,
-                                     opt_state.params, ff_inputs)
+        ff_feats = jax.tree_map(to_map_get_mlp_features, ms, rms, grads,
+                                opt_state.params, ff_inputs)
 
         # Apply the per parameter mlp on these features.
         outputs = jax.tree_map(

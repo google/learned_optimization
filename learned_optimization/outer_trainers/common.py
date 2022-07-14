@@ -50,8 +50,8 @@ def vector_sample_perturbations(theta: T, key: chex.PRNGKey, std: float,
 
   def _fn(key):
     pos = sample_perturbations(theta, key, std=std)
-    p_theta = jax.tree_multimap(lambda t, a: t + a, theta, pos)
-    n_theta = jax.tree_multimap(lambda t, a: t - a, theta, pos)
+    p_theta = jax.tree_map(lambda t, a: t + a, theta, pos)
+    n_theta = jax.tree_map(lambda t, a: t - a, theta, pos)
     return pos, p_theta, n_theta
 
   keys = jax.random.split(key, num_samples)

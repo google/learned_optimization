@@ -177,7 +177,7 @@ class ReparamWeightsFamily(base.TaskFamily):
           jax.random.PRNGKey(0))
       leaves, tree = jax.tree_flatten(abstract_params)
       keys = jax.tree_unflatten(tree, jax.random.split(key2, len(leaves)))
-      param_scale = jax.tree_multimap(self._single_random, keys)
+      param_scale = jax.tree_map(self._single_random, keys)
       return cfgobject.CFGNamed("ReparamWeightsFamily", {
           "sub_cfg": sub_config,
           "param_scale": LogFeat(param_scale)

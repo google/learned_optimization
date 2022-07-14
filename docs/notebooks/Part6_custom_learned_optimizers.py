@@ -359,7 +359,8 @@ class HParamControllerLOPT(lopt_base.LearnedOptimizer):
         # use the results of the RNN to update the parameters.
         def update_one(p, g):
           return p - g * lr
-        next_params = jax.tree_multimap(update_one, opt_state.params, grads)
+
+        next_params = jax.tree_map(update_one, opt_state.params, grads)
 
         return HParamControllerInnerOptState(
             params=next_params,

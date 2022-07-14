@@ -84,7 +84,7 @@ def smoketest_optimizer(optimizer: base.Optimizer, strict_types: bool = True):
     logging.info(jax.tree_map(lambda x: (x.shape, x.dtype), shape1))
     logging.info(jax.tree_map(lambda x: (x.shape, x.dtype), shape2))
 
-    eqls = jax.tree_multimap(lambda x, x2: x.shape == x2.shape, shape1, shape2)
+    eqls = jax.tree_map(lambda x, x2: x.shape == x2.shape, shape1, shape2)
     assert all(
         jax.tree_leaves(eqls)), "does not have the same input output shape"
 

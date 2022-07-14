@@ -71,8 +71,7 @@ class CircularBuffer(Generic[T]):
       else:
         return src.at[idx, :].set(to_set)
 
-    new_jax_array = jax.tree_multimap(do_update, state.values,
-                                      (value, state.idx))
+    new_jax_array = jax.tree_map(do_update, state.values, (value, state.idx))
     return CircularBufferState(idx=state.idx + 1, values=new_jax_array)
 
   def _reorder(self, vals, idx):
