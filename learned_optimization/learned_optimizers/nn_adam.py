@@ -172,6 +172,7 @@ class NNAdam(lopt_base.LearnedOptimizer):
       initial_beta2: float = 0.999,
       initial_epsilon: float = 1e-8,
       decay_strength: float = 0.0,
+      lstm_hidden_size: int = 32,
   ):
     """Initalizer.
 
@@ -184,6 +185,7 @@ class NNAdam(lopt_base.LearnedOptimizer):
       decay_strength: Decay term which pulls the current per layer hparams
         to the initial hparam values. This prevents exploding or vanishing
         values.
+      lstm_hidden_size: Size of lstm hidden size.
     """
 
     super().__init__()
@@ -192,7 +194,7 @@ class NNAdam(lopt_base.LearnedOptimizer):
     self.initial_beta2 = initial_beta2
     self.initial_epsilon = initial_epsilon
     self.output_scale = output_scale
-    self.lstm_hidden_size = 32
+    self.lstm_hidden_size = lstm_hidden_size
     self.decay_strength = decay_strength
 
     # This hardcoded value matches the number of features created by the

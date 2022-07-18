@@ -49,6 +49,10 @@ class LearnedOptimizer(abc.ABC):
              is_training: bool = False) -> opt_base.Optimizer:
     raise NotImplementedError()
 
+  @property
+  def name(self):
+    return None
+
 
 Invertable = collections.namedtuple("Invertable", ["forward", "inverse"])
 one_minus_log = Invertable(
