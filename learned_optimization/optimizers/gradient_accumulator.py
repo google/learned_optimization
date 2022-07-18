@@ -18,18 +18,24 @@
 This optimizer alternates between accumulating gradients, and applying some
 base optimizer.
 """
-import collections
 from typing import Optional
 
+import chex
+import flax
 import gin
 import jax
 import jax.numpy as jnp
 from learned_optimization import jax_utils
 from learned_optimization.optimizers import base
 
-GradientAccumulatorState = collections.namedtuple(
-    "GradientAccumulatorState",
-    ["grad_accum", "loss_accum", "inner_opt_state", "iteration", "model_state"])
+
+@flax.struct.dataclass
+class GradientAccumulatorState:
+  grad_accum: chex.ArrayTree
+  loss_accum: chex.ArrayTree
+  inner_opt_state: chex.ArrayTree
+  iteration: chex.Array
+  model_state: chex.ArrayTree
 
 
 @gin.configurable

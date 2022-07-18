@@ -14,9 +14,11 @@
 # limitations under the License.
 
 """Schedules for learning rates."""
+from typing import Optional, Sequence
 from typing import Union
 
 import chex
+import gin
 import jax.numpy as jnp
 from learned_optimization import jax_utils
 import numpy as onp
@@ -116,3 +118,61 @@ class CosineLearningRateSchedule(ScalarSchedule):
     new_learning_rate = constant_and_decay * (1.0 - is_warmup) + is_warmup * (
         warmup_lr)
     return new_learning_rate
+
+
+@gin.configurable
+class LinearRampupSqrtDecay(ScalarSchedule):
+  """Linearly increases the schedule value in warmup_steps, then sqrt decay.
+
+  lr = peak_lr * min(current_step / warmup_step, sqrt(warmup_steps/current_step)
+  """
+
+  def __init__(self, peak_lr=1e-3, warmup_steps=1000):
+    super().__init__()
+    self.peak_lr = peak_lr
+    self.warmup_steps = warmup_steps
+
+  def __call__(self,
+               global_step: chex.Array,
+               max_steps: Optional[chex.Array] = None) -> chex.Array:
+    current_step = jnp.maximum(global_step.astype(jnp.float32), 1)
+    warmup_steps = jnp.array(self.warmup_steps, dtype=jnp.float32)
+    return self.peak_lr * jnp.minimum(current_step / warmup_steps,
+                                      jnp.sqrt(warmup_steps / current_step))
+
+
+@gin.configurable
+class PiecewiseLinear(ScalarSchedule):
+  """Learning rate schedule that is piecewise linear."""
+
+  def __init__(self, times: Sequence[float], vals: Sequence[float]):
+    super().__init__()
+    if len(times) != len(vals):
+      raise ValueError("Length of times and values must match!")
+    # cap the ends, so if we are in an unspecified
+    self.times = [-onp.inf] + list(times) + [onp.inf]
+    self.vals = [vals[0]] + list(vals) + [vals[-1]]
+
+  def __call__(self,
+               global_step: chex.Array,
+               max_steps: Optional[chex.Array] = None) -> chex.Array:
+    times = jnp.asarray(self.times)
+    vals = jnp.asarray(self.vals)
+
+    x = global_step
+    vs = []
+    for i in range(len(self.times) - 1):
+      x1 = times[i]
+      x2 = times[i + 1]
+      y1 = vals[i]
+      y2 = vals[i + 1]
+      # the first time is always -onp.inf, which causes the else case to be
+      # undefined.
+      if i == 0:
+        v = y1
+      else:
+        m = (y2 - y1) / (x2 - x1)
+        v = (x - x1) * m + y1
+      vs.append(v)
+    idx = jnp.sum(x > times) - 1
+    return jnp.take(jnp.asarray(vs), idx)
