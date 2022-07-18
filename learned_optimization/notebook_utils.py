@@ -113,6 +113,15 @@ def threaded_tqdm_map(threads: int, func: Callable[[Any], Any],
     return [x.result() for x in tqdm.tqdm(future_list)]
 
 
+def threaded_map(threads: int, func: Callable[[Any], Any],
+                 data: Sequence[Any]) -> Sequence[Any]:
+  future_list = []
+  with futures.ThreadPoolExecutor(threads) as executor:
+    for l in data:
+      future_list.append(executor.submit(func, l))
+    return [x.result() for x in future_list]
+
+
 def similar_colors(
     folders: Sequence[str],
     remove_trailing_subfolder_number: Optional[int] = None
@@ -120,7 +129,10 @@ def similar_colors(
   """Utility to create colors and labels from a list of folders."""
 
   def sep(f):
-    return "rep".join(f.split("rep")[:-1])
+    if "_rep" in f:
+      return "_rep".join(f.split("_rep")[:-1])
+    else:
+      return f
 
   no_rep_folders = [sep(f) for f in folders]
   if remove_trailing_subfolder_number is not None:

@@ -116,6 +116,10 @@ _last_checkpoint_time = collections.defaultdict(lambda: -1)
 _last_checkpoint_futures = {}
 _checkpoint_thread_pool = futures.ThreadPoolExecutor(1)
 
+# TODO(lmetz) use this instead: futures.Future[Mapping[str, str]] once colab
+# python version gets increased
+FutureMapping = Any
+
 
 @gin.configurable
 def periodically_save_checkpoint(
@@ -126,7 +130,7 @@ def periodically_save_checkpoint(
     step_interval: Optional[int] = None,
     keep: int = 20,
     background: bool = False,
-) -> Optional[Union[futures.Future[Mapping[str, str]], Mapping[str, str]]]:
+) -> Optional[Union[FutureMapping, Mapping[str, str]]]:
   """Maybe a checkpoint based on how much time or steps have elapsed.
 
   If a checkpoint is saved, return the paths otherwise return None.

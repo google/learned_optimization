@@ -62,8 +62,11 @@ def plot_tasks_and_sets(task: str,
                         opt_sets: Sequence[str],
                         ax: Optional[Any] = None,
                         alpha_on_confidence: float = 0.1,
+                        confidence_alpha: float = 1.0,
                         ema: float = 0.9,
-                        initial_shift: int = 500):
+                        initial_shift: int = 500,
+                        legend: bool = True,
+                        labels: Optional[Sequence[str]] = None):
   """Plot performance of a task with respect to the best of each hparam set.
 
   Args:
@@ -71,8 +74,11 @@ def plot_tasks_and_sets(task: str,
     opt_sets: List of hparam sets with data precomputed to plot.
     ax: axis to plot onto. If not set, a new figure is created.
     alpha_on_confidence: Alpha value of the confidence interval.
+    confidence_alpha: Alpha on lines surrounding confidence fill_between.
     ema: ema value to smooth values with.
     initial_shift: Used to set the max ylim.
+    legend: to plot a legend or not.
+    labels: Labels to plot in legend. If None, use opt_sets.
   """
   colors = nu.colors_for_num(len(opt_sets))
 
@@ -85,18 +91,23 @@ def plot_tasks_and_sets(task: str,
   if ax is None:
     unused_fig, ax = plt.subplots()
 
-  for oi, o in enumerate(opt_sets):
+  if labels is None:
+    labels = opt_sets
+  else:
+    assert len(labels) == len(opt_sets)
+
+  for oi, label in enumerate(labels):
     xs, curve, (min_c, max_c) = curves[oi]
     curve = nu.ema(curve, ema)
     min_c = nu.ema(min_c, ema)
     max_c = nu.ema(max_c, ema)
 
-    ax.plot(xs, curve, label=o, color=colors[oi], lw=2)
+    ax.plot(xs, curve, label=label, color=colors[oi], lw=2)
     if alpha_on_confidence:
       ax.fill_between(
           xs, min_c, max_c, color=colors[oi], alpha=alpha_on_confidence)
-      ax.plot(xs, min_c, color=colors[oi], lw=0.3)
-      ax.plot(xs, max_c, color=colors[oi], lw=0.3)
+      ax.plot(xs, min_c, color=colors[oi], lw=0.3, alpha=confidence_alpha)
+      ax.plot(xs, max_c, color=colors[oi], lw=0.3, alpha=confidence_alpha)
     best_vals.append(onp.nanmin(min_c))
     shift = (onp.argmax(xs > initial_shift))
     ylim_top_vals.append(max_c[shift])
@@ -105,4 +116,5 @@ def plot_tasks_and_sets(task: str,
   vmax = onp.nanmin(ylim_top_vals)
   ax.set_ylim(vmin, vmax)
   ax.set_title(task)
-  nu.legend_to_side(ax=ax)
+  if legend:
+    nu.legend_to_side(ax=ax)
