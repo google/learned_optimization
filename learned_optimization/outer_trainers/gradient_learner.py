@@ -122,6 +122,10 @@ def _tree_mean(stack):
   return jax.tree_map(lambda x: jnp.mean(x, axis=0), stack)
 
 
+def _tree_mean_onp(stack):
+  return jax.tree_map(lambda x: onp.mean(x, axis=0), stack)
+
+
 @functools.lru_cache(None)
 def _get_theta_update_fn(theta_opt: opt_base.Optimizer):
 
@@ -144,6 +148,7 @@ class GradientLearner:
       theta_opt: opt_base.Optimizer,
       init_theta_from_path: Optional[str] = None,
       init_outer_state_from_path: Optional[str] = None,
+      reset_outer_iteration: bool = False,
       num_steps: Optional[int] = None,
       init_seed: Optional[int] = None,
   ):
@@ -151,6 +156,7 @@ class GradientLearner:
     self._meta_init = meta_init
     self._init_theta_from_path = init_theta_from_path
     self._init_outer_state_from_path = init_outer_state_from_path
+    self._reset_outer_iteration = reset_outer_iteration
     self._num_steps = num_steps
     self._init_seed = init_seed
 
@@ -212,6 +218,8 @@ class GradientLearner:
       real_checkpoint = checkpoints.load_state(self._init_outer_state_from_path,
                                                fake_checkpoint)
       theta_opt_state = real_checkpoint.gradient_learner_state.theta_opt_state
+      if self._reset_outer_iteration:
+        theta_opt_state = theta_opt_state.replace(iteration=0)
 
     return GradientLearnerState(theta_opt_state)
 
@@ -241,14 +249,17 @@ class GradientLearner:
     metrics = {}
     theta_opt_state = state.theta_opt_state
 
-    with profile.Profile("stack_data"):
+    with profile.Profile("stack_grad"):
       grads_stack = tree_utils.tree_zip_onp([t.theta_grads for t in grads_list])
-      grads = _tree_mean(grads_stack)
+    with profile.Profile("mean_grad"):
+      grads = _tree_mean_onp(grads_stack)
 
+    with profile.Profile("stack_state"):
       model_state_stack = tree_utils.tree_zip_onp(
           [t.theta_model_state for t in grads_list])
-      next_model_state = _tree_mean(model_state_stack)
+      next_model_state = _tree_mean_onp(model_state_stack)
 
+    with profile.Profile("stack_loss"):
       losses = jnp.asarray([t.mean_loss for t in grads_list])
       mean_loss = jnp.mean(losses)
       min_loss = jnp.min(losses)
@@ -297,6 +308,9 @@ class GradientEstimator(abc.ABC):
   def task_name(self):
     return "default_task"
 
+  def cfg_name(self):
+    return "default_cfg"
+
   def get_datas(self) -> Any:
     raise NotImplementedError()
 
@@ -336,6 +350,7 @@ def gradient_worker_compute(
     key: PRNGKey,
     with_metrics: bool,
     clip_nan_loss_to_value: Optional[float] = 20.0,
+    extra_metrics: bool = True,
     device: Optional[jax.lib.xla_client.Device] = None) -> WorkerComputeOut:
   """Compute a gradient signal to meta-train with.
 
@@ -352,6 +367,7 @@ def gradient_worker_compute(
     key: jax rng
     with_metrics: compute with summary metrics or not
     clip_nan_loss_to_value: float, value to set nan losses to
+    extra_metrics: log out additional metrics.
     device: The jax device to run the computation on
 
   Returns:
@@ -381,8 +397,11 @@ def gradient_worker_compute(
       stime = time.time()
       key, rng = jax.random.split(key)
 
-      logging.info("compute_gradient_estimate for estimator name %s.",
-                   estimator.task_name())
+      cfg_name = estimator.cfg_name()
+
+      logging.info(
+          "compute_gradient_estimate for estimator name %s and cfg name %s",
+          estimator.task_name(), estimator.cfg_name())
       with profile.Profile(f"unroll__metrics{with_metrics}"):
         estimator_out, metrics = estimator.compute_gradient_estimate(
             worker_weights, rng, unroll_state, with_summary=with_metrics)
@@ -415,25 +434,32 @@ def gradient_worker_compute(
                      "Not logging any events data.")
 
       metrics = {k: v for k, v in metrics.items()}
-      family_name = estimator.task_name()
-      if with_metrics:
-        # Metrics don't take into account which task they are comming from.
-        # Let's add additional metrics with the task name pulled out.
-        with profile.Profile("metric_computation"):
-          keys = list(metrics.keys())
-          for k in keys:
-            v = metrics[k]
-            assert "||" in k, f"bad metric format? Got: {k}"
-            agg, name = k.split("||")
-            metrics[f"{agg}||{family_name}/{name}"] = v
+      if extra_metrics:
+        family_name = estimator.task_name()
+        cfg_name = estimator.cfg_name()
+        if with_metrics:
+          # Metrics don't take into account which task they are comming from.
+          # Let's add additional metrics with the task name pulled out.
+          with profile.Profile("metric_computation"):
+            keys = list(metrics.keys())
+            for k in keys:
+              v = metrics[k]
+              assert "||" in k, f"bad metric format? Got: {k}"
+              agg, name = k.split("||")
+              metrics[f"{agg}||{family_name}/{name}"] = v
+              metrics[f"{agg}||{cfg_name}/{name}"] = v
 
-          mean_abs = tree_utils.tree_mean_abs(estimator_out.grad)
-          metrics[f"mean||{family_name}/grad_mean_abs"] = mean_abs
+            mean_abs = tree_utils.tree_mean_abs(estimator_out.grad)
+            metrics[f"mean||{family_name}/grad_mean_abs"] = mean_abs
+            metrics[f"mean||{cfg_name}/grad_mean_abs"] = mean_abs
 
-          norm = tree_utils.tree_norm(estimator_out.grad)
-          metrics[f"mean||{family_name}/grad_norm"] = norm
-      metrics[f"mean||{family_name}/mean_loss"] = estimator_out.mean_loss
-      metrics[f"sample||{family_name}/time"] = time.time() - stime
+            norm = tree_utils.tree_norm(estimator_out.grad)
+            metrics[f"mean||{family_name}/grad_norm"] = norm
+            metrics[f"mean||{cfg_name}/grad_norm"] = norm
+        metrics[f"mean||{family_name}/mean_loss"] = estimator_out.mean_loss
+        metrics[f"mean||{cfg_name}/mean_loss"] = estimator_out.mean_loss
+        metrics[f"sample||{family_name}/time"] = time.time() - stime
+        metrics[f"sample||{cfg_name}/time"] = time.time() - stime
 
       metrics_list.append(metrics)
 

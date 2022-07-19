@@ -290,6 +290,12 @@ def _pmap_reduce(vals):
   return jax.lax.pmean(vals, axis_name="dev")
 
 
+@jax.pmap
+def vec_key_split(key):
+  key1, key2 = jax.random.split(key)
+  return key1, key2
+
+
 @gin.configurable
 class TruncatedPESPMAP(TruncatedPES):
   """GradientEstimator for computing PES gradient estimates leveraging pmap.
@@ -391,8 +397,9 @@ class TruncatedPESPMAP(TruncatedPES):
 
     theta = worker_weights.theta
 
+    vec_key1, vec_key = vec_key_split(vec_key)
     vec_pos, vec_p_theta, vec_n_theta = self.pmap_vector_sample_perturbations(
-        theta, vec_key)
+        theta, vec_key1)
 
     p_yses = []
     n_yses = []
@@ -419,6 +426,7 @@ class TruncatedPESPMAP(TruncatedPES):
       p_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), p_state)
       n_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), n_state)
 
+      vec_key1, vec_key = vec_key_split(vec_key)
       (p_state, p_ys), m = self.pmap_unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking
           vec_p_theta, vec_key, p_state, datas, worker_weights.outer_state,
           with_summary)

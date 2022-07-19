@@ -16,8 +16,15 @@
 """Tests for learned_optimizers.outer_trainers.truncation_schedule."""
 
 from absl.testing import absltest
+import flax
 import jax
+from learned_optimization.optimizers import learning_rate_schedules
 from learned_optimization.outer_trainers import truncation_schedule
+
+
+@flax.struct.dataclass
+class OuterState:
+  outer_iteration: int
 
 
 class TruncationScheduleTest(absltest.TestCase):
@@ -43,6 +50,18 @@ class TruncationScheduleTest(absltest.TestCase):
       assert state.length >= 10
       assert state.length <= 100
       del is_done
+
+  def test_ScheduledTruncationSchedule(self):
+    sched = learning_rate_schedules.PiecewiseLinear([0, 10], [10, 100])
+    key = jax.random.PRNGKey(0)
+    trunc_fns = truncation_schedule.ScheduledTruncationSchedule(sched)
+    outer_state = OuterState(0)
+    state = trunc_fns.init(key, outer_state=outer_state)
+    assert state.length == 10
+
+    outer_state = OuterState(5)
+    state = trunc_fns.init(key, outer_state=outer_state)
+    assert state.length == int(10 + 100) // 2
 
 
 if __name__ == '__main__':

@@ -178,12 +178,12 @@ def maybe_stacked_es_unroll(
     p_state, n_state = _split_tree(pn_state)
     p_ys, n_ys = _split_tree(pn_ys, axis=1)
   else:
-    (p_state, p_ys), m = truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking,unexpected-keyword-arg
+    (p_state, p_ys), m = truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking,unexpected-keyword-arg,redundant-keyword-arg
         *(static_args +
           [vec_p_theta, key, p_state, datas, outer_state, override_num_steps]),
         with_summary=with_summary,
         sample_rng_key=sample_rng_key)
-    (n_state, n_ys), _ = truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking,unexpected-keyword-arg
+    (n_state, n_ys), _ = truncated_unroll(  # pylint: disable=unbalanced-tuple-unpacking,unexpected-keyword-arg,redundant-keyword-arg
         *(static_args +
           [vec_n_theta, key, n_state, datas, outer_state, override_num_steps]),
         with_summary=False)

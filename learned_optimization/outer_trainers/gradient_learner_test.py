@@ -167,6 +167,14 @@ class GradientLearnerTest(absltest.TestCase):
 
       self.assertEqual(grad_state.theta_opt_state.iteration, 11)
 
+      learner = gradient_learner.GradientLearner(
+          lopt,
+          theta_opt,
+          init_outer_state_from_path=checkpoint_path,
+          reset_outer_iteration=True)
+      grad_state = learner.init(key)
+      self.assertEqual(grad_state.theta_opt_state.iteration, 0)
+
 
 if __name__ == "__main__":
   absltest.main()

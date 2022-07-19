@@ -486,6 +486,9 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     else:
       return self._task_name
 
+  def cfg_name(self):
+    return self.learned_opt.name
+
   def init_step_state(self,
                       theta,
                       outer_state,
@@ -521,7 +524,6 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     else:
       data_shape = (self.num_tasks,)
     tr_batch = training.get_batches(
-        #self.task_family, data_shape, numpy=False, split="train")
         self.task_family,
         data_shape,
         numpy=True,

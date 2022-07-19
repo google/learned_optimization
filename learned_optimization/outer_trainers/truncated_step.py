@@ -31,7 +31,6 @@ import flax
 import jax
 import jax.numpy as jnp
 from learned_optimization import tree_utils
-import gin
 
 MetaParams = Any
 OuterState = Any
@@ -154,6 +153,16 @@ class TruncatedStep:
       meta_loss: computed meta loss.
     """
     raise NotImplementedError()
+
+  def cfg_name(self) -> str:
+    """Name of configuration.
+
+    For summary purposes only.
+
+    Returns:
+      name: name of cfg
+    """
+    return "default"
 
 
 class VectorizedTruncatedStep(TruncatedStep):

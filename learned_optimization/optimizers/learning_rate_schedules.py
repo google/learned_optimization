@@ -30,8 +30,10 @@ from typing_extensions import Protocol
 class ScalarSchedule(Protocol):
   """Protocol for schedules -- usually learning rate schedules."""
 
-  def __call__(self, step: Union[int, chex.Array],
-               max_steps: Union[int, chex.Array]) -> chex.Array:
+  def __call__(
+      self,
+      step: Union[int, chex.Array],
+      max_steps: Optional[Union[int, chex.Array]] = None) -> chex.Array:
     raise NotImplementedError()
 
 

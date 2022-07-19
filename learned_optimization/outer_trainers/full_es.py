@@ -18,19 +18,22 @@
 import functools
 from typing import Any, Mapping, Optional, Sequence, Tuple
 
+from absl import logging
 import flax
+from flax import jax_utils as flax_jax_utils
 import gin
 import haiku as hk
 import jax
 import jax.numpy as jnp
-from learned_optimization import profile
 from learned_optimization import jax_utils
+from learned_optimization import profile
 from learned_optimization import summary
 from learned_optimization import tree_utils
 from learned_optimization.outer_trainers import common
 from learned_optimization.outer_trainers import gradient_learner
 from learned_optimization.outer_trainers import truncated_step as truncated_step_mod
 from learned_optimization.outer_trainers import truncation_schedule as truncation_schedule_mod
+import numpy as onp
 import typing_extensions
 from typing_extensions import Protocol
 
@@ -76,6 +79,7 @@ class UnrollState(gradient_learner.GradientEstimatorState):
 @jax.jit
 def _es_grad(vec_pos, pos_loss, neg_loss, sign_delta_loss_scalar,
              clip_loss_diff, std):
+  """Compute the ES gradient from losses."""
   delta_loss = (pos_loss - neg_loss)
 
   delta_loss = jnp.nan_to_num(delta_loss, posinf=0., neginf=0.)
@@ -96,7 +100,8 @@ def _es_grad(vec_pos, pos_loss, neg_loss, sign_delta_loss_scalar,
   return jnp.mean((pos_loss + neg_loss) / 2.0), es_grad
 
 
-# TODO(lmetz) consider jitting this? If variable length, this will cause many cache misses.
+# TODO(lmetz) consider jitting this? If variable length, this will cause many
+# cache misses.
 # @functools.partial(
 #     jax.jit, static_argnames=("std", "clip_loss_diff", "loss_type"))
 def traj_loss_antithetic_es(
@@ -152,6 +157,71 @@ def traj_loss_antithetic_es(
 
   loss, grad = _es_grad(vec_pos, pos_loss, neg_loss, sign_delta_loss_scalar,
                         clip_loss_diff, std)
+  return loss, grad, p_ys
+
+
+def pmap_traj_loss_antithetic_es(
+    p_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
+    n_yses: Sequence[truncated_step_mod.TruncatedUnrollOut],
+    vec_pos: MetaParams,
+    std: float,
+    loss_type: str,
+    clip_loss_diff: Optional[float] = None,
+    sign_delta_loss_scalar: Optional[float] = None,
+) -> Tuple[jnp.ndarray, MetaParams, truncated_step_mod.TruncatedUnrollOut]:
+  """Compute an ES based gradient estimate based on losses of the unroll.
+
+  Args:
+    p_yses: Sequence of outputs from each unroll for the positive ES direction.
+    n_yses: Sequence of outputs from each unroll for the negative ES direction.
+    vec_pos: The positive direction of the ES perturbations.
+    std: Standard deviation of noise used.
+    loss_type: type of loss to use. Either "avg" or "min".
+    clip_loss_diff: Term used to clip the max contribution of each sample.
+    sign_delta_loss_scalar: Optional, if specified the sign of the delta loss
+      multiplied by this value is used instead of the real delta_loss
+
+  Returns:
+    mean_loss: average loss of positive and negative unroll.
+    gradients: Gradient estimate of learned optimizer weights.
+    output: concatenated intermediate outputs from the positive sample.
+  """
+
+  def flat_first(x):
+    # dims are: seq, dev, steps_per_jit, tasks...
+    x = x.swapaxes(0, 1)
+    return x.reshape([x.shape[0], x.shape[1] * x.shape[2]] + list(x.shape[3:]))
+
+  if jax_utils.in_jit():
+    tree_zip = tree_utils.tree_zip_jnp
+  else:
+    # use numpy here to prevent an expensive jit.
+    tree_zip = tree_utils.tree_zip_onp
+  p_ys = jax.tree_map(flat_first, tree_zip(p_yses))
+  n_ys = jax.tree_map(flat_first, tree_zip(n_yses))
+
+  # mean over the num steps axis.
+  if loss_type == "avg":
+    pos_loss = jnp.mean(p_ys.loss, axis=1)
+    neg_loss = jnp.mean(n_ys.loss, axis=1)
+  elif loss_type == "min":
+    pos_loss = jnp.min(p_ys.loss, axis=1)
+    neg_loss = jnp.min(n_ys.loss, axis=1)
+  elif loss_type == "last":
+    pos_loss = p_ys.loss[:, -1, :]
+    neg_loss = n_ys.loss[:, -1, :]
+  else:
+    raise ValueError(f"Unsupported loss type {loss_type}.")
+
+  loss, grad = jax.vmap(
+      _es_grad,
+      in_axes=(0, 0, 0, None, None, None))(vec_pos, pos_loss, neg_loss,
+                                           sign_delta_loss_scalar,
+                                           clip_loss_diff, std)
+  # Keep dims here to fake this being pmap.
+  # We just grab the first element when used anyway.
+  loss = jnp.mean(loss, axis=0, keepdims=True)
+  grad = jax.tree_map(lambda x: jnp.mean(x, axis=0, keepdims=True), grad)
   return loss, grad, p_ys
 
 
@@ -310,6 +380,9 @@ class FullES(gradient_learner.GradientEstimator):
     self.recompute_split = recompute_split
     self.sign_delta_loss_scalar = sign_delta_loss_scalar
 
+    logging.info(  # pylint: disable=logging-fstring-interpolation
+        f"FullES estimator constructed with loss_type={self.loss_type}.")
+
     # Some truncated step also have truncation_schedule. This will be ignored
     # by this class. Here we do a sanity check to try to prevent this mistake if
     # users accidentally misconfigure things. This is not a bullet proof check,
@@ -331,11 +404,12 @@ class FullES(gradient_learner.GradientEstimator):
   def task_name(self) -> str:
     return self.truncated_step.task_name()
 
+  def cfg_name(self) -> str:
+    return self.truncated_step.cfg_name()
 
   def init_worker_state(self, worker_weights: gradient_learner.WorkerWeights,
                         key: PRNGKey) -> UnrollState:
     return UnrollState()
-
 
   def compute_gradient_estimate(
       self,
@@ -343,7 +417,11 @@ class FullES(gradient_learner.GradientEstimator):
       key,
       state,
       with_summary=False,
+      datas_list=None,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
+    if datas_list is not None:
+      raise NotImplementedError()
+
     num_tasks = self.truncated_step.num_tasks
     rng = hk.PRNGSequence(key)
 
@@ -413,6 +491,14 @@ class FullES(gradient_learner.GradientEstimator):
         p_yses.append(p_ys)
         n_yses.append(n_ys)
 
+        # copy from device back to host to free up some XPU memory.
+        # this is done on the -2th value to still allow jax to do some async
+        # computation
+        if len(metrics) > 2:
+          metrics[-2] = jax.tree_map(onp.asarray, metrics[-2])
+          p_yses[-2] = jax.tree_map(onp.asarray, p_yses[-2])
+          n_yses[-2] = jax.tree_map(onp.asarray, n_yses[-2])
+
     if hasattr(p_state, "inner_step"):
       metrics.append({"sample||end_inner_step": p_state.inner_step[0]})
 
@@ -471,4 +557,249 @@ class FullES(gradient_learner.GradientEstimator):
         unroll_state=UnrollState(),
         unroll_info=unroll_info)
 
+    return output, summary.aggregate_metric_list(metrics)
+
+
+@jax.pmap
+def vec_key_split(key):
+  key1, key2 = jax.random.split(key)
+  return key1, key2
+
+
+@gin.configurable
+class PMAPFullES(FullES):
+  """Gradient Est.
+
+  for computing ES gradients over multiple task with pmap.
+
+  See FullES for docs.
+  """
+
+  def __init__(self,
+               *args,
+               num_devices=None,
+               replicate_data_across_devices=False,
+               **kwargs):
+    super().__init__(*args, **kwargs)
+    logging.info(  # pylint: disable=logging-fstring-interpolation
+        f"PMAPFullES estimator constructed with loss_type={self.loss_type}.")
+    self.num_devices = num_devices if num_devices else len(jax.devices())
+    self.replicate_data_across_devices = replicate_data_across_devices
+
+    self.pmap_vector_sample_perturbations = jax.pmap(
+        functools.partial(
+            common.vector_sample_perturbations,
+            std=self.std,
+            num_samples=self.truncated_step.num_tasks),
+        in_axes=(None, 0),
+    )
+
+    def init(theta, outer_state, key, override):
+      return self.truncated_step.init_step_state(
+          theta,
+          outer_state,
+          key,
+          theta_is_vector=True,
+          num_steps_override=override)
+
+    self.pmap_init_step_state = jax.pmap(init, in_axes=(0, None, 0, None))
+
+  @functools.partial(
+      jax.pmap,
+      in_axes=(None, None, 0, 0, 0, 0, 0, 0, None, 0),
+      static_broadcasted_argnums=(
+          0,
+          1,
+      ))
+  def pmap_maybe_stacked_es_unroll(self, with_summary, vec_p_theta, vec_n_theta,
+                                   p_state, n_state, key, datas, outer_state,
+                                   length):
+    key1, key2 = jax.random.split(key)
+    p_state, n_state, p_ys, n_ys, m = common.maybe_stacked_es_unroll(
+        self.truncated_step,
+        self.steps_per_jit,
+        self.stack_antithetic_samples,
+        vec_p_theta,
+        vec_n_theta,
+        p_state,
+        n_state,
+        key1,
+        datas,
+        outer_state,
+        with_summary=with_summary,
+        sample_rng_key=key2,
+        override_num_steps=length)
+    return p_state, n_state, p_ys, n_ys, m
+
+  @functools.partial(
+      jax.pmap,
+      axis_name="batch",
+      in_axes=(None, 0, 0, None, 0, 0, 0, 0, 0),
+      static_broadcasted_argnums=(0,))
+  def pmap_last_recompute_antithetic_es(self, vec_p_theta, vec_n_theta,
+                                        outer_state, datas, p_state, n_state,
+                                        vec_pos, key):
+    mean_loss, es_grad = last_recompute_antithetic_es(
+        self.truncated_step,
+        vec_p_theta,
+        vec_n_theta,
+        outer_state,
+        datas,
+        p_state,
+        n_state,
+        vec_pos,
+        key,
+        self.std,
+        recompute_samples=self.recompute_samples,
+        clip_loss_diff=self.clip_loss_diff,
+        sign_delta_loss_scalar=self.sign_delta_loss_scalar)
+    es_grad, mean_loss = jax.lax.pmean((es_grad, mean_loss), "batch")
+    return mean_loss, es_grad
+
+  def compute_gradient_estimate(
+      self,
+      worker_weights,
+      key,
+      state,
+      with_summary=False,
+      datas_list=None,
+  ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
+    if datas_list is not None:
+      raise NotImplementedError()
+
+    rng = hk.PRNGSequence(key)
+
+    vec_key = jax.random.split(key, self.num_devices)
+    vec_key, vec_key1 = vec_key_split(vec_key)
+
+    theta = worker_weights.theta
+    vec_pos, vec_p_theta, vec_n_theta = self.pmap_vector_sample_perturbations(
+        theta, vec_key1)
+
+    p_yses = []
+    n_yses = []
+    metrics = []
+
+    key = next(rng)
+
+    # use the same key here for antithetic sampling.
+    trunc_state = self.truncation_schedule.init(key, worker_weights.outer_state)
+
+    # round to steps per jit
+    length = max(
+        (int(trunc_state.length) // self.steps_per_jit) * self.steps_per_jit,
+        self.steps_per_jit)
+
+    vec_key, vec_key1 = vec_key_split(vec_key)
+    p_state = self.pmap_init_step_state(vec_p_theta, worker_weights.outer_state,
+                                        vec_key1, length)
+
+    n_state = self.pmap_init_step_state(vec_n_theta, worker_weights.outer_state,
+                                        vec_key1, length)
+
+    if not hasattr(trunc_state, "length"):
+      raise AttributeError("Please specify a truncation schedule whose state"
+                           " contains a length attribute.")
+
+    def get_batch():
+      """Get batch with leading dims [num_devices, steps_per_jit, num_tasks]."""
+      # Use different data across the devices
+      if self.replicate_data_across_devices:
+        b = self.truncated_step.get_batch(self.steps_per_jit)
+        return flax_jax_utils.replicate(b)
+      else:
+        batches = [
+            self.truncated_step.get_batch(self.steps_per_jit)
+            for _ in range(self.num_devices)
+        ]
+        return tree_utils.tree_zip_jnp(batches)
+
+    vec_length = onp.asarray([length] * self.num_devices)
+
+    for _ in range(length // self.steps_per_jit):
+      with profile.Profile("data"):
+        datas = get_batch()
+
+      with profile.Profile("step"):
+        # Because we are training with antithetic sampling we need to unroll
+        # both models using the same random key and same data.
+        datas = jax.tree_map(jnp.asarray, datas)
+
+        # TODO(lmetz) Explore cache hitting / missing to see if we need
+        # something like the following for pmap.
+        # p_state, n_state = tree_utils.strip_weak_type((p_state, n_state))
+
+        vec_key, vec_key1 = vec_key_split(vec_key)
+        p_state, n_state, p_ys, n_ys, m = self.pmap_maybe_stacked_es_unroll(
+            with_summary, vec_p_theta, vec_n_theta, p_state, n_state, vec_key,
+            datas, worker_weights.outer_state, vec_length)
+
+        metrics.append(m)
+        p_yses.append(p_ys)
+        n_yses.append(n_ys)
+
+        # copy from device back to host to free up some XPU memory.
+        # this is done on the -2th value to still allow jax to do some async
+        # computation
+        if len(metrics) > 2:
+          metrics[-2] = jax.tree_map(onp.asarray, metrics[-2])
+          p_yses[-2] = jax.tree_map(onp.asarray, p_yses[-2])
+          n_yses[-2] = jax.tree_map(onp.asarray, n_yses[-2])
+
+    if hasattr(p_state, "inner_step"):
+      metrics.append({"sample||end_inner_step": p_state.inner_step[0]})
+
+    with profile.Profile("computing_loss_and_update"):
+      if self.loss_type in ["avg", "min", "last"]:
+        mean_loss, es_grad, p_ys = pmap_traj_loss_antithetic_es(
+            p_yses,
+            n_yses,
+            vec_pos,
+            self.std,
+            loss_type=self.loss_type,
+            clip_loss_diff=self.clip_loss_diff,
+            sign_delta_loss_scalar=self.sign_delta_loss_scalar)
+
+        unroll_info = gradient_learner.UnrollInfo(
+            loss=p_ys.loss,
+            iteration=p_ys.iteration,
+            task_param=p_ys.task_param,
+            is_done=p_ys.is_done)
+
+      elif self.loss_type == "last_recompute":
+        # TODO(lmetz) do this in multiple passes to overlap compute and data.
+        with profile.Profile("last_recompute_data"):
+          if self.replicate_data_across_devices:
+            b = self.truncated_step.get_outer_batch(self.recompute_samples)
+            datas = flax_jax_utils.replicate(b)
+          else:
+            batches = [
+                self.truncated_step.get_outer_batch(self.recompute_samples)
+                for _ in range(self.num_devices)
+            ]
+            datas = tree_utils.tree_zip_jnp(batches)
+
+        with profile.Profile("last_recompute_compute"):
+          # TODO(lmetz) possibly split this up.
+          vec_key, vec_key1 = vec_key_split(vec_key)
+          mean_loss, es_grad = self.pmap_last_recompute_antithetic_es(
+              vec_p_theta, vec_n_theta, worker_weights.outer_state, datas,
+              p_state, n_state, vec_pos, vec_key1)
+
+          # TODO(lmetz) fill this in for more logs!
+          unroll_info = None
+
+      else:
+        raise ValueError(f"Unsupported loss type {self.loss_type}")
+
+    # mean loss and es grads already reduced from pmean.
+    output = gradient_learner.GradientEstimatorOut(
+        mean_loss=flax_jax_utils.unreplicate(mean_loss),
+        grad=flax_jax_utils.unreplicate(es_grad),
+        unroll_state=UnrollState(),
+        unroll_info=unroll_info)
+
+    # TODO(lmetz) there is no reduction currently done on metrics meaning this
+    # is only recording the metrics from the first device.
+    metrics = flax_jax_utils.unreplicate(metrics)
     return output, summary.aggregate_metric_list(metrics)
