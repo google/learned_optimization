@@ -57,6 +57,12 @@ class ImageTest(absltest.TestCase):
     self.assertEqual(datasets.abstract_batch["image"].shape, (128, 32, 32, 3))
     self.assertEqual(data["image"].shape, (128, 32, 32, 3))
 
+  def test_imagenet8(self):
+    datasets = image.imagenet8_datasets(128)
+    data = next(datasets.test)
+    self.assertEqual(datasets.abstract_batch["image"].shape, (128, 8, 8, 3))
+    self.assertEqual(data["image"].shape, (128, 8, 8, 3))
+
   def test_imagenet16(self):
     datasets = image.imagenet16_datasets(128)
     data = next(datasets.test)

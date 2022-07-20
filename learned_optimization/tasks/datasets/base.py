@@ -404,6 +404,7 @@ def tfrecord_image_classification_datasets(
     normalize_mean: Optional[Tuple[int, int, int]] = None,
     normalize_std: Optional[Tuple[int, int, int]] = None,
     convert_to_black_and_white: Optional[bool] = False,
+    cache: Optional[bool] = False,
 ) -> Datasets:
   """Load an image dataset from tfrecords.
 
@@ -422,17 +423,20 @@ def tfrecord_image_classification_datasets(
     normalize_mean: mean RGB value to subtract off of images to normalize imgs
     normalize_std: std RGB of dataset to normalize imgs
     convert_to_black_and_white: conver a color image to black and white.
+    cache: to cache the dataset in ram or not.
 
   Returns:
     A Datasets object containing data iterators.
   """
 
   num_classes_map = {
+      "imagenet2012_8": 1000,
       "imagenet2012_16": 1000,
       "imagenet2012_32": 1000,
       "imagenet2012_64": 1000,
   }
   image_shapes_map = {
+      "imagenet2012_8": (8, 8, 3),
       "imagenet2012_16": (16, 16, 3),
       "imagenet2012_32": (32, 32, 3),
       "imagenet2012_64": (64, 64, 3),
@@ -475,7 +479,10 @@ def tfrecord_image_classification_datasets(
       feats["label"] = tf.reshape(feats["label"], [])
       return feats
 
-    ds = ds.map(parse).map(functools.partial(_image_map_fn, cfg))
+    ds = ds.map(parse)
+    if cache:
+      ds = ds.cache()
+    ds = ds.map(functools.partial(_image_map_fn, cfg))
     ds = ds.shuffle(shuffle_buffer_size)
     ds = ds.batch(batch_size, drop_remainder=True)
     ds = ds.prefetch(prefetch_batches)
