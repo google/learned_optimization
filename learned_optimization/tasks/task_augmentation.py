@@ -307,6 +307,11 @@ class ConvertFloatDType(base.Task):
     data = jax.tree_map(f, data)
     return self.task.loss_with_state(params, state, key, data)
 
+  def loss_with_state_and_aux(self, params, state, key, data):
+    f = lambda x: jnp.asarray(x, self.dtype) if x.dtype == jnp.float32 else x
+    data = jax.tree_map(f, data)
+    return self.task.loss_with_state_and_aux(params, state, key, data)
+
   def loss(self, params, key, data):
     l, _ = self.loss_with_state(params, None, key, data)
     return l
