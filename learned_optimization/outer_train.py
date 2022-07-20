@@ -34,6 +34,7 @@ from concurrent import futures
 import itertools
 import os
 import time
+import traceback
 from typing import Any, Callable, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
 
 from absl import flags
@@ -63,6 +64,11 @@ FLAGS = flags.FLAGS
 PRNGKey = jnp.ndarray
 
 GinRequired = str
+
+
+def iter_group_amount(it, n):
+  while True:
+    yield tuple([next(it) for _ in range(n)])
 
 
 @profile.wrap()
@@ -295,6 +301,7 @@ def train_worker(
     num_steps: Optional[int] = None,
     learner_address: Optional[str] = None,
     sample_estimators_fn=build_gradient_estimators,
+    run_num_estimators_per_gradient: Optional[int] = None,
 ):
   """Distributed training loop for the worker.
 
@@ -311,7 +318,12 @@ def train_worker(
     num_steps: number of steps to run worker for.
     learner_address: location of learner courier server.
     sample_estimators_fn: Function which returns list of gradient estimators.
+    run_num_estimators_per_gradient: Number of gradient estimators to run per
+      calculation and transmission of meta-gradient. If None, this is set to
+      num_estimators, and thus all gradients are used.
   """
+  if not run_num_estimators_per_gradient:
+    run_num_estimators_per_gradient = num_estimators
 
   seed = onp.random.randint(0, 10000000)
   key = jax.device_put(jax.random.PRNGKey(seed), device)
@@ -343,6 +355,9 @@ def train_worker(
   grad_estimators = None
   worker_weights = None
 
+  gest_idx_to_use = iter_group_amount(
+      itertools.cycle(range(num_estimators)), run_num_estimators_per_gradient)
+
   for i in range(num_steps) if num_steps else itertools.count():
     with_m = True if (summary_every_n and i % summary_every_n == 0) else False
 
@@ -370,15 +385,19 @@ def train_worker(
       grad_estimators, unroll_states = build_static_and_init_unroll_state(
           worker_weights, next(rng))
 
+    # only run on a subset of grad estimators and weights.
+    idxs = next(gest_idx_to_use)
     gradient_worker_out = gradient_learner.gradient_worker_compute(
         worker_weights=worker_weights,
-        gradient_estimators=grad_estimators,
-        unroll_states=unroll_states,
+        gradient_estimators=[grad_estimators[gidx] for gidx in idxs],
+        unroll_states=[unroll_states[gidx] for gidx in idxs],
         key=next(rng),
         with_metrics=with_m,
         device=device)
 
-    unroll_states = gradient_worker_out.unroll_states
+    unroll_states = list(unroll_states)
+    for oidx, gidx in enumerate(idxs):
+      unroll_states[gidx] = gradient_worker_out.unroll_states[oidx]
 
     # TODO(lmetz) update total_inner_steps from the gradient_worker_out
     total_inner_steps = onp.asarray(0, dtype=onp.int64)
@@ -487,7 +506,8 @@ def summarize_learner(step: int, metrics: Mapping[str, float],
 def _threaded_write_summary(
     summary_writer: Any, to_write: Mapping[str, Union[float, onp.ndarray]],
     step: int, summary_thread_pool: futures.ThreadPoolExecutor,
-    summary_future: Optional[futures.Future]) -> futures.Future:
+    summary_future: Optional[futures.Future]
+) -> futures.Future:  # pylint: disable=g-bare-generic
   """Write summaries out in the background in a thread pool."""
 
   def write_summary(to_write):
@@ -841,6 +861,7 @@ def local_train(
     num_seconds: float = 0.,
     stochastic_resample_frequency: int = 200,
     sample_estimators_fn=build_gradient_estimators,
+    run_num_estimators_per_gradient: Optional[int] = None,
 ):
   """Train a learned optimizer in a single process.
 
@@ -855,7 +876,13 @@ def local_train(
     stochastic_resample_frequency: How frequently to resample gradient estimator
       we resample at a rate of 1 over this number randomly.
     sample_estimators_fn: Function which returns list of GradientEstimators.
+    run_num_estimators_per_gradient: Number of gradient estimators to run per
+      calculation and transmission of meta-gradient. If None, this is set to
+      num_estimators, and thus all gradients are used.
   """
+  if not run_num_estimators_per_gradient:
+    run_num_estimators_per_gradient = num_estimators
+
   train_start_time = time.time()
   elapsed_time = 0.
   total_inner_steps = onp.asarray(0, dtype=onp.int64)
@@ -924,6 +951,9 @@ def local_train(
   learner_time = time.time()
   worker_ids = collections.deque(maxlen=10)
 
+  gest_idx_to_use = iter_group_amount(
+      itertools.cycle(range(num_estimators)), run_num_estimators_per_gradient)
+
   for i in tqdm.trange(num_steps):
     checkpoints.periodically_save_checkpoint(
         train_log_dir,
@@ -949,10 +979,18 @@ def local_train(
       # estimators
     worker_weights = outer_learner.get_state_for_worker(gradient_learner_state)
 
+    idxs = next(gest_idx_to_use)
     gradient_worker_out = gradient_learner.gradient_worker_compute(
-        worker_weights, gradient_estimators, unroll_states, next(rng),
-        with_metrics)
-    unroll_states = gradient_worker_out.unroll_states
+        worker_weights=worker_weights,
+        gradient_estimators=[gradient_estimators[gidx] for gidx in idxs],
+        unroll_states=[unroll_states[gidx] for gidx in idxs],
+        key=next(rng),
+        with_metrics=with_metrics)
+
+    unroll_states = list(unroll_states)
+    for oidx, gidx in enumerate(idxs):
+      unroll_states[gidx] = gradient_worker_out.unroll_states[oidx]
+
     metrics = gradient_worker_out.metrics
 
     with profile.Profile("grads_to_onp"):
@@ -1093,6 +1131,7 @@ def run_train(
     population_root_dir: Optional[str] = None,
     num_workers: Optional[int] = None,
     learner_mode="async",
+    run_num_estimators_per_gradient: Optional[int] = None,
 ):
   """Kick off training!
 
@@ -1123,6 +1162,9 @@ def run_train(
       population based training.
     num_workers: Number of workers being used to train.
     learner_mode: either sync or async. Represents the kind of learning done.
+    run_num_estimators_per_gradient: Number of gradient estimators to run per
+      calculation and transmission of meta-gradient. If None, this is set to
+      num_estimators, and thus all gradients are used.
   """
   if outer_learner_fn == gin.REQUIRED:
     raise ValueError("Must set run_train.outer_learner_fn in gin")
@@ -1146,6 +1188,7 @@ def run_train(
           num_steps=num_steps,
           num_seconds=num_seconds,
           sample_estimators_fn=sample_estimator_fn,
+          run_num_estimators_per_gradient=run_num_estimators_per_gradient,
       )
     elif is_trainer:
       if population_root_dir is not None:
@@ -1183,14 +1226,20 @@ def run_train(
               stochastic_resample_frequency=stochastic_resample_frequency,
               train_log_dir=train_log_dir,
               sample_estimators_fn=sample_estimator_fn,
+              run_num_estimators_per_gradient=run_num_estimators_per_gradient,
           )
           break
+        # note this also catches other kinds of errors like
+        # NotImplementedError
         except RuntimeError as e:
           # TODO(lmetz) catch only memory errors?
           logging.error(
               "Failed to train worker? Likely this is a memory error.")
           logging.error("Please check the following error manually for now.")
+          logging.error(str(type(e)))
           logging.error(str(e))
+          logging.error(traceback.format_exc())
+
           # TODO(lmetz) clear a bunch of memory on the device?
     else:
       raise ValueError("Either is_trainer or is_worker need to be set.")

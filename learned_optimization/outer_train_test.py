@@ -191,7 +191,7 @@ class OuterTrainTest(parameterized.TestCase):
           stochastic_resample_frequency=200,
       )
 
-  def test_local_train_truncated_pes_fixed_tasks(self):
+  def test_local_train_truncated_pes_fixed_tasks_with_run_num_estimators(self):
     gin.clear_config()
 
     with tempfile.TemporaryDirectory() as train_log_dir:
@@ -200,7 +200,7 @@ class OuterTrainTest(parameterized.TestCase):
       task_family = lambda: quadratics.FixedDimQuadraticFamilyData(10)
       gin.bind_parameter(
           "build_gradient_estimators_fixed.list_of_task_family_per_machine",
-          [[task_family]])
+          [[task_family, task_family]])
 
       gin.bind_parameter(
           "build_gradient_estimators_fixed.gradient_estimator_fn",
@@ -219,7 +219,8 @@ class OuterTrainTest(parameterized.TestCase):
       outer_train.local_train(
           train_log_dir,
           outer_learner=outer_learner,
-          num_estimators=1,
+          num_estimators=2,
+          run_num_estimators_per_gradient=1,
           summary_every_n=3,
           num_steps=10,
           num_seconds=0,
