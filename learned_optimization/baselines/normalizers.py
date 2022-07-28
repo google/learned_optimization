@@ -72,6 +72,16 @@ def threaded_tqdm_map(threads: int, func: Callable[[Any], Any],
     return [x.result() for x in tqdm.tqdm(future_list)]
 
 
+def _one_line_dumps(dd):
+  content = "{\n"
+  lines = []
+  for l, n in sorted(dd.items(), key=lambda x: x[0]):
+    lines.append("\"%s\":%s" % (l, json.dumps(n)))
+  content += ",\n".join(lines)
+  content += "\n}"
+  return content
+
+
 def _speedup_over_adam_build(task_name: str) -> NormData:
   """Construct data needed for normalization function."""
   big_adam = utils.load_archive(task_name, "AdamLR_100000_R5")
@@ -111,16 +121,6 @@ def _speedup_over_adam_make_func(norm_data: NormData) -> NormFN:
   return fn
 
 
-def _one_line_dumps(dd):
-  content = "{\n"
-  lines = []
-  for l, n in sorted(dd.items(), key=lambda x: x[0]):
-    lines.append("\"%s\":%s" % (l, json.dumps(n)))
-  content += ",\n".join(lines)
-  content += "\n}"
-  return content
-
-
 def speedup_over_adam_build_and_write(tasks: Sequence[str],
                                       output_path: str,
                                       overwrite: bool = False):
@@ -154,4 +154,69 @@ def speedup_over_adam_normalizer_map() -> Mapping[str, NormFN]:
   with filesystem.file_open(path, "r") as f:
     data_dict = json.loads(f.read())
 
+  return {k: _speedup_over_adam_make_func(d) for k, d in data_dict.items()}
+
+
+def _speedup_over_multiple_baselines_build(task_name: str) -> NormData:
+  """Construct data needed for normalization function."""
+  all_emaed = []
+  for name in [
+      "AdamLR_100000_R5", "AdamSqrtDecayLR_100000_R5",
+      "AdamExpDecayLR_100000_R5", "RAdamLR_100000_R5"
+  ]:
+    big_adam = utils.load_archive(task_name, name)
+    emaed_adam = [
+        ema(c, 0.95) for c in onp.mean(big_adam["eval/train/loss"], axis=1)
+    ]
+    all_emaed.extend(emaed_adam)
+
+  # this assumes all the xs are the same.
+  xs = big_adam["eval/xs"][0][0]
+
+  bottom_env = onp.nanmin(all_emaed, axis=0)
+
+  num_pieces = 512
+  xp = onp.linspace(0, xs[-1], num_pieces)
+  yp = onp.interp(xp, xs, bottom_env)
+
+  yp = onp.minimum.accumulate(yp)
+  return (xp.tolist(), yp.tolist())
+
+
+def speedup_over_multiple_baselines_build_and_write(tasks: Sequence[str],
+                                                    output_path: str,
+                                                    overwrite: bool = False):
+  """Build and append the normalization data for the provided set of tasks."""
+  flat_norm_datas = threaded_tqdm_map(32,
+                                      _speedup_over_multiple_baselines_build,
+                                      tasks)
+
+  if filesystem.exists(output_path):
+    with filesystem.file_open(output_path, "r") as f:
+      data_dict = json.loads(f.read())
+  else:
+    data_dict = {}
+
+  for d, t in zip(flat_norm_datas, tasks):
+    if t not in data_dict or overwrite:
+      data_dict[t] = d
+    else:
+      raise ValueError(f"Duplicate found for {t}")
+
+  content = _one_line_dumps(data_dict)
+
+  with filesystem.file_open(output_path, "w") as f:
+    f.write(content)
+  return content
+
+
+@functools.lru_cache(None)
+def speedup_over_multiple_baselines_map() -> Mapping[str, NormFN]:
+  """Load the precomputed dictionary mapping from task name to a norm func."""
+  path = os.path.join(
+      os.path.dirname(__file__), "data", "speedup_over_multiple_baselines.json")
+  with filesystem.file_open(path, "r") as f:
+    data_dict = json.loads(f.read())
+
+  # This uses the same functional form as speedup over adam.
   return {k: _speedup_over_adam_make_func(d) for k, d in data_dict.items()}

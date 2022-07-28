@@ -157,17 +157,38 @@ def AdamLR_100000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-na
 
 
 @gin.configurable
-def LOpt_10000_R5(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  # pylint: disable=invalid-name
-  """Hparam set and output path for a learned optimizer."""
+def RAdamLR_100000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
   reps = 5
+  cfgs = _lr_cfgs(task_name, "RAdam", 100000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
 
+
+@gin.configurable
+def AdamSqrtDecayLR_100000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "AdamSqrtDecayLR", 100000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def AdamExpDecayLR_100000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "AdamExpDecayLR", 100000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+def _LOpt_set(num_step, reps, task_name, opt_name, opt_path):
+  """Hparam set and output path for a learned optimizer."""
   cfg = {
       "inner_train_task.task": f"@{task_name}()",
       "inner_train_task.opt": "@opt_from_checkpoint()",
       "opt_from_checkpoint.checkpoint_path": opt_path,
       "inner_train_task.opt_name": f"{opt_name}",
       "inner_train_task.task_name": task_name,
-      "inner_train_task.num_steps": 10000,
+      "inner_train_task.num_steps": num_step,
       "inner_train_task.eval_every": 10,
       "inner_train_task.eval_batches": 5,
       "inner_train_task.last_eval_batches": 10,
@@ -176,22 +197,56 @@ def LOpt_10000_R5(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  #
 
 
 @gin.configurable
+def LOpt_10000_R5(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  # pylint: disable=invalid-name
+  """Hparam set and output path for a learned optimizer."""
+  return _LOpt_set(10000, 5, task_name, opt_name, opt_path)
+
+
+@gin.configurable
 def LOpt_10000_R1(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  # pylint: disable=invalid-name
   """Hparam set and output path for a learned optimizer."""
-  reps = 1
+  return _LOpt_set(10000, 1, task_name, opt_name, opt_path)
+
+
+for _num_step in [
+    5000, 10_000, 20_000, 30_000, 40_000, 50_000, 60_000, 70_000, 80_000,
+    90_000, 100_000
+]:
+  _fn = functools.partial(_LOpt_set, _num_step, 5)
+  _n = f"LOpt_{_num_step}_R5"
+  locals()[_n] = _fn
+  gin.external_configurable(locals()[_n], _n)
+
+
+def _LOptGradAccum_set(num_step, reps, grad_accum, task_name, opt_name,
+                       opt_path):
+  """Hparam set and output path for a learned optimizer."""
 
   cfg = {
       "inner_train_task.task": f"@{task_name}()",
-      "inner_train_task.opt": "@opt_from_checkpoint()",
+      "inner_train_task.opt": "@GradientAccumulator()",
+      "GradientAccumulator.num_average": grad_accum,
+      "GradientAccumulator.opt": "@opt_from_checkpoint()",
       "opt_from_checkpoint.checkpoint_path": opt_path,
       "inner_train_task.opt_name": f"{opt_name}",
       "inner_train_task.task_name": task_name,
-      "inner_train_task.num_steps": 10000,
+      "inner_train_task.num_steps": num_step,
       "inner_train_task.eval_every": 10,
       "inner_train_task.eval_batches": 5,
       "inner_train_task.last_eval_batches": 10,
   }
   return [cfg] * reps, [(_save_dir_from_cfg(cfg), reps)]
+
+
+for _num_step in [
+    5000, 10_000, 20_000, 30_000, 40_000, 50_000, 60_000, 70_000, 80_000,
+    90_000, 100_000
+]:
+  _fn = functools.partial(_LOptGradAccum_set, _num_step, 5, 10)
+  _n = f"LOptGradAccum10_{_num_step}_R5"
+  locals()[_n] = _fn
+  gin.external_configurable(locals()[_n], _n)
+
 
 
 @gin.configurable

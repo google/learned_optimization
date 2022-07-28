@@ -178,3 +178,18 @@ class PiecewiseLinear(ScalarSchedule):
       vs.append(v)
     idx = jnp.sum(x > times) - 1
     return jnp.take(jnp.asarray(vs), idx)
+
+
+@gin.configurable
+class ExponentialDecay(ScalarSchedule):
+  """Exponential decay of the form base_lr * (1-decay_amount)**t."""
+
+  def __init__(self, base_lr: float, decay_amount: float):
+    super().__init__()
+    self.decay_amount = decay_amount
+    self.base_lr = base_lr
+
+  def __call__(self,
+               global_step: chex.Array,
+               max_steps: Optional[chex.Array] = None) -> chex.Array:
+    return self.base_lr * (1 - self.decay_amount)**global_step
