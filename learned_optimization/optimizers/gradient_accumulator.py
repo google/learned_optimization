@@ -55,6 +55,10 @@ class GradientAccumulator(base.Optimizer):
   def get_params(self, state):
     return self.opt.get_params(state.inner_opt_state)
 
+  def set_params(self, state, params):
+    new_inner_opt_state = self.opt.set_params(state.inner_opt_state, params)
+    return state.replace(inner_opt_state=new_inner_opt_state)
+
   def get_state(self, state):
     return state.model_state
 

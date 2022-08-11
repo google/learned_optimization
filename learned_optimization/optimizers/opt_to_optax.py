@@ -48,7 +48,7 @@ def opt_to_optax_opt(
     del extra_args
     opt_state = opt.init(params, num_steps=num_steps)
     if dataclasses.is_dataclass(opt_state):
-      return opt_state.replace(params=())
+      return opt.set_params(opt_state, ())
     else:
       raise NotImplementedError("Only flax dataclasses are supported!")
 
@@ -66,15 +66,15 @@ def opt_to_optax_opt(
       raise ValueError("Params must not be None!")
 
     if dataclasses.is_dataclass(state):
-      state = state.replace(params=params)
+      state = opt.set_params(state, params)
     else:
       raise NotImplementedError("Only flax dataclasses are supported!")
 
     next_state = opt.update(state, updates, **extra_args)
 
-    step = tree_utils.tree_sub(next_state.params, params)
+    step = tree_utils.tree_sub(opt.get_params(next_state), params)
 
-    next_state = next_state.replace(params=())
+    next_state = opt.set_params(next_state, ())
 
     return step, next_state
 

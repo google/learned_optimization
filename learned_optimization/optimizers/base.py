@@ -16,7 +16,6 @@
 """Base class for Optimizer and a couple hand designed optimizer."""
 
 import abc
-import collections
 from typing import Any, Optional, Tuple
 import warnings
 
@@ -34,7 +33,11 @@ Params = Any
 Gradient = Params
 OptState = Any
 
-StatelessState = collections.namedtuple("StatelessState", ["params", "state"])
+
+@flax.struct.dataclass
+class StatelessState:
+  params: chex.ArrayTree
+  state: chex.ArrayTree
 
 
 class Optimizer(abc.ABC):
@@ -58,7 +61,7 @@ class Optimizer(abc.ABC):
     raise NotImplementedError
 
   def set_params(self, state: OptState, params: Params) -> OptState:
-    return state._replace(params=params)
+    return state.replace(params=params)
 
   def update(
       self,
