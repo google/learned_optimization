@@ -20,6 +20,8 @@ from typing import Any, Mapping, Sequence, Tuple, Optional
 import gin
 from learned_optimization.baselines import utils
 
+# pylint: disable=missing-function-docstring,invalid-name
+
 _LRS = [
     1e-7, 3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2,
     1e-1, 3e-1, 1
@@ -180,6 +182,63 @@ def AdamExpDecayLR_100000_R5(task_name: str) -> HParamSet:  # pylint: disable=in
   return list(cfgs) * reps, paths
 
 
+@gin.configurable
+def Grad10AdamLR_100000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = []
+  num_steps = 100000
+
+  for lr in _LRS:
+    cfgs.append({
+        "inner_train_task.task": f"@{task_name}()",
+        "inner_train_task.opt": "@GradientAccumulator()",
+        "GradientAccumulator.opt": "@Adam()",
+        "GradientAccumulator.num_average": 10,
+        "Adam.learning_rate": lr,
+        "inner_train_task.opt_name": f"Grad10Adam_lr{lr}",
+        "inner_train_task.task_name": task_name,
+        "inner_train_task.num_steps": num_steps,
+        "inner_train_task.eval_every": 10,
+        "inner_train_task.eval_batches": 5,
+        "inner_train_task.last_eval_batches": 10,
+    })
+
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def AdamLR_300000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "Adam", 300000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def RAdamLR_300000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "RAdam", 300000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def AdamSqrtDecayLR_300000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "AdamSqrtDecayLR", 300000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def AdamExpDecayLR_300000_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  reps = 5
+  cfgs = _lr_cfgs(task_name, "AdamExpDecayLR", 300000)
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
 def _LOpt_set(num_step, reps, task_name, opt_name, opt_path):
   """Hparam set and output path for a learned optimizer."""
   cfg = {
@@ -248,7 +307,6 @@ for _num_step in [
   gin.external_configurable(locals()[_n], _n)
 
 
-
 @gin.configurable
 def LOpt_1000_R5(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  # pylint: disable=invalid-name
   """Hparam set and output path for a learned optimizer."""
@@ -315,13 +373,13 @@ def _no_hparam_cfg(task_name: str, opt_name: str, num_steps: int) -> HParamList:
 ### HParam sweep of less popular hparam lists.
 def _make_lr(name):
 
-  def _fn(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  def _inner_fn(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
     reps = 5
     cfgs = _lr_cfgs(task_name, name, 10000)
     paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
     return list(cfgs) * reps, paths
 
-  return _fn
+  return _inner_fn
 
 
 _names = [
@@ -347,7 +405,7 @@ def SM3beta2_999_LR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=in
 def _shampoo_make_lr(graft_type, block_size, opt_name):
   """Make learning rate sweep for the shampoo optimizer."""
 
-  def _fn(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  def _inner_fn(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
     reps = 5
     cfgs = _lr_cfgs(task_name, "Shampoo", 10000, opt_name_override=opt_name)
     new_cfgs = []
@@ -360,7 +418,7 @@ def _shampoo_make_lr(graft_type, block_size, opt_name):
     paths = [(_save_dir_from_cfg(c), reps) for c in new_cfgs]
     return list(new_cfgs) * reps, paths
 
-  return _fn
+  return _inner_fn
 
 
 def _to_name(graft_type):
@@ -392,6 +450,78 @@ def AdamLR_GradAccum_16384_R3(task_name: str) -> HParamSet:  # pylint: disable=i
           "GradientAccumulator.opt": "@Adam()",
           "Adam.learning_rate": lr,
           "inner_train_task.opt_name": f"GradAccum{accum_amount}_Adam_lr{lr}",
+          "inner_train_task.task_name": task_name,
+          "inner_train_task.num_steps": num_steps,
+          "inner_train_task.eval_every": 10,
+          "inner_train_task.eval_batches": 5,
+          "inner_train_task.last_eval_batches": 10,
+      })
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def AdamLR_GradAccum_16384_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  num_steps = 16384
+  reps = 5
+  cfgs = []
+  for accum_amount in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]:
+    for lr in _LRS:
+      cfgs.append({
+          "inner_train_task.task": f"@{task_name}()",
+          "inner_train_task.opt": "@GradientAccumulator()",
+          "GradientAccumulator.num_average": accum_amount,
+          "GradientAccumulator.opt": "@Adam()",
+          "Adam.learning_rate": lr,
+          "inner_train_task.opt_name": f"GradAccum{accum_amount}_Adam_lr{lr}",
+          "inner_train_task.task_name": task_name,
+          "inner_train_task.num_steps": num_steps,
+          "inner_train_task.eval_every": 10,
+          "inner_train_task.eval_batches": 5,
+          "inner_train_task.last_eval_batches": 10,
+      })
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def SGDLR_GradAccum_16384_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  num_steps = 16384
+  reps = 5
+  cfgs = []
+  for accum_amount in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]:
+    for lr in _LRS:
+      cfgs.append({
+          "inner_train_task.task": f"@{task_name}()",
+          "inner_train_task.opt": "@GradientAccumulator()",
+          "GradientAccumulator.num_average": accum_amount,
+          "GradientAccumulator.opt": "@SGD()",
+          "SGD.learning_rate": lr,
+          "inner_train_task.opt_name": f"GradAccum{accum_amount}_SGD_lr{lr}",
+          "inner_train_task.task_name": task_name,
+          "inner_train_task.num_steps": num_steps,
+          "inner_train_task.eval_every": 10,
+          "inner_train_task.eval_batches": 5,
+          "inner_train_task.last_eval_batches": 10,
+      })
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
+
+
+@gin.configurable
+def SGDMLR_GradAccum_16384_R5(task_name: str) -> HParamSet:  # pylint: disable=invalid-name
+  num_steps = 16384
+  reps = 5
+  cfgs = []
+  for accum_amount in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]:
+    for lr in _LRS:
+      cfgs.append({
+          "inner_train_task.task": f"@{task_name}()",
+          "inner_train_task.opt": "@GradientAccumulator()",
+          "GradientAccumulator.num_average": accum_amount,
+          "GradientAccumulator.opt": "@SGDM()",
+          "SGDM.learning_rate": lr,
+          "inner_train_task.opt_name": f"GradAccum{accum_amount}_SGDM_lr{lr}",
           "inner_train_task.task_name": task_name,
           "inner_train_task.num_steps": num_steps,
           "inner_train_task.eval_every": 10,
@@ -448,3 +578,29 @@ def GraftedShampoo_LOpt_10000_R5(
       "inner_train_task.last_eval_batches": 10,
   }
   return [cfg] * reps, [(_save_dir_from_cfg(cfg), reps)]
+
+
+@gin.configurable
+def GradAccum_LOpt_16384_R5(
+    task_name: str, opt_name: str, opt_path: str) -> HParamSet:  # pylint: disable=invalid-name
+  """Hparam set and output path for a learned optimizer."""
+  reps = 5
+
+  cfgs = []
+  for grad_accum in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]:
+    cfgs.append({
+        "inner_train_task.task": f"@{task_name}()",
+        "inner_train_task.opt": "@GradientAccumulator()",
+        "GradientAccumulator.num_average": grad_accum,
+        "GradientAccumulator.opt": "@opt_from_checkpoint()",
+        "opt_from_checkpoint.checkpoint_path": opt_path,
+        "inner_train_task.opt_name": f"GradLOpt{grad_accum}_{opt_name}",
+        "inner_train_task.task_name": task_name,
+        "inner_train_task.num_steps": 16384,
+        "inner_train_task.eval_every": 10,
+        "inner_train_task.eval_batches": 5,
+        "inner_train_task.last_eval_batches": 10,
+    })
+
+  paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
+  return list(cfgs) * reps, paths
