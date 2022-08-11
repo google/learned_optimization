@@ -21,7 +21,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.13.5
+#       jupytext_version: 1.14.1
 #   kernelspec:
 #     display_name: Python 3
 #     name: python3
@@ -200,7 +200,7 @@ states = jax.vmap(init_state)(keys)
 losses = []
 is_done = jnp.zeros([n_tasks])
 for i in range(200):
-  vec_batch = training.vec_get_batch(task, n_tasks)
+  vec_batch = training.vec_get_batch(task, n_tasks, split="train")
   states, is_done, l = update(states, is_done, vec_batch)
   losses.append(l)
 
@@ -229,7 +229,7 @@ states = (opt_state, trunc_state, keys)
 losses = []
 is_done = jnp.zeros([n_tasks])
 for i in range(200):
-  vec_batch = training.vec_get_batch(task, n_tasks)
+  vec_batch = training.vec_get_batch(task, n_tasks, split="train")
   states, is_done, l = update(states, is_done, vec_batch)
   losses.append(l)
 

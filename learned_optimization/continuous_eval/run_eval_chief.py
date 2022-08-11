@@ -259,7 +259,7 @@ def metrics_fn_for_aggregate_normalized_losses(
 
   # check if we ran over the outer_valid data split by checking the loss.
   if "eval/outer_valid/norm_loss" in values[0]:
-    losses = [r["eval/outer_valid/loss"] for r in values]
+    losses = [r["eval/outer_valid/norm_loss"] for r in values]
     metrics["outer_valid/norm_avg_loss"] = _mean_mean(losses)
     metrics["outer_valid/norm_min_loss"] = _mean_min(losses)
     metrics["outer_valid/norm_last_loss"] = _mean_last(losses)

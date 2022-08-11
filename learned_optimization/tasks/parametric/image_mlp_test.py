@@ -35,6 +35,11 @@ class ImageMlpTest(absltest.TestCase):
     sampled_task = image_mlp.timed_sample_image_mlp(key)
     self.assertIsInstance(sampled_task, cfgobject.CFGObject)
 
+  def test_timed_sample_image_mlp_subsample_data(self):
+    key = jax.random.PRNGKey(0)
+    sampled_task = image_mlp.timed_sample_image_mlp_subsample_data(key)
+    self.assertIsInstance(sampled_task, cfgobject.CFGObject)
+
 
 if __name__ == '__main__':
   absltest.main()

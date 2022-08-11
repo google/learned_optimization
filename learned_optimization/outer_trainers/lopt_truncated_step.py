@@ -475,7 +475,8 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
 
     self.data_shape = jax.tree_map(
         lambda x: jax.ShapedArray(shape=x.shape, dtype=x.dtype),
-        training.vec_get_batch(task_family, num_tasks, numpy=True))
+        training.vec_get_batch(
+            task_family, num_tasks, split="train", numpy=True))
 
   def outer_init(self, key):
     return self.learned_opt.init(key)

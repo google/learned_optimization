@@ -143,8 +143,13 @@ def train_test_iterators(
       else:
         t = onp.nan
       yield {
-          "feats": tuple([maybe_pad(x) for x in cfgobject.featurize(cfg)]),
-          "time": t,
+          "feats":
+              tuple([
+                  maybe_pad(x)
+                  for x in cfgobject.featurize(cfg, feature_type="time")
+              ]),
+          "time":
+              t,
       }
 
   lead_val = [

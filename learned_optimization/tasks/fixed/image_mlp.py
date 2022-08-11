@@ -164,6 +164,12 @@ def ImageMLP_Cifar10_256x256_Relu():
 
 
 @gin.configurable
+def ImageMLP_Cifar10_256x256_Relu_BS32():
+  datasets = image.cifar10_datasets(batch_size=32)
+  return _MLPImageTask(datasets, [256, 256])
+
+
+@gin.configurable
 def ImageMLP_Cifar10_1024x1024_Relu():
   datasets = image.cifar10_datasets(batch_size=128)
   return _MLPImageTask(datasets, [1024, 1024])

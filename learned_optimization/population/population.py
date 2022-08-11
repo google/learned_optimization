@@ -300,8 +300,7 @@ class PopulationController:
       filesystem.rename(tmp_path, target_path)
 
 
-def start_courier_server(name: str,
-                         population: PopulationController) -> courier.Server:
+def start_courier_server(name: str, population: PopulationController):
   """Start courier server for a given population."""
   server = courier.Server(name)
   server.Bind("maybe_get_worker_data", population.maybe_get_worker_data)
@@ -310,7 +309,7 @@ def start_courier_server(name: str,
   return server
 
 
-def get_courier_client(name: str) -> courier.Client:
+def get_courier_client(name: str):
   population = courier.Client(name)
   return population
 

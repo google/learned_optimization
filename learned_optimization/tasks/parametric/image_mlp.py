@@ -137,3 +137,22 @@ def timed_sample_image_mlp(key: PRNGKey, max_time=1e-5):
   model_path = model_paths.models[("sample_image_mlp", "time")]
   return time_model.rejection_sample(sample_image_mlp, model_path, key,
                                      max_time)
+
+
+def sample_image_mlp_subsample_data(key: PRNGKey):
+  rng = hk.PRNGSequence(key)
+  cfg = sample_image_mlp(next(rng))
+  ds = cfg.kwargs["datasets"]
+  if "imagenet" not in ds.obj:
+    if jax.random.uniform(next(rng), []) < 0.2:
+      frac = float(jax.random.uniform(next(rng), []))
+      cfg.kwargs["data_fraction"] = cfgobject.DoNotFeaturize(
+          frac, ("time", "valid"))
+  return cfg
+
+
+@gin.configurable()
+def timed_sample_image_mlp_subsample_data(key: PRNGKey, max_time=1e-5):
+  model_path = model_paths.models[("sample_image_mlp", "time")]
+  return time_model.rejection_sample(sample_image_mlp_subsample_data,
+                                     model_path, key, max_time)

@@ -79,6 +79,12 @@ class LogFeature:
 
 
 @flax.struct.dataclass
+class DoNotFeaturize:
+  value: Any
+  feature_types: Sequence[str] = flax.struct.field(pytree_node=False)
+
+
+@flax.struct.dataclass
 class CFGObject:
   """Base configurable object for the configuration language.
 
@@ -137,12 +143,14 @@ def deserialize_cfg(b):
   return pickle.loads(b)
 
 
-def flatten_cfg(cfg: CFGObject) -> Mapping[str, Any]:
+def flatten_cfg(cfg: CFGObject, features_for: str) -> Mapping[str, Any]:
   """Take a potentially nested CFGObject and flatten keys to a single dict.
 
   This function additionally applies feature transforms.
   Args:
     cfg: The config to be flattened
+    features_for: Features are parsed differently depending on the target
+      application. This is the string respresenting that target application.
 
   Returns:
     The features as a depth 1 dictionary.
@@ -158,6 +166,11 @@ def flatten_cfg(cfg: CFGObject) -> Mapping[str, Any]:
       to_process.append((k + "/" + a.obj, a.kwargs))
     elif isinstance(a, CFGNamed):
       to_process.append((k + "/" + a.name, a.values))
+    elif isinstance(a, DoNotFeaturize):
+      if features_for in a.feature_types:
+        continue
+      else:
+        to_process.append((k, a.value))
     elif isinstance(a, LogFeature):
 
       def log_fn(x):
@@ -233,15 +246,16 @@ def featurize_cfg_path(path: str) -> jnp.ndarray:
 
 def featurize(
     cfg: CFGObject,
-    other_cfg: Optional[CFGObject] = None
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    other_cfg: Optional[CFGObject] = None,
+    feature_type: Any = None) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
   """Featurize a configuration so as to be able to pass into an ML model.
 
   Args:
     cfg: The configuration to featurize
-    other_cfg: A second configuration to featureize. This is useful for, say,
+    other_cfg: A second configuration to featurize. This is useful for, say,
       having a static level config (to sample a task family) and a dynamic level
       say to sample a task inside a task family.
+    feature_type: the kind of featurization to perform.
 
   Returns:
     id features: int32[tags, 8] features representing the keys
@@ -251,11 +265,11 @@ def featurize(
     Where tags is the number of key value pairs in the nested cfg.
   """
   cfg = copy.deepcopy(cfg)
-  flat_cfg = flatten_cfg(cfg)
+  flat_cfg = flatten_cfg(cfg, feature_type)
   # make mutable again for pytype to be happy
   flat_cfg = {k: v for k, v in flat_cfg.items()}
   if other_cfg:
-    for k, v in flatten_cfg(other_cfg).items():
+    for k, v in flatten_cfg(other_cfg, feature_type).items():
       flat_cfg[k] = v
 
   outs = []
@@ -270,13 +284,15 @@ def featurize(
 
 def featurize_many(
     cfgs: Sequence[CFGObject],
-    max_length: Optional[int] = None
+    max_length: Optional[int] = None,
+    feature_type: Any = None
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
   """Featurize a list of configurations into a fixed length feature array.
 
   Args:
     cfgs: List of configs
     max_length: length of the returned features.
+    feature_type: the kind of featurization to perform.
 
   Returns:
     id features: int32[BS, N, 8] features representing the keys.
@@ -285,7 +301,7 @@ def featurize_many(
     mask: float32[BS, N] which masks the second dimension to adjust for variable
       length keys.
   """
-  feat_list = [featurize(c) for c in cfgs]
+  feat_list = [featurize(c, feature_type=feature_type) for c in cfgs]
   inds, float_feats, int_feats = zip(*feat_list)
 
   if max_length is None:

@@ -55,8 +55,10 @@ def fashion_mnist_datasets(batch_size: int,
 @gin.configurable
 def cifar10_datasets(batch_size: int,
                      image_size: Tuple[int, int] = (32, 32),
+                     data_fraction: float = 1.,
                      **kwargs) -> base.Datasets:
-  splits = ("train[0:80%]", "train[80%:90%]", "train[90%:]", "test")
+  perc = max(1, int(80 * data_fraction))
+  splits = (f"train[0:{perc}%]", "train[80%:90%]", "train[90%:]", "test")
   return base.preload_tfds_image_classification_datasets(
       "cifar10", splits, batch_size=batch_size, image_size=image_size, **kwargs)
 
@@ -66,8 +68,10 @@ def cifar10_datasets(batch_size: int,
 def cifar100_datasets(
     batch_size: int,
     image_size: Tuple[int, int] = (32, 32),
+    data_fraction: float = 1.,
 ) -> base.Datasets:
-  splits = ("train[0:80%]", "train[80%:90%]", "train[90%:]", "test")
+  perc = min(1, int(80 * data_fraction))
+  splits = (f"train[0:{perc}%]", "train[80%:90%]", "train[90%:]", "test")
   return base.preload_tfds_image_classification_datasets(
       "cifar100", splits, batch_size=batch_size, image_size=image_size)
 
@@ -76,8 +80,10 @@ def cifar100_datasets(
 @gin.configurable
 def svhn_cropped_datasets(batch_size: int,
                           image_size: Tuple[int, int] = (32, 32),
+                          data_fraction: float = 1.,
                           **kwargs) -> base.Datasets:
-  splits = ("train[0:80%]", "train[80%:90%]", "train[90%:]", "test")
+  perc = min(1, int(80 * data_fraction))
+  splits = (f"train[0:{perc}%]", "train[80%:90%]", "train[90%:]", "test")
   return base.preload_tfds_image_classification_datasets(
       "svhn_cropped",
       splits,
@@ -90,8 +96,10 @@ def svhn_cropped_datasets(batch_size: int,
 @gin.configurable
 def food101_datasets(batch_size: int,
                      image_size: Tuple[int, int] = (32, 32),
+                     data_fraction: float = 1.0,
                      **kwargs) -> base.Datasets:
-  splits = ("train[0:80%]", "train[80%:90%]", "train[90%:]", "validation")
+  perc = min(1, int(80 * data_fraction))
+  splits = (f"train[0:{perc}%]", "train[80%:90%]", "train[90%:]", "validation")
   return base.tfds_image_classification_datasets(
       "food101", splits, batch_size=batch_size, image_size=image_size, **kwargs)
 

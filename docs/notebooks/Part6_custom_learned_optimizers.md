@@ -6,7 +6,7 @@ jupytext:
     extension: .md
     format_name: myst
     format_version: 0.13
-    jupytext_version: 1.13.5
+    jupytext_version: 1.14.1
 kernelspec:
   display_name: Python 3
   name: python3
@@ -495,7 +495,8 @@ class HParamControllerLOPT(lopt_base.LearnedOptimizer):
         # use the results of the RNN to update the parameters.
         def update_one(p, g):
           return p - g * lr
-        next_params = jax.tree_multimap(update_one, opt_state.params, grads)
+
+        next_params = jax.tree_map(update_one, opt_state.params, grads)
 
         return HParamControllerInnerOptState(
             params=next_params,

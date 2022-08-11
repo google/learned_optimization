@@ -109,5 +109,19 @@ class CFGTest(absltest.TestCase):
     testing.assert_allclose(float_feats[0, 0], onp.log(123))
     testing.assert_allclose(float_feats[1, 0], onp.log(222))
 
+  def test_featurize_do_not_featurize(self):
+    static_cfg = cfgobject.CFGObject(
+        "DummyObject", {
+            "param": cfgobject.DoNotFeaturize(123, "a"),
+            "param2": cfgobject.DoNotFeaturize(123, "b")
+        })
+    ids, float_feats, int_feats = cfgobject.featurize(
+        static_cfg, feature_type="a")
+    self.assertEqual(ids.shape, (1, 8))
+    self.assertEqual(float_feats.shape, (1, 8))
+    self.assertEqual(int_feats.shape, (1,))
+    flattened = cfgobject.flatten_cfg(static_cfg, "a")
+    self.assertLen(flattened, 1)
+
 if __name__ == "__main__":
   absltest.main()

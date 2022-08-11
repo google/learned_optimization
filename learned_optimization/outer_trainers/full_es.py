@@ -335,7 +335,6 @@ class FullES(gradient_learner.GradientEstimator):
       steps_per_jit: int = 10,
       loss_type: str = "avg",
       recompute_samples: int = 50,
-      recompute_split: str = "train",
       clip_loss_diff: Optional[float] = None,
       stack_antithetic_samples: bool = False,
       sign_delta_loss_scalar: Optional[float] = None,
@@ -355,8 +354,6 @@ class FullES(gradient_learner.GradientEstimator):
         loss for ES.
       recompute_samples: If loss_type="last_recompute", this determines the
         number of samples to estimate the final loss with.
-      recompute_split: If loss_type="last_recompute", which split of data to
-        compute the loss over.
       clip_loss_diff: Clipping applied to differences in losses before computing
         ES gradients.
       stack_antithetic_samples: Implementation detail of how antithetic samples
@@ -377,7 +374,6 @@ class FullES(gradient_learner.GradientEstimator):
 
     self.loss_type = loss_type
     self.recompute_samples = recompute_samples
-    self.recompute_split = recompute_split
     self.sign_delta_loss_scalar = sign_delta_loss_scalar
 
     logging.info(  # pylint: disable=logging-fstring-interpolation

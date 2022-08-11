@@ -362,7 +362,7 @@ def time_loss_fn(feats: Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
 
 
 def get_model_root_dir() -> str:
-  root_dir = "~/lopt_model_timings"
+  root_dir = "gs://gresearch/learned_optimization/task_timing_models/"
   root_dir = os.environ.get("LOPT_TIMING_MODEL_DIR", root_dir)
   return root_dir
 
@@ -460,13 +460,16 @@ def rejection_sample(
   for _ in range(512 // batch_size):
     keys = jax.random.split(next(rng), batch_size)
     cfgs = [sampler(key) for key in keys]
-    key_feat, int_feat, float_feat, feat_mask = cfgobject.featurize_many(cfgs)
+    key_feat, int_feat, float_feat, feat_mask = cfgobject.featurize_many(
+        cfgs, feature_type="time")
     # TODO(lmetz) pass through feat mask to support variable length features
     del feat_mask
     times = forward_fn((key_feat, int_feat, float_feat))
     mask = times < max_time
 
     if valid_forward_fn:
+      key_feat, int_feat, float_feat, feat_mask = cfgobject.featurize_many(
+          cfgs, feature_type="valid")
       is_valid = forward_fn((key_feat, int_feat, float_feat))
       mask = jnp.logical_and(mask, is_valid)
 

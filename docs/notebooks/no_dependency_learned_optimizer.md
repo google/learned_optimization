@@ -6,7 +6,7 @@ jupytext:
     extension: .md
     format_name: myst
     format_version: 0.13
-    jupytext_version: 1.13.5
+    jupytext_version: 1.14.1
 kernelspec:
   display_name: Python 3
   name: python3
@@ -1405,7 +1405,8 @@ def vec_short_segment_pes(meta_param,
     # if we finished one trajectory.
     def _switch_one_accum(a, b):
       return jnp.where(has_finished[-1], a, b)
-    new_accum = jax.tree_multimap(_switch_one_accum, perturbs, new_accum)
+
+    new_accum = jax.tree_map(_switch_one_accum, perturbs, new_accum)
 
     next_pes_state = (new_accum, pos_opt_state, neg_opt_state,
                       next_on_iteration)

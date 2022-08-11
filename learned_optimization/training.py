@@ -43,8 +43,8 @@ def load_state(path, state):
 
 def get_batches(task_family: tasks_base.TaskFamily,
                 batch_shape: Sequence[int],
-                numpy: bool = False,
-                split: str = "train") -> Any:
+                split: str,
+                numpy: bool = False) -> Any:
   """Get batches of data with the `batch_shape` leading dimension."""
   if len(batch_shape) == 1:
     return vec_get_batch(task_family, batch_shape[0], numpy=numpy, split=split)
@@ -59,8 +59,10 @@ def get_batches(task_family: tasks_base.TaskFamily,
       return tree_utils.tree_zip_jnp(datas_list)
   elif len(batch_shape) == 3:
     datas_list = [
-        get_batches(task_family, [batch_shape[1], batch_shape[2]], numpy, split)
-        for _ in range(batch_shape[0])
+        get_batches(
+            task_family, [batch_shape[1], batch_shape[2]],
+            numpy=numpy,
+            split=split) for _ in range(batch_shape[0])
     ]
     if numpy:
       return tree_utils.tree_zip_onp(datas_list)
@@ -71,7 +73,7 @@ def get_batches(task_family: tasks_base.TaskFamily,
 
 
 @profile.wrap()
-def vec_get_batch(task_family, n_tasks, split="train", numpy=False):
+def vec_get_batch(task_family, n_tasks, split, numpy=False):
   to_zip = []
   for _ in range(n_tasks):
     if task_family.datasets is None:
