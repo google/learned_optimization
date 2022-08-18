@@ -101,6 +101,7 @@ class AggregationType(str, enum.Enum):
   sample = "sample"  # pylint: disable=invalid-name
   collect = "collect"  # pylint: disable=invalid-name
   none = "none"  # pylint: disable=invalid-name
+  tensor = "tensor"  # pylint: disable=invalid-name
 
 
 def summary(
@@ -138,8 +139,12 @@ def summary(
 
   oryx_name = aggregation + "||" + name
 
+  mode = "append"
+  if aggregation == AggregationType.tensor:
+    mode = "strict"
+
   if ORYX_LOGGING:
-    val = oryx.core.sow(val, tag=_SOW_TAG, name=oryx_name, mode="append")
+    val = oryx.core.sow(val, tag=_SOW_TAG, name=oryx_name, mode=mode)
 
   return val
 
@@ -203,6 +208,9 @@ def aggregate_metric(k: str,
   elif agg == AggregationType.collect:
     # This might be multi dim if vmap is used, so ravel first.
     return xnp.concatenate([xnp.asarray(v).ravel() for v in vs], axis=0)
+  elif agg == AggregationType.tensor:
+    assert len(vs) == 1
+    return vs[0]
   elif agg == AggregationType.none:
     if len(vs) != 1:
       raise ValueError("when using no aggregation one must ensure only scalar "
@@ -279,6 +287,8 @@ def with_summary_output_reduced(fn: F, static_argnums=()) -> G:
         to_sample.append((k, v))
       elif agg == AggregationType.collect:
         new_metrics[k] = v.ravel()
+      elif agg == AggregationType.tensor:
+        new_metrics[k] = v
       else:
         raise ValueError(f"unsupported aggregation {agg}")
 
@@ -387,6 +397,9 @@ class SummaryWriterBase:
   def histogram(self, name, value, step):
     raise NotImplementedError()
 
+  def tensor(self, name, value, step):
+    raise NotImplementedError()
+
   def flush(self):
     raise NotImplementedError()
 
@@ -423,6 +436,10 @@ class PrintWriter(SummaryWriterBase):
     if self.filter_fn(name):
       print(f"{step}] {name}={value}")
 
+  def tensor(self, name, value, step):
+    if self.filter_fn(name):
+      print(f"{step}] {name}=Tensor: {value.shape}")
+
   def flush(self):
     pass
 
@@ -438,6 +455,9 @@ class MultiWriter(SummaryWriterBase):
 
   def flush(self):
     _ = [w.flush() for w in self.writers]
+
+  def tensor(self, name, value, step):
+    _ = [w.tensor(name, value, step) for w in self.writers]
 
   def histogram(self, name, value, step):
     _ = [w.histogram(name, value, step) for w in self.writers]
@@ -527,6 +547,12 @@ class TensorboardWriter(SummaryWriterBase):
     self._ensure_default()
 
     tf.summary.text(name=name, data=tf.constant(textdata), step=step)
+
+  def tensor(self, name, tensor, step):
+    """Write a tensor summary."""
+    self._ensure_default()
+    tf.summary.write(tag=name, tensor=tensor, step=step, name=name)
+
 
 
 JaxboardWriter = TensorboardWriter

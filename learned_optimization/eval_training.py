@@ -73,7 +73,9 @@ def _next_state(
     key, summary_key = jax.random.split(key)
     (next_opt_state, loss,
      key), metrics = summary.with_summary_output_reduced(fn)(
-         opt_state, key, data, summary_sample_rng_key=summary_key)
+         opt_state, key, data, sample_rng_key=summary_key)
+    key, key1 = jax.random.split(key)
+    metrics = summary.aggregate_metric_list([metrics], use_jnp=True, key=key1)
   else:
     next_opt_state, loss, key = fn(opt_state, key, data)
     metrics = {}
@@ -142,6 +144,7 @@ def single_task_training_curves(
     last_eval_batches: int = 20,
     eval_task: Optional[tasks_base.Task] = None,
     device: Optional[jax.lib.xla_client.Device] = None,
+    metrics_every: Optional[int] = None,
     summary_writer: Optional[summary.SummaryWriterBase] = None,
 ) -> Mapping[str, jnp.ndarray]:
   """Compute training curves."""
@@ -160,11 +163,14 @@ def single_task_training_curves(
         opt.init, static_argnames=("num_steps",))(
             p, model_state=s, num_steps=num_steps)
 
-    losses = []
-    eval_auxs = []
-    use_data = task.datasets is not None
-    train_xs = []
-    eval_xs = []
+  losses = []
+  eval_auxs = []
+  use_data = task.datasets is not None
+  train_xs = []
+  eval_xs = []
+  metrics = []
+  metrics_xs = []
+
   for i in tqdm.trange(num_steps + 1, position=0):
     with profile.Profile("eval"):
       m = {}
@@ -196,15 +202,40 @@ def single_task_training_curves(
       batch = jax.device_put(batch, device=device)
 
     with profile.Profile("next_state"):
-      opt_state, l, key, _ = _next_state(
-          task, opt, opt_state, batch, key, with_metrics=False)
+      with_metrics = False if (
+          metrics_every is None) else i % metrics_every == 0
+      opt_state, l, key, m = _next_state(
+          task, opt, opt_state, batch, key, with_metrics=with_metrics)
       losses.append(l)
       train_xs.append(i)
+
+      if summary_writer:
+        summary_writer.scalar("train/loss", l, step=i)
+
+      if metrics_every:
+        if summary_writer:
+          for k, v in m.items():
+            agg, k = k.split("||")
+            if agg in ["mean", "sample"]:
+              summary_writer.scalar(k, v, step=i)
+            elif agg == "tensor":
+              summary_writer.tensor(k, v, step=i)
+            else:
+              logging.warning(f"Not supported aggregation type {agg}."  # pylint: disable=logging-fstring-interpolation
+                              f"Dropping data for key {k}.")
+        metrics.append(m)
+        metrics_xs.append(i)
 
   ret = {
       "train/xs": onp.asarray(train_xs),
       "train/loss": onp.asarray(losses),
   }
+
+  if metrics_every:
+    stacked_metrics = tree_utils.tree_zip_onp(metrics)
+    metric_dict = {f"train/metrics/{k}": v for k, v in stacked_metrics.items()}
+    ret = {**ret, **metric_dict}
+    ret["train/metrics/xs"] = onp.asarray(metrics_xs)
 
   if eval_batches:
     stacked_metrics = tree_utils.tree_zip_onp(eval_auxs)
