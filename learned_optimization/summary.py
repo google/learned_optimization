@@ -548,11 +548,10 @@ class TensorboardWriter(SummaryWriterBase):
 
     tf.summary.text(name=name, data=tf.constant(textdata), step=step)
 
-  def tensor(self, name, tensor, step):
+  def tensor(self, name, value, step):
     """Write a tensor summary."""
     self._ensure_default()
-    tf.summary.write(tag=name, tensor=tensor, step=step, name=name)
-
+    tf.summary.write(tag=name, tensor=value, step=step, name=name)
 
 
 JaxboardWriter = TensorboardWriter
