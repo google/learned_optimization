@@ -247,7 +247,7 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
         lambda: self.lstm_fn().initial_state(1))[1](  # pylint: disable=unnecessary-lambda
             None, key3)
 
-    return hk.data_structures.to_immutable_dict({
+    return {
         "initial_from_lstm":
             var_init(None, key1, [self.from_lstm_size], dtype=jnp.float32),
         "initial_from_mlp":
@@ -265,7 +265,7 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
                                          jnp.zeros([0, self.lstm_hidden_size])),
         "ffmod_params":
             self.per_param_mlp_network.init(key6, jnp.zeros([0, mlp_inp_size]))
-    })
+    }
 
   def opt_fn(self,
              theta: lopt_base.MetaParams,
