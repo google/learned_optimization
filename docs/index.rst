@@ -32,6 +32,7 @@ optimizers. It implements hand designed and learned optimizers, tasks to meta-tr
    outer_trainers
    continuous_eval
    population
+   optimization_baselines
    
    
 Indices and tables
