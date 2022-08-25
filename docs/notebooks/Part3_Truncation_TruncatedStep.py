@@ -243,7 +243,7 @@ for i in range(n_tasks):
 # With this version, all the tasks start lockstep-ed initially, but then reset early so as to ensure the training trajectories are not running in lock step.
 
 # + [markdown] id="9ef76f1f"
-# # TruncatedStep: An interface for unrolled computation graphs
+# ## TruncatedStep: An interface for unrolled computation graphs
 #
 # The TruncatedStep abstraction defines an interface which can be used to inner-train a task with some meta-learned pieces.
 #

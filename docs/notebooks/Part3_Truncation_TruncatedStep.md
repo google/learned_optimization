@@ -363,7 +363,7 @@ With this version, all the tasks start lockstep-ed initially, but then reset ear
 
 +++ {"id": "9ef76f1f"}
 
-# TruncatedStep: An interface for unrolled computation graphs
+## TruncatedStep: An interface for unrolled computation graphs
 
 The TruncatedStep abstraction defines an interface which can be used to inner-train a task with some meta-learned pieces.
 
