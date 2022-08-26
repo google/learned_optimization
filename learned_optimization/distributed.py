@@ -31,7 +31,6 @@ import time
 from typing import Any, Callable, Generic, Optional, Sequence, Tuple, TypeVar
 
 from absl import logging
-import courier
 from learned_optimization import profile
 import numpy as onp
 
@@ -117,6 +116,7 @@ class AsyncLearner(Generic[T, W]):
       self.start_server()
 
   def start_server(self):
+    import courier  # pylint: disable=g-import-not-at-top
     if not self._server:
       self._server = courier.Server(
           uniquify_server_name("learner", self._experiment_name),
@@ -257,6 +257,7 @@ class DistributedWorker(Generic[T, W]):
       worker_id: ID of the current worker.
       learner_address: adress of learner courier server.
     """
+    import courier  # pylint: disable=g-import-not-at-top
     self._client = courier.Client(
         learner_address if learner_address else uniquify_server_name(
             "learner", experiment_name))
@@ -333,6 +334,7 @@ class SyncLearner(Generic[T, W]):
 
   def start_server(self):
     if not self._server:
+      import courier  # pylint: disable=g-import-not-at-top
       self._server = courier.Server(
           uniquify_server_name("learner", self._experiment_name),
           port=self._port,
