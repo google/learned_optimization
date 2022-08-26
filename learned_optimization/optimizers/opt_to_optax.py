@@ -16,7 +16,7 @@
 """Convert a learned_optimization Optimizer to an optax update."""
 
 import dataclasses
-from typing import Any, Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple, NamedTuple
 
 import chex
 from learned_optimization import tree_utils
@@ -25,10 +25,16 @@ import optax
 import optax.experimental
 
 
+class GradientTransformationWithExtraArgs(NamedTuple):
+  init: Any
+  update: Any
+
+
+
+
 def opt_to_optax_opt(
     opt: base.Optimizer,
-    num_steps: Optional[int] = None
-) -> optax.experimental.GradientTransformationWithExtraArgs:
+    num_steps: Optional[int] = None) -> GradientTransformationWithExtraArgs:
   """Convert a learned_optimization optimizer to an optax optimizers.
 
   This makes use of optax's 'extra_args' argument. For many learned optimizers
@@ -78,5 +84,4 @@ def opt_to_optax_opt(
 
     return step, next_state
 
-  return optax.experimental.GradientTransformationWithExtraArgs(
-      init_fn, update_fn)
+  return GradientTransformationWithExtraArgs(init_fn, update_fn)

@@ -55,6 +55,7 @@ setuptools.setup(
         'tensorflow-metadata==1.5.0',
         'tensorboard>=2.7.0',
         'gin-config>=0.5.0',
+        'oryx',
     ],
     url='https://github.com/google/learned_optimization',
     license='Apache-2.0',
