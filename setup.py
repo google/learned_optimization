@@ -47,7 +47,7 @@ setuptools.setup(
         'nose',
         'dm-launchpad-nightly',
         'tqdm>=4.62.3',
-        'flax==0.3.3',
+        'flax',
         'dm-haiku==0.0.5',
         'optax>=0.0.9',
         'tensorflow>=2.7.0',
