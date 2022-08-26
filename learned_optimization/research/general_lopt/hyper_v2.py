@@ -733,7 +733,7 @@ class HyperV2(lopt_base.LearnedOptimizer):
           summary_prefix = tree_utils.map_named(lambda k, v: k,
                                                 opt_state.params)
         else:
-          summary_prefix = jax.tree_map(lambda x: None, opt_state.params)
+          summary_prefix = jax.tree_map(lambda x: "None", opt_state.params)
 
         rnn_inputs = jax.tree_map(ff, opt_state.params, grads, m, rms,
                                   summary_prefix)
