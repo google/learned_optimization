@@ -24,7 +24,6 @@ from typing import Any, MutableMapping, Optional, Sequence, Tuple, MutableSequen
 import uuid
 
 from absl import logging
-import courier
 import flax
 from learned_optimization import filesystem
 
@@ -302,6 +301,7 @@ class PopulationController:
 
 def start_courier_server(name: str, population: PopulationController):
   """Start courier server for a given population."""
+  import courier  # pylint: disable=g-import-not-at-top
   server = courier.Server(name)
   server.Bind("maybe_get_worker_data", population.maybe_get_worker_data)
   server.Bind("set_eval", population.set_eval)
@@ -310,6 +310,7 @@ def start_courier_server(name: str, population: PopulationController):
 
 
 def get_courier_client(name: str):
+  import courier  # pylint: disable=g-import-not-at-top
   population = courier.Client(name)
   return population
 
