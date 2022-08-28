@@ -196,7 +196,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     ]
 
   @profile.wrap()
-  def compute_gradient_estimate(
+  def compute_gradient_estimate(  # pytype: disable=signature-mismatch  # overriding-parameter-type-checks
       self,
       worker_weights: gradient_learner.WorkerWeights,
       key: PRNGKey,
