@@ -166,4 +166,4 @@ def legend_to_side(*args, ax=None, rescale=True, **kwargs):
   if rescale:
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
   # Put a legend to the right of the current axis
-  ax.legend(*args, loc="center left", bbox_to_anchor=(1, 0.5), **kwargs)
+  return ax.legend(*args, loc="center left", bbox_to_anchor=(1, 0.5), **kwargs)

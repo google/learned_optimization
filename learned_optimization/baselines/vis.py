@@ -58,15 +58,19 @@ def load_curves(
                               sets)
 
 
-def plot_tasks_and_sets(task: str,
-                        opt_sets: Sequence[str],
-                        ax: Optional[Any] = None,
-                        alpha_on_confidence: float = 0.1,
-                        confidence_alpha: float = 1.0,
-                        ema: float = 0.9,
-                        initial_shift: int = 500,
-                        legend: bool = True,
-                        labels: Optional[Sequence[str]] = None):
+def plot_tasks_and_sets(
+    task: str,
+    opt_sets: Sequence[str],
+    ax: Optional[Any] = None,
+    alpha_on_confidence: float = 0.1,
+    confidence_alpha: float = 1.0,
+    ema: float = 0.9,
+    initial_shift: int = 500,
+    legend: bool = True,
+    labels: Optional[Sequence[str]] = None,
+    colors: Optional[Sequence[Any]] = None,
+    always_include_first_opt=False,
+):
   """Plot performance of a task with respect to the best of each hparam set.
 
   Args:
@@ -79,8 +83,10 @@ def plot_tasks_and_sets(task: str,
     initial_shift: Used to set the max ylim.
     legend: to plot a legend or not.
     labels: Labels to plot in legend. If None, use opt_sets.
+    always_include_first_opt: Ensure that the y-lim always includes the first optimizer.
   """
-  colors = nu.colors_for_num(len(opt_sets))
+  if colors is None:
+    colors = nu.colors_for_num(len(opt_sets))
 
   curves = load_curves(task, tuple(opt_sets))
 
@@ -114,6 +120,8 @@ def plot_tasks_and_sets(task: str,
 
   vmin = onp.nanmin(best_vals)
   vmax = onp.nanmin(ylim_top_vals)
+  if always_include_first_opt:
+    vmax = onp.maximum(ylim_top_vals[0], vmax)
   ax.set_ylim(vmin, vmax)
   ax.set_title(task)
   if legend:

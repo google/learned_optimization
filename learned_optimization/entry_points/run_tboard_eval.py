@@ -39,6 +39,7 @@ def inner_train_task(train_log_dir,
                      eval_batches: int = 5,
                      last_eval_batches: int = 10,
                      eval_task: Optional[tasks_base.Task] = None,
+                     metrics_every: Optional[int] = None,
                      device: Optional[jax.lib.xla_client.Device] = None):
   """Train and save results of a single training run.
 
@@ -72,6 +73,7 @@ def inner_train_task(train_log_dir,
       last_eval_batches=last_eval_batches,
       eval_task=eval_task,
       device=device,
+      metrics_every=metrics_every,
       summary_writer=summary_writer)
 
 

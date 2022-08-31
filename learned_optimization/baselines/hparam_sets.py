@@ -262,6 +262,12 @@ def LOpt_10000_R5(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  #
 
 
 @gin.configurable
+def LOpt_2000_R5(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  # pylint: disable=invalid-name
+  """Hparam set and output path for a learned optimizer."""
+  return _LOpt_set(2000, 5, task_name, opt_name, opt_path)
+
+
+@gin.configurable
 def LOpt_10000_R1(task_name: str, opt_name: str, opt_path: str) -> HParamSet:  # pylint: disable=invalid-name
   """Hparam set and output path for a learned optimizer."""
   return _LOpt_set(10000, 1, task_name, opt_name, opt_path)
