@@ -106,6 +106,7 @@ opt_names = [
     'jun26_bigcluster_8rep_jf_1e3lr_2906',
     'jul18_continue_on_bigger_2xbs_morestale_9264',
     'aug12_continue_on_bigger_2xbs_200kstep_bigproblem_v2_5620',
+    'aug26_aug12_continue_on_bigger_2xbs_200kstep_bigproblem_v2_1397',
 ]
 
 

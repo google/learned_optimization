@@ -26,9 +26,15 @@ class PretrainedLOptTest(absltest.TestCase):
         pretrained_optimizers
         .aug12_continue_on_bigger_2xbs_200kstep_bigproblem_v2_5620())
 
+
   def test_hyperv2_pretrain2(self):
     opt_test_utils.smoketest_optimizer(
         pretrained_optimizers.aug11_aug4_trunc10per_last())
+
+  def test_hyperv2_pretrain3(self):
+    opt_test_utils.smoketest_optimizer(
+        pretrained_optimizers
+        .aug26_aug12_continue_on_bigger_2xbs_200kstep_bigproblem_v2_1397())
 
 
 if __name__ == '__main__':
