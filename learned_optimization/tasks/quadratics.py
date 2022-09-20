@@ -60,6 +60,28 @@ def batch_datasets() -> datasets_base.Datasets:
 
 
 @gin.configurable
+class NoisyMeanQuadraticTask(base.Task):
+  """Simple task consisting of a quadratic loss."""
+
+  def __init__(self, dim=2, noise_stdev=1.):
+    super().__init__()
+    self._dim = dim
+
+    key = jax.random.PRNGKey(7)  # fixed key to yield consistent H!
+    hess_asym = jax.random.normal(key, shape=(self._dim, self._dim))
+    self.hess = hess_asym @ hess_asym.T
+    self.stdev = noise_stdev
+
+  def loss(self, params, rng, _):
+    rng, rng1 = jax.random.split(rng)
+    noise = self.stdev * jax.random.normal(rng1, shape=params.shape)
+    return jnp.sum((params - noise).T @ self.hess @ (params - noise))
+
+  def init(self, key):
+    return jax.random.normal(key, shape=(self._dim, 1)) * 10
+
+
+@gin.configurable
 class BatchQuadraticTask(base.Task):
   """Simple task consisting of a quadratic loss with noised data."""
   datasets = batch_datasets()
