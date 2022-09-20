@@ -1038,7 +1038,7 @@ def local_train(
 
     delta_time = time.time() - learner_time
     learner_time = time.time()
-    to_write = summarize_learner(
+    to_write = summarize_learner(  # pytype: disable=wrong-arg-types  # typed-numpy
         step=step,
         metrics=metrics,
         worker_ids=worker_ids,

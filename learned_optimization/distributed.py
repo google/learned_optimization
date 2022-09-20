@@ -128,7 +128,7 @@ class AsyncLearner(Generic[T, W]):
 
   def _is_step_valid(self, step: int) -> bool:
     step = onp.asarray(step)
-    return (self._current_iteration >= step and
+    return (self._current_iteration >= step and  # pytype: disable=bad-return-type  # typed-numpy
             (self._current_iteration - step) <= self._staleness)
 
   def put_grads(self, worker_id: Any, step: int, value: T):
