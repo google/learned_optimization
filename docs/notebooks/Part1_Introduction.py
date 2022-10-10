@@ -106,7 +106,7 @@ key = jax.random.PRNGKey(0)
 task = image_mlp.ImageMLP_FashionMnist8_Relu32()
 
 params = task.init(key)
-jax.tree_map(lambda x: x.shape, params)
+jax.tree_util.tree_map(lambda x: x.shape, params)
 
 # + [markdown] id="a7ce6c75"
 # We can see we initialized parameters which correspond to the weights of the MLP.
@@ -115,7 +115,7 @@ jax.tree_map(lambda x: x.shape, params)
 
 # + executionInfo={"elapsed": 4, "status": "ok", "timestamp": 1643173202813, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 480} id="bf030fd0" outputId="c6b2ee31-b1ef-4fa9-8f07-04e041ac9537"
 batch = next(task.datasets.train)
-jax.tree_map(lambda x: (x.shape, x.dtype), batch)
+jax.tree_util.tree_map(lambda x: (x.shape, x.dtype), batch)
 
 # + [markdown] id="7ad6d9b8"
 # We get batches of 128 with images of size 8x8 and labels stored as integers.
@@ -133,7 +133,7 @@ loss
 
 # + executionInfo={"elapsed": 672, "status": "ok", "timestamp": 1643173204150, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 480} id="0c78a15a" outputId="7706bf0f-741d-401a-f70b-8c66c8f10859"
 loss, grad = jax.value_and_grad(task.loss)(params, key1, batch)
-jax.tree_map(lambda x: x.shape, grad)
+jax.tree_util.tree_map(lambda x: x.shape, grad)
 
 # + [markdown] id="fbe89c3b"
 # Now let's pull this together to train this task with SGD. Note that we will _jit_ the loss gradient computation for improved performance---if this is not familiar, we recommend reading about [Just in Time Compilation with JAX](https://jax.readthedocs.io/en/latest/jax-101/02-jitting.html).
@@ -149,7 +149,7 @@ for i in range(1000):
   batch = next(task.datasets.train)
   l, grads = grad_fn(params, key1, batch)
   # apply SGD to each parameter
-  params = jax.tree_map(lambda p, g: p - lr * g, params, grads)
+  params = jax.tree_util.tree_map(lambda p, g: p - lr * g, params, grads)
   if i % 100 == 0:
     test_l = task.loss(params, key, next(task.datasets.test))
     print(f"train loss at {i}: {float(l)}. Test loss: {float(test_l)}")
@@ -284,14 +284,14 @@ class MomentumOptimizer(opt_base.Optimizer):
     return MomentumOptState(
         params=params,
         model_state=model_state,
-        momentums=jax.tree_map(jnp.zeros_like, params),
+        momentums=jax.tree_util.tree_map(jnp.zeros_like, params),
         iteration=jnp.asarray(0, dtype=jnp.int32))
 
   def update(self, opt_state, grads, loss, model_state=None, **kwargs):
-    struct = jax.tree_structure(grads)
-    flat_momentum = jax.tree_leaves(opt_state.momentums)
-    flat_grads = jax.tree_leaves(grads)
-    flat_params = jax.tree_leaves(opt_state.params)
+    struct = jax.tree_util.tree_structure(grads)
+    flat_momentum = jax.tree_util.tree_leaves(opt_state.momentums)
+    flat_grads = jax.tree_util.tree_leaves(grads)
+    flat_params = jax.tree_util.tree_leaves(opt_state.params)
 
     output_params = []
     output_momentums = []
@@ -301,10 +301,10 @@ class MomentumOptimizer(opt_base.Optimizer):
       output_params.append(next_p)
       output_momentums.append(next_m)
     return MomentumOptState(
-        params=jax.tree_unflatten(struct, output_params),
+        params=jax.tree_util.tree_unflatten(struct, output_params),
         model_state=model_state,
         iteration=opt_state.iteration + 1,
-        momentums=jax.tree_unflatten(struct, output_params),
+        momentums=jax.tree_util.tree_unflatten(struct, output_params),
     )
 
 

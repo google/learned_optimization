@@ -119,11 +119,11 @@ class MetaInitializer(Protocol):
 
 @jax.jit
 def _tree_mean(stack):
-  return jax.tree_map(lambda x: jnp.mean(x, axis=0), stack)
+  return jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), stack)
 
 
 def _tree_mean_onp(stack):
-  return jax.tree_map(lambda x: onp.mean(x, axis=0), stack)
+  return jax.tree_util.tree_map(lambda x: onp.mean(x, axis=0), stack)
 
 
 @functools.lru_cache(None)
@@ -317,7 +317,7 @@ class GradientEstimator(abc.ABC):
 
 @functools.partial(jax.jit, donate_argnums=(0,))
 def _jit_nan_to_num(vals, replace):
-  return jax.tree_map(
+  return jax.tree_util.tree_map(
       functools.partial(
           jnp.nan_to_num, nan=replace, posinf=replace, neginf=replace), vals)
 
@@ -326,19 +326,20 @@ def _nan_to_num(vals, replace, use_jnp=False):
   if use_jnp:
     return _jit_nan_to_num(vals, replace)
   else:
-    return jax.tree_map(onp.nan_to_num, vals)
+    return jax.tree_util.tree_map(onp.nan_to_num, vals)
 
 
 def _tree_zeros_on_device(shapes, device):
-  leaves, treedef = jax.tree_flatten(shapes)
-  return jax.tree_unflatten(treedef,
-                            _tree_zeros_on_device_inner(tuple(leaves), device))
+  leaves, treedef = jax.tree_util.tree_flatten(shapes)
+  return jax.tree_util.tree_unflatten(
+      treedef, _tree_zeros_on_device_inner(tuple(leaves), device))
 
 
 @functools.partial(jax.jit, static_argnums=(0, 1))
 def _tree_zeros_on_device_inner(shapes, device):
   zero_val = lambda x: jax.device_put(jnp.asarray(0, dtype=x.dtype), device)
-  return jax.tree_map(lambda x: jnp.full(x.shape, zero_val(x)), shapes)
+  return jax.tree_util.tree_map(lambda x: jnp.full(x.shape, zero_val(x)),
+                                shapes)
 
 
 @gin.configurable
@@ -381,7 +382,8 @@ def gradient_worker_compute(
   theta = worker_weights.theta
   theta_model_state = worker_weights.theta_model_state
 
-  theta_shape = jax.tree_map(lambda x: jax.ShapedArray(x.shape, x.dtype), theta)
+  theta_shape = jax.tree_util.tree_map(
+      lambda x: jax.ShapedArray(x.shape, x.dtype), theta)
   grads_accum = _tree_zeros_on_device(theta_shape, device)
 
   metrics_list = []
@@ -419,13 +421,13 @@ def gradient_worker_compute(
           return x[idx] if x is not None else None
 
         fn = functools.partial(extract_one, idx)
-        onp_task_params = jax.tree_map(onp.asarray,
-                                       estimator_out.unroll_info.task_param)
+        onp_task_params = jax.tree_util.tree_map(
+            onp.asarray, estimator_out.unroll_info.task_param)
         iteration = estimator_out.unroll_info.iteration[
             idx] if estimator_out.unroll_info.iteration is not None else None
         event_info.append({
             "loss": estimator_out.unroll_info.loss[idx, :],
-            "task_param": jax.tree_map(fn, onp_task_params),
+            "task_param": jax.tree_util.tree_map(fn, onp_task_params),
             "iteration": iteration,
             "outer_iteration": worker_weights.outer_state.outer_iteration,
         })
@@ -491,7 +493,7 @@ def gradient_worker_compute(
         mean_loss=mean_loss)
 
     return WorkerComputeOut(
-        to_put=jax.tree_map(onp.asarray, to_put),
+        to_put=jax.tree_util.tree_map(onp.asarray, to_put),
         unroll_states=unroll_states_out,
         metrics=metrics,
         event_info=event_info)

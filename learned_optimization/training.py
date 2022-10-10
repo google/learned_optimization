@@ -36,9 +36,9 @@ def load_state(path, state):
   logging.info("Restoring state %s", path)
   with fs.file_open(path, "rb") as fp:
     state_new = serialization.from_bytes(state, fp.read())
-  tree = jax.tree_structure(state)
-  leaves = jax.tree_leaves(state_new)
-  return jax.tree_unflatten(tree, leaves)
+  tree = jax.tree_util.tree_structure(state)
+  leaves = jax.tree_util.tree_leaves(state_new)
+  return jax.tree_util.tree_unflatten(tree, leaves)
 
 
 def get_batches(task_family: tasks_base.TaskFamily,

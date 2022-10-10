@@ -356,12 +356,12 @@ def add_with_summary(fn: F, static_argnums=()) -> G:
 
 
 def tree_scalar_mean(prefix, values):
-  for li, l in enumerate(jax.tree_leaves(values)):
+  for li, l in enumerate(jax.tree_util.tree_leaves(values)):
     summary(prefix + "/" + str(li), jnp.mean(l))
 
 
 def tree_step(prefix, values):
-  for ui, u in enumerate(jax.tree_leaves(values)):
+  for ui, u in enumerate(jax.tree_util.tree_leaves(values)):
     avg_step_size = jnp.mean(jnp.abs(u))
     summary(prefix + "/%d_avg_step_size" % ui, avg_step_size)
 

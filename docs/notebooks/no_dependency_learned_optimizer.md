@@ -1194,15 +1194,15 @@ def vec_short_segment_es(meta_param,
   # Compute an es estimate on a single inner-problem
   def do_one(meta_param, key, inner_opt_state, on_iteration, seq_of_batches):
     # Sample random noise of the same shape as meta-parameters
-    flat_params, struct = jax.tree_flatten(meta_param)
+    flat_params, struct = jax.tree_util.tree_flatten(meta_param)
     keys = [jax.random.fold_in(key, i) for i in range(len(flat_params))]
-    keys = jax.tree_unflatten(struct, keys)
-    perturbs = jax.tree_map(lambda k, v: jax.random.normal(k, v.shape) * std,
+    keys = jax.tree_util.tree_unflatten(struct, keys)
+    perturbs = jax.tree_util.tree_map(lambda k, v: jax.random.normal(k, v.shape) * std,
                             keys, meta_param)
 
     # compute positive and negative antithetic samples
-    pos_theta = jax.tree_map(lambda eps, v: v + eps, perturbs, meta_param)
-    neg_theta = jax.tree_map(lambda eps, v: v - eps, perturbs, meta_param)
+    pos_theta = jax.tree_util.tree_map(lambda eps, v: v + eps, perturbs, meta_param)
+    neg_theta = jax.tree_util.tree_map(lambda eps, v: v - eps, perturbs, meta_param)
 
     # Apply both of the antithetic samples
     p_losses, p_opt_state, p_on_iteration = short_segment_unroll(
@@ -1223,7 +1223,7 @@ def vec_short_segment_es(meta_param,
     n_loss = jnp.mean(n_losses)
 
     # estimate gradient
-    es_grad = jax.tree_map(lambda p: (p_loss - n_loss) * 1 / (2. * std) * p,
+    es_grad = jax.tree_util.tree_map(lambda p: (p_loss - n_loss) * 1 / (2. * std) * p,
                            perturbs)
 
     return ((p_loss + n_loss) / 2.0, (p_opt_state, p_on_iteration)), es_grad
@@ -1234,7 +1234,7 @@ def vec_short_segment_es(meta_param,
 
   # Gradient has an extra batch dimension here from the vmap -- reduce over this.
   return (jnp.mean(loss),
-          inner_opt_state), jax.tree_map(lambda x: jnp.mean(x, axis=0), es_grad)
+          inner_opt_state), jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), es_grad)
 ```
 
 ```{code-cell}
@@ -1354,15 +1354,15 @@ def vec_short_segment_pes(meta_param,
     accumulator, pos_opt_state, neg_opt_state, on_iteration = pes_state
 
     # Sample random noise of the same shape as meta-parameters
-    flat_params, struct = jax.tree_flatten(meta_param)
+    flat_params, struct = jax.tree_util.tree_flatten(meta_param)
     keys = [jax.random.fold_in(key, i) for i in range(len(flat_params))]
-    keys = jax.tree_unflatten(struct, keys)
-    perturbs = jax.tree_map(lambda k, v: jax.random.normal(k, v.shape) * std,
+    keys = jax.tree_util.tree_unflatten(struct, keys)
+    perturbs = jax.tree_util.tree_map(lambda k, v: jax.random.normal(k, v.shape) * std,
                             keys, meta_param)
 
     # compute positive and negative antithetic samples
-    pos_theta = jax.tree_map(lambda eps, v: v + eps, perturbs, meta_param)
-    neg_theta = jax.tree_map(lambda eps, v: v - eps, perturbs, meta_param)
+    pos_theta = jax.tree_util.tree_map(lambda eps, v: v + eps, perturbs, meta_param)
+    neg_theta = jax.tree_util.tree_map(lambda eps, v: v - eps, perturbs, meta_param)
 
     # Apply both of the antithetic samples
     p_losses, pos_opt_state, _ = short_segment_unroll(
@@ -1382,7 +1382,7 @@ def vec_short_segment_pes(meta_param,
 
     # estimate gradient. PES works by multipliying loss difference by the sum
     # of previous perturbations.
-    new_accum = jax.tree_map(lambda a, b: a + b, accumulator, perturbs)
+    new_accum = jax.tree_util.tree_map(lambda a, b: a + b, accumulator, perturbs)
     delta_losses = p_losses - n_losses
     unroll_length = p_losses.shape[0]
 
@@ -1394,11 +1394,11 @@ def vec_short_segment_pes(meta_param,
     last_unroll_losses = jnp.mean(delta_losses * (1.0 - has_finished), axis=0)
     new_unroll = jnp.mean(delta_losses * has_finished)
 
-    es_grad_from_accum = jax.tree_map(
+    es_grad_from_accum = jax.tree_util.tree_map(
         lambda p: last_unroll_losses * 1 / (2. * std) * p, new_accum)
-    es_grad_from_new_perturb = jax.tree_map(
+    es_grad_from_new_perturb = jax.tree_util.tree_map(
         lambda p: new_unroll * 1 / (2. * std) * p, perturbs)
-    es_grad = jax.tree_map(lambda a, b: a + b, es_grad_from_accum,
+    es_grad = jax.tree_util.tree_map(lambda a, b: a + b, es_grad_from_accum,
                            es_grad_from_new_perturb)
 
     # finally, we potentially reset the accumulator to the current perturbation
@@ -1406,7 +1406,7 @@ def vec_short_segment_pes(meta_param,
     def _switch_one_accum(a, b):
       return jnp.where(has_finished[-1], a, b)
 
-    new_accum = jax.tree_map(_switch_one_accum, perturbs, new_accum)
+    new_accum = jax.tree_util.tree_map(_switch_one_accum, perturbs, new_accum)
 
     next_pes_state = (new_accum, pos_opt_state, neg_opt_state,
                       next_on_iteration)
@@ -1420,7 +1420,7 @@ def vec_short_segment_pes(meta_param,
 
   # Gradient has an extra batch dimension here from the vmap -- reduce over this.
   return (jnp.mean(loss),
-          pes_state), jax.tree_map(lambda x: jnp.mean(x, axis=0), es_grad)
+          pes_state), jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), es_grad)
 ```
 
 ```{code-cell}
@@ -1449,7 +1449,7 @@ def init_single_inner_opt_state(key):
   return lopt.initial_inner_opt_state(meta_params, task.init(key))
 keys = jax.random.split(key, num_tasks)
 inner_opt_states = jax.vmap(init_single_inner_opt_state)(keys)
-accumulator = jax.tree_map(lambda x: jnp.zeros([num_tasks] + list(x.shape)),
+accumulator = jax.tree_util.tree_map(lambda x: jnp.zeros([num_tasks] + list(x.shape)),
                            meta_params)
 # Randomly set the initial iteration to prevent the tasks from running in lock step.
 on_iterations = jax.random.randint(key, [num_tasks], 0, 30)

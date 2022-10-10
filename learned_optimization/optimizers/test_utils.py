@@ -60,20 +60,20 @@ def smoketest_optimizer(optimizer: base.Optimizer, strict_types: bool = True):
     initial_state = jnp.asarray(0)
     opt_state = optimizer.init(
         init_param, model_state=initial_state, num_steps=100)
-    struct1 = jax.tree_structure(opt_state)
+    struct1 = jax.tree_util.tree_structure(opt_state)
 
     def shape_fn(x):
       return jax.ShapedArray(jnp.asarray(x).shape, jnp.asarray(x).dtype)
 
-    shape1 = jax.tree_map(shape_fn, opt_state)
+    shape1 = jax.tree_util.tree_map(shape_fn, opt_state)
     p = optimizer.get_params(opt_state)
     s = optimizer.get_state(opt_state)
 
     (l, s), grad = jax.value_and_grad(loss_and_state, has_aux=True)(p, s)
     opt_state = optimizer.update(
         opt_state, grad, loss=l, model_state=s, key=key)
-    struct2 = jax.tree_structure(opt_state)
-    shape2 = jax.tree_map(shape_fn, opt_state)
+    struct2 = jax.tree_util.tree_structure(opt_state)
+    shape2 = jax.tree_util.tree_map(shape_fn, opt_state)
 
     opt_state = optimizer.update(
         opt_state, grad, loss=l, model_state=s, key=key)
@@ -81,12 +81,13 @@ def smoketest_optimizer(optimizer: base.Optimizer, strict_types: bool = True):
     assert struct1 == struct2, "does not have the same input output structure"
 
     logging.info("Got resulting shapes:")
-    logging.info(jax.tree_map(lambda x: (x.shape, x.dtype), shape1))
-    logging.info(jax.tree_map(lambda x: (x.shape, x.dtype), shape2))
+    logging.info(jax.tree_util.tree_map(lambda x: (x.shape, x.dtype), shape1))
+    logging.info(jax.tree_util.tree_map(lambda x: (x.shape, x.dtype), shape2))
 
-    eqls = jax.tree_map(lambda x, x2: x.shape == x2.shape, shape1, shape2)
-    assert all(
-        jax.tree_leaves(eqls)), "does not have the same input output shape"
+    eqls = jax.tree_util.tree_map(lambda x, x2: x.shape == x2.shape, shape1,
+                                  shape2)
+    assert all(jax.tree_util.tree_leaves(
+        eqls)), "does not have the same input output shape"
 
     if strict_types:
       assert shape1 == shape2, f"miss-match dtypes/shapes! {shape1} != {shape2}"

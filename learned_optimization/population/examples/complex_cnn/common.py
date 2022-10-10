@@ -95,7 +95,7 @@ def augment_one(batch, meta_params, key):
 
 def augment_batch(batch, meta_params, key):
   """Vectorized augmentation."""
-  dim = jax.tree_leaves(batch)[0].shape[0]
+  dim = jax.tree_util.tree_leaves(batch)[0].shape[0]
   return jax.vmap(
       augment_one, in_axes=(0, None, 0))(batch, meta_params,
                                          jax.random.split(key, dim))

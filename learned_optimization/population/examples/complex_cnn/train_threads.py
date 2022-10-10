@@ -114,7 +114,8 @@ def train_one(worker_id: int):
         summary_writer.flush()
 
     batch = next(tr_iterator)
-    batch = jax.tree_map(lambda x: x[0:meta_params["batch_size"]], batch)
+    batch = jax.tree_util.tree_map(lambda x: x[0:meta_params["batch_size"]],
+                                   batch)
 
     params, opt_state, l = common.update(params, key, opt_state, batch,
                                          meta_params)

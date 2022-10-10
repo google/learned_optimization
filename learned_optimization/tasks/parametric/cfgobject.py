@@ -136,7 +136,7 @@ def serialize_cfg(cfg: CFGObject) -> bytes:
       return x.tolist()
     return x
 
-  return pickle.dumps(jax.tree_map(serialize_one, cfg))
+  return pickle.dumps(jax.tree_util.tree_map(serialize_one, cfg))
 
 
 def deserialize_cfg(b):
@@ -180,7 +180,7 @@ def flatten_cfg(cfg: CFGObject, features_for: str) -> Mapping[str, Any]:
         else:
           return onp.log(x)
 
-      to_process.append((k, jax.tree_map(log_fn, a.value)))
+      to_process.append((k, jax.tree_util.tree_map(log_fn, a.value)))
     else:
       rets.append((k, a))
   return {k: v for k, v in rets}

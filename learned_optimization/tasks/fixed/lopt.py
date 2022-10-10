@@ -264,7 +264,7 @@ class TruncGradEstTask(base.Task):
     def f_bwd(args, g):
       grad, = args
       dl, unused_ds = g
-      grad = jax.tree_map(lambda x: x * dl, grad)
+      grad = jax.tree_util.tree_map(lambda x: x * dl, grad)
       return (grad, None, None, None)
 
     def fn(params, model_state, key, data):

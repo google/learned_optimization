@@ -98,8 +98,8 @@ class Shampoo(optax_opts.OptaxOptimizer):
     # distributed shampoo's updates assume pmap (or pjit). We fake a pmap
     # here by expanding and then squeezing the dimensions along a fake axis.
     # As a result this will now work on a single accelerator.
-    opt_state, grad, model_state = jax.tree_map(lambda x: jnp.expand_dims(x, 0),
-                                                (opt_state, grad, model_state))
+    opt_state, grad, model_state = jax.tree_util.tree_map(
+        lambda x: jnp.expand_dims(x, 0), (opt_state, grad, model_state))
     out_mapped = jax.pmap(super().update, self.batch_axis_name)(
         opt_state=opt_state, grad=grad, model_state=model_state)
-    return jax.tree_map(lambda x: jnp.squeeze(x, 0), out_mapped)
+    return jax.tree_util.tree_map(lambda x: jnp.squeeze(x, 0), out_mapped)

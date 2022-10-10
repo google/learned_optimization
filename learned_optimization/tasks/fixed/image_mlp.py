@@ -53,8 +53,8 @@ class _MLPImageTask(base.Task):
     self._mod = hk.transform(_forward)
 
   def init(self, key: PRNGKey) -> Any:
-    batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                         self.datasets.abstract_batch)
+    batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                                   self.datasets.abstract_batch)
     return self._mod.init(key, batch["image"])
 
   def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
@@ -269,8 +269,8 @@ class _MLPImageTaskNorm(base.Task):
     self._mod = hk.transform_with_state(_forward)
 
   def init_with_state(self, key: PRNGKey) -> Any:
-    batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                         self.datasets.abstract_batch)
+    batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                                   self.datasets.abstract_batch)
     params, state = self._mod.init(key, batch["image"])
     return params, state
 

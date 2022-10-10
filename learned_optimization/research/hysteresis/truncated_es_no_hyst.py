@@ -94,7 +94,9 @@ class TruncatedESNoHyst(gradient_learner.GradientEstimator):
       key,
       state,
       with_summary=False,
+      datas_list: Any = None,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
+    del datas_list
     rng = hk.PRNGSequence(key)
 
     theta = worker_weights.theta
@@ -137,8 +139,10 @@ class TruncatedESNoHyst(gradient_learner.GradientEstimator):
 
       # force all to be non weak type. This is for cache hit reasons.
       # TODO(lmetz) consider instead just setting the weak type flag?
-      p_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), p_state)
-      n_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), n_state)
+      p_state = jax.tree_util.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype),
+                                       p_state)
+      n_state = jax.tree_util.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype),
+                                       n_state)
 
       key = next(rng)
 

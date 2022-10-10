@@ -54,7 +54,7 @@ class ParametricUtilsTest(absltest.TestCase):
 
     init_fn, _ = hk.transform(forward)
     val = jax.jit(init_fn)(key, cfg)
-    self.assertEqual(jax.tree_leaves(val)[0].shape, (2, 2))
+    self.assertEqual(jax.tree_util.tree_leaves(val)[0].shape, (2, 2))
 
   def test_orth_init(self):
     key = jax.random.PRNGKey(0)

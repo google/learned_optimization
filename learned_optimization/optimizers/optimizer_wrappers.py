@@ -42,7 +42,7 @@ class ExtendTimeWrapper(opt_base.Optimizer):
     inner_opt_state = self._opt.init(params, model_state, num_steps=num_steps)
     return ExtendTimeState(jnp.asarray(0, jnp.int32), inner_opt_state)
 
-  def update(self, opt_state, grad, loss, **kwargs):
+  def update(self, opt_state, grad, loss=None, **kwargs):
     inner_state = opt_state.inner_opt_state
     inner_state = inner_state.replace(
         iteration=self._warp_fn(opt_state.iteration))
@@ -84,11 +84,11 @@ class WeightDecayWrapper(opt_base.Optimizer):
     ps = self.opt.get_params(opt_state)
 
     if self.add_to_loss:
-      l2 = [jnp.sum(p**2) for p in jax.tree_leaves(ps)]
+      l2 = [jnp.sum(p**2) for p in jax.tree_util.tree_leaves(ps)]
       loss = loss + sum([x * self.weight_decay for x in l2])
 
-    grad_l2 = jax.tree_map(lambda p: self.weight_decay * p, ps)
-    grads = jax.tree_map(lambda g, g_l2: g + g_l2, grads, grad_l2)
+    grad_l2 = jax.tree_util.tree_map(lambda p: self.weight_decay * p, ps)
+    grads = jax.tree_util.tree_map(lambda g, g_l2: g + g_l2, grads, grad_l2)
 
     return self.opt.update(
         opt_state, grads, model_state=model_state, loss=loss, **kwargs)

@@ -53,7 +53,7 @@ class TeacherForcedRNNLM(base.Task):
       embed = hk.Embed(vocab_size, embedding_dim)(inp)
 
       template_state = rnn_core.initial_state(1)
-      leaves, treedef = jax.tree_flatten(template_state)
+      leaves, treedef = jax.tree_util.tree_flatten(template_state)
 
       def get_param_like(name: str, val: jnp.ndarray) -> jnp.ndarray:
         return hk.get_parameter(
@@ -63,8 +63,8 @@ class TeacherForcedRNNLM(base.Task):
           get_param_like("initial_state_%d" % di, d)
           for di, d in enumerate(leaves)
       ]
-      single_state = jax.tree_unflatten(treedef, learnable_leaves)
-      initial_state = jax.tree_map(
+      single_state = jax.tree_util.tree_unflatten(treedef, learnable_leaves)
+      initial_state = jax.tree_util.tree_map(
           lambda x: jnp.tile(x, [inp.shape[0]] + [1] * (len(x.shape) - 1)),
           single_state)
 
@@ -77,8 +77,8 @@ class TeacherForcedRNNLM(base.Task):
     self._vocab_size = vocab_size
 
   def init(self, key: PRNGKey) -> base.Params:
-    batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                         self.datasets.abstract_batch)
+    batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                                   self.datasets.abstract_batch)
     return self._mod.init(key, batch["obs"])
 
   def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:

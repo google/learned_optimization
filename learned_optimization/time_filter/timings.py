@@ -44,12 +44,12 @@ def time_jax_fn(fn: Callable[[], PyTree],
   """
   # Do an initial run of the function to ensure that everything that
   # needs to be compiled is compiled.
-  jax.tree_map(lambda x: x.block_until_ready(), fn())
+  jax.tree_util.tree_map(lambda x: x.block_until_ready(), fn())
 
   times = []
   for _ in range(time_measurements):
     stime = time.time()
-    jax.tree_map(lambda x: x.block_until_ready(), fn())
+    jax.tree_util.tree_map(lambda x: x.block_until_ready(), fn())
     times.append(time.time() - stime)
 
   return onp.mean(times), onp.std(times) / onp.sqrt(len(times))
@@ -89,7 +89,7 @@ def _unrolled_meta_loss(opt: opt_base.Optimizer,
         opt_state, grad, loss=loss, model_state=model_state, key=key2)
     return next_opt_state, loss
 
-  flat_datas = jax.tree_leaves(datas)
+  flat_datas = jax.tree_util.tree_leaves(datas)
   if flat_datas:
     assert unroll_length == flat_datas[0].shape[0]
 

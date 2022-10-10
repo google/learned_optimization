@@ -105,8 +105,8 @@ class GradientClipOptimizer(Optimizer):
     return self.opt.init(*args, **kwargs)
 
   def update(self, opt_state, grad, *args, **kwargs):
-    grad = jax.tree_map(lambda x: jnp.clip(x, -self.grad_clip, self.grad_clip),
-                        grad)
+    grad = jax.tree_util.tree_map(
+        lambda x: jnp.clip(x, -self.grad_clip, self.grad_clip), grad)
     return self.opt.update(opt_state, grad, *args, **kwargs)
 
 

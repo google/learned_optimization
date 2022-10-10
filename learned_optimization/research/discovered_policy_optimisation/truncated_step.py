@@ -352,7 +352,9 @@ def get_train_fns(
       state, policy_params, normalizer_params, key = carry
       key, key_sample = jax.random.split(key)
       # TODO: Make this nicer ([0] comes from pmapping).
-      # obs = obs_normalizer_apply_fn(jax.tree_map(lambda x: x[0], normalizer_params), state.obs)
+      # obs = obs_normalizer_apply_fn(
+      #     jax.tree_util.tree_map(lambda x: x[0], normalizer_params),
+      #     state.obs)
       obs = obs_normalizer_apply_fn(normalizer_params, state.obs)
       logits = policy_model.apply(policy_params, obs)
       actions = parametric_action_distribution.sample(logits, key_sample)
@@ -364,7 +366,7 @@ def get_train_fns(
                  normalizer_params) -> Tuple[envs.State, PRNGKey]:
       key1, key = jax.random.split(key)
       state = eval_first_state_fn(key1)
-      # policy_params = jax.tree_map(lambda x: x[0], policy_params)
+      # policy_params = jax.tree_util.tree_map(lambda x: x[0], policy_params)
       (state, _, _, key), _ = jax.lax.scan(
           do_one_step_eval, (state, policy_params, normalizer_params, key), (),
           length=episode_length // action_repeat)
@@ -431,7 +433,8 @@ def get_train_fns(
         data = jnp.swapaxes(data, 0, 1)
         return data
 
-      ndata = jax.tree_map(lambda x: convert_data(x, permutation), data)
+      ndata = jax.tree_util.tree_map(lambda x: convert_data(x, permutation),
+                                     data)
       (optimizer_state, params, _), metrics = jax.lax.scan(
           update_model, (optimizer_state, params, key_grad),
           ndata,
@@ -448,8 +451,8 @@ def get_train_fns(
            training_state.params["policy"], key_generate_unroll), (),
           length=batch_size * num_minibatches // num_envs)
       # make unroll first
-      data = jax.tree_map(lambda x: jnp.swapaxes(x, 0, 1), data)
-      data = jax.tree_map(
+      data = jax.tree_util.tree_map(lambda x: jnp.swapaxes(x, 0, 1), data)
+      data = jax.tree_util.tree_map(
           lambda x: jnp.reshape(x, [x.shape[0], -1] + list(x.shape[3:])), data)
 
       # Update normalization params and normalize observations.

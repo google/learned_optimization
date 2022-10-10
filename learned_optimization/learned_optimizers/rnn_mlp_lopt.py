@@ -92,8 +92,8 @@ class _LossNormalizer:
 
 
 def _avg_square_mean(tree: Any) -> jnp.ndarray:
-  return sum([jnp.mean(jnp.square(x)) for x in jax.tree_leaves(tree)]) / len(
-      jax.tree_leaves(tree))
+  return sum([jnp.mean(jnp.square(x)) for x in jax.tree_util.tree_leaves(tree)
+             ]) / len(jax.tree_util.tree_leaves(tree))
 
 
 def _clip_log_abs(value: jnp.ndarray) -> jnp.ndarray:
@@ -137,7 +137,8 @@ class _DynamicGradientClipper:
     clip_amount = (snd / (1 - self.alpha**t)) * self.clip_mult
     summary.summary("dynamic_grad_clip", clip_amount)
 
-    return jax.tree_map(lambda g: jnp.clip(g, -clip_amount, clip_amount), grads)
+    return jax.tree_util.tree_map(
+        lambda g: jnp.clip(g, -clip_amount, clip_amount), grads)
 
   def next_state_and_normalize(
       self, state: _DynamicGradientClipperState, grads: opt_base.Params
@@ -289,13 +290,13 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
                model_state: Optional[opt_base.ModelState] = None,
                num_steps: Optional[jnp.ndarray] = None,
                key: Optional[PRNGKey] = None) -> RNNMLPLOptState:
-        n_states = len(jax.tree_leaves(params))
-        lstm_hidden_state = jax.tree_map(
+        n_states = len(jax.tree_util.tree_leaves(params))
+        lstm_hidden_state = jax.tree_util.tree_map(
             lambda x: jnp.tile(x, [n_states] + [1] * len(x.shape[1:])),
             self.theta["lstm_init_state"])
 
-        from_mlp = jax.tree_map(lambda x: self.theta["initial_from_mlp"],
-                                params)
+        from_mlp = jax.tree_util.tree_map(
+            lambda x: self.theta["initial_from_mlp"], params)
 
         return RNNMLPLOptState(
             params=params,
@@ -513,7 +514,7 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
         ms = next_mom_rolling.m
         rms = next_rms_rolling.rms
         from_lstm = opt_state.from_lstm
-        param_tree = jax.tree_structure(ms)
+        param_tree = jax.tree_util.tree_structure(ms)
 
         def to_map_per_tensor(ms, rms, g, v, from_mlp):
           return self.lstm_features_for_tensor(ms, rms, g, v, from_mlp,
@@ -521,8 +522,8 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
                                                valid_loss_feat)
 
         tree_args = (ms, rms, grads, opt_state.params, opt_state.from_mlp)
-        flat_args = [jax.tree_leaves(a) for a in tree_args]
-        stacked_inp_tree = jax.tree_map(to_map_per_tensor, *flat_args)
+        flat_args = [jax.tree_util.tree_leaves(a) for a in tree_args]
+        stacked_inp_tree = jax.tree_util.tree_map(to_map_per_tensor, *flat_args)
 
         # We stack all the different tensors together so that we can run the
         # RNN only once.
@@ -547,20 +548,20 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
         # These need to be unstacked as they are currently concatenated
         ff_inputs = _unstack(ff_inputs)
         # And need to be converted back to a parameter tree structure.
-        ff_inputs = jax.tree_unflatten(param_tree, ff_inputs)
+        ff_inputs = jax.tree_util.tree_unflatten(param_tree, ff_inputs)
 
-        num_tensors = len(jax.tree_leaves(opt_state.params))
+        num_tensors = len(jax.tree_util.tree_leaves(opt_state.params))
 
         def to_map_get_mlp_features(m, rms, g, v, ff_inputs):
           return self.mlp_features_for_tensor(m, rms, g, v, ff_inputs,
                                               opt_state.iteration, num_tensors)
 
         # Prep the features
-        ff_feats = jax.tree_map(to_map_get_mlp_features, ms, rms, grads,
-                                opt_state.params, ff_inputs)
+        ff_feats = jax.tree_util.tree_map(to_map_get_mlp_features, ms, rms,
+                                          grads, opt_state.params, ff_inputs)
 
         # Apply the per parameter mlp on these features.
-        outputs = jax.tree_map(
+        outputs = jax.tree_util.tree_map(
             functools.partial(parent.per_param_mlp_network.apply,
                               theta["ffmod_params"]), ff_feats)
 
@@ -569,7 +570,8 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
         new_params = []
         from_mlp = []
         for o, v in zip(
-            jax.tree_leaves(outputs), jax.tree_leaves(opt_state.params)):
+            jax.tree_util.tree_leaves(outputs),
+            jax.tree_util.tree_leaves(opt_state.params)):
           direction = o[:, 0:1]
           magnitude = o[:, 1:2]
           step = direction * jnp.exp(
@@ -581,8 +583,8 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
           from_mlp.append(to_lstm)
 
         # convert these structures back to match the parameter tree.
-        new_params = jax.tree_unflatten(param_tree, new_params)
-        new_from_mlp = jax.tree_unflatten(param_tree, from_mlp)
+        new_params = jax.tree_util.tree_unflatten(param_tree, new_params)
+        new_from_mlp = jax.tree_util.tree_unflatten(param_tree, from_mlp)
 
         # Finally, package all these values up and return.
         next_opt_state = RNNMLPLOptState(

@@ -134,7 +134,7 @@ def save_model(model: Any, sample_fn_name: str, hardware_name: str,
       sample_fn_name, hardware_name, model_type=model_type)
   timestr = time.strftime("%Y%m%d_%H%M%S")
   path = os.path.join(dirname, f"{timestr}.weights")
-  model = jax.tree_map(_lower_precision, model)
+  model = jax.tree_util.tree_map(_lower_precision, model)
   checkpoints.save_state(path, model)
   return path
 

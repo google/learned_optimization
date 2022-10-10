@@ -116,7 +116,7 @@ key = jax.random.PRNGKey(0)
 task = image_mlp.ImageMLP_FashionMnist8_Relu32()
 
 params = task.init(key)
-jax.tree_map(lambda x: x.shape, params)
+jax.tree_util.tree_map(lambda x: x.shape, params)
 ```
 
 +++ {"id": "a7ce6c75"}
@@ -140,7 +140,7 @@ id: bf030fd0
 outputId: c6b2ee31-b1ef-4fa9-8f07-04e041ac9537
 ---
 batch = next(task.datasets.train)
-jax.tree_map(lambda x: (x.shape, x.dtype), batch)
+jax.tree_util.tree_map(lambda x: (x.shape, x.dtype), batch)
 ```
 
 +++ {"id": "7ad6d9b8"}
@@ -188,7 +188,7 @@ id: 0c78a15a
 outputId: 7706bf0f-741d-401a-f70b-8c66c8f10859
 ---
 loss, grad = jax.value_and_grad(task.loss)(params, key1, batch)
-jax.tree_map(lambda x: x.shape, grad)
+jax.tree_util.tree_map(lambda x: x.shape, grad)
 ```
 
 +++ {"id": "fbe89c3b"}
@@ -219,7 +219,7 @@ for i in range(1000):
   batch = next(task.datasets.train)
   l, grads = grad_fn(params, key1, batch)
   # apply SGD to each parameter
-  params = jax.tree_map(lambda p, g: p - lr * g, params, grads)
+  params = jax.tree_util.tree_map(lambda p, g: p - lr * g, params, grads)
   if i % 100 == 0:
     test_l = task.loss(params, key, next(task.datasets.test))
     print(f"train loss at {i}: {float(l)}. Test loss: {float(test_l)}")
@@ -445,14 +445,14 @@ class MomentumOptimizer(opt_base.Optimizer):
     return MomentumOptState(
         params=params,
         model_state=model_state,
-        momentums=jax.tree_map(jnp.zeros_like, params),
+        momentums=jax.tree_util.tree_map(jnp.zeros_like, params),
         iteration=jnp.asarray(0, dtype=jnp.int32))
 
   def update(self, opt_state, grads, loss, model_state=None, **kwargs):
-    struct = jax.tree_structure(grads)
-    flat_momentum = jax.tree_leaves(opt_state.momentums)
-    flat_grads = jax.tree_leaves(grads)
-    flat_params = jax.tree_leaves(opt_state.params)
+    struct = jax.tree_util.tree_structure(grads)
+    flat_momentum = jax.tree_util.tree_leaves(opt_state.momentums)
+    flat_grads = jax.tree_util.tree_leaves(grads)
+    flat_params = jax.tree_util.tree_leaves(opt_state.params)
 
     output_params = []
     output_momentums = []
@@ -462,10 +462,10 @@ class MomentumOptimizer(opt_base.Optimizer):
       output_params.append(next_p)
       output_momentums.append(next_m)
     return MomentumOptState(
-        params=jax.tree_unflatten(struct, output_params),
+        params=jax.tree_util.tree_unflatten(struct, output_params),
         model_state=model_state,
         iteration=opt_state.iteration + 1,
-        momentums=jax.tree_unflatten(struct, output_params),
+        momentums=jax.tree_util.tree_unflatten(struct, output_params),
     )
 
 

@@ -36,8 +36,8 @@ def smoketest_task(task: base.Task, abstract_data: bool = True):
   logging.info("Getting data for %s task", str(task))
   if task.datasets:
     if abstract_data and task.datasets.abstract_batch is not None:
-      batch = jax.tree_map(lambda x: jnp.zeros(x.shape, x.dtype),
-                           task.datasets.abstract_batch)
+      batch = jax.tree_util.tree_map(lambda x: jnp.zeros(x.shape, x.dtype),
+                                     task.datasets.abstract_batch)
     else:
       batch = next(task.datasets.train)
   else:

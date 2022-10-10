@@ -32,10 +32,12 @@ def rolling_mom(decay: float) -> _InitUpdate:
 
   def init_fn(p: Any) -> MomAccumulator:
     return MomAccumulator(
-        m=jax.tree_map(jnp.zeros_like, p), t=jnp.asarray(0, dtype=jnp.int32))
+        m=jax.tree_util.tree_map(jnp.zeros_like, p),
+        t=jnp.asarray(0, dtype=jnp.int32))
 
   def update_fn(state: MomAccumulator, grad: Any) -> MomAccumulator:
-    m = jax.tree_map(lambda a, b: decay * a + (1 - decay) * b, state.m, grad)
+    m = jax.tree_util.tree_map(lambda a, b: decay * a + (1 - decay) * b,
+                               state.m, grad)
     return MomAccumulator(m=m, t=state.t + 1)
 
   return _InitUpdate(init_fn, update_fn)
@@ -46,12 +48,14 @@ def rolling_rms(decay: float) -> _InitUpdate:
 
   def init_fn(p: Any) -> RMSAccumulator:
     return RMSAccumulator(
-        rms=jax.tree_map(jnp.zeros_like, p), t=jnp.asarray(0, dtype=jnp.int32))
+        rms=jax.tree_util.tree_map(jnp.zeros_like, p),
+        t=jnp.asarray(0, dtype=jnp.int32))
 
   def update_fn(state: RMSAccumulator, grad: Any) -> RMSAccumulator:
     clip_decay = jnp.clip(decay, 0.0, 1.0)
-    rms = jax.tree_map(lambda a, b: clip_decay * a + (1 - clip_decay) * (b * b),
-                       state.rms, grad)
+    rms = jax.tree_util.tree_map(
+        lambda a, b: clip_decay * a + (1 - clip_decay) * (b * b), state.rms,
+        grad)
     return RMSAccumulator(rms=rms, t=state.t + 1)
 
   return _InitUpdate(init_fn, update_fn)
@@ -143,12 +147,12 @@ def factored_rolling(decay_rate: float, epsilon: float = 1e-30) -> _InitUpdate:
                            dtype=jnp.float32), jnp.asarray([],
                                                            dtype=jnp.float32), v
 
-    leaves, tree = jax.tree_flatten(params)
+    leaves, tree = jax.tree_util.tree_flatten(params)
     v_rows, v_cols, v_fulls = zip(*[_init_one(l) for l in leaves])
     return FactoredAccum(
-        v_row=jax.tree_unflatten(tree, v_rows),
-        v_col=jax.tree_unflatten(tree, v_cols),
-        v_diag=jax.tree_unflatten(tree, v_fulls))
+        v_row=jax.tree_util.tree_unflatten(tree, v_rows),
+        v_col=jax.tree_util.tree_unflatten(tree, v_cols),
+        v_diag=jax.tree_util.tree_unflatten(tree, v_fulls))
 
   def update_fn(state: FactoredAccum, grad: Any) -> Tuple[FactoredAccum, Any]:
 
@@ -185,10 +189,10 @@ def factored_rolling(decay_rate: float, epsilon: float = 1e-30) -> _InitUpdate:
         return jnp.asarray([], jnp.float32), jnp.asarray([],
                                                          jnp.float32), new_v, y
 
-    f_v_col, tree = jax.tree_flatten(state.v_col)
-    f_v_row = jax.tree_leaves(state.v_row)
-    f_v = jax.tree_leaves(state.v_diag)
-    f_g = jax.tree_leaves(grad)
+    f_v_col, tree = jax.tree_util.tree_flatten(state.v_col)
+    f_v_row = jax.tree_util.tree_leaves(state.v_row)
+    f_v = jax.tree_util.tree_leaves(state.v_diag)
+    f_g = jax.tree_util.tree_leaves(grad)
     assert len(f_g) == len(f_v_col)
     assert len(f_g) == len(f_v)
     assert len(f_g) == len(f_v_row)
@@ -196,11 +200,11 @@ def factored_rolling(decay_rate: float, epsilon: float = 1e-30) -> _InitUpdate:
         *[update_one(*args) for args in zip(f_v_col, f_v_row, f_v, f_g)])
 
     next_state = FactoredAccum(
-        v_col=jax.tree_unflatten(tree, f_v_col),
-        v_row=jax.tree_unflatten(tree, f_v_row),
-        v_diag=jax.tree_unflatten(tree, f_v))
+        v_col=jax.tree_util.tree_unflatten(tree, f_v_col),
+        v_row=jax.tree_util.tree_unflatten(tree, f_v_row),
+        v_diag=jax.tree_util.tree_unflatten(tree, f_v))
 
-    return next_state, jax.tree_unflatten(tree, outs)
+    return next_state, jax.tree_util.tree_unflatten(tree, outs)
 
   return _InitUpdate(init_fn, update_fn)
 

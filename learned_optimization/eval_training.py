@@ -130,7 +130,7 @@ def _batch_eval(
     eval_auxs.append(aux)
 
   return (onp.mean(eval_losses), onp.mean(eval_norm_losses),
-          jax.tree_map(onp.mean, tree_utils.tree_zip_onp(eval_auxs)))
+          jax.tree_util.tree_map(onp.mean, tree_utils.tree_zip_onp(eval_auxs)))
 
 
 @profile.wrap()
@@ -364,7 +364,8 @@ def _cached_vectorize_train_fns(
 
       data, key = data_key
       loss, norm_loss, aux = jax.vmap(single_batch)(data, key)
-      return jnp.mean(loss), jnp.mean(norm_loss), jax.tree_map(jnp.mean, aux)
+      return jnp.mean(loss), jnp.mean(norm_loss), jax.tree_util.tree_map(
+          jnp.mean, aux)
 
     return fn(opt_state, task_params, data_key)
 
@@ -460,9 +461,9 @@ def multi_task_training_curves(
   if task_params is None:
     opt_states, task_params = train_fns.init(theta, keys, steps)
   else:
-    if jax.tree_leaves(task_params):
+    if jax.tree_util.tree_leaves(task_params):
       assert tree_utils.first_dim(task_params) == n_tasks
-    task_params = jax.tree_map(
+    task_params = jax.tree_util.tree_map(
         lambda x: jnp.reshape(x, (n_devices, n_tasks_per_device) + x.shape[1:]),
         task_params)
     opt_states = train_fns.init_with_task_params(theta, keys, steps,
@@ -547,7 +548,7 @@ def multi_task_training_curves(
   train_losses = train_losses.reshape([n_tasks, train_losses.shape[2]])
 
   eval_losses = tree_utils.tree_zip_onp(eval_losses)
-  eval_losses = jax.tree_map(
+  eval_losses = jax.tree_util.tree_map(
       lambda x: x.reshape([x.shape[0], n_tasks]).transpose(1, 0), eval_losses)
 
   return {

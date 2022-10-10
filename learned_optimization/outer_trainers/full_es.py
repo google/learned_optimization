@@ -92,10 +92,10 @@ def _es_grad(vec_pos, pos_loss, neg_loss, sign_delta_loss_scalar,
 
   # The actual ES update done for each vectorized task
   contrib = delta_loss / (2 * std**2)
-  vec_es_grad = jax.vmap(lambda c, p: jax.tree_map(lambda e: e * c, p))(contrib,
-                                                                        vec_pos)
+  vec_es_grad = jax.vmap(
+      lambda c, p: jax.tree_util.tree_map(lambda e: e * c, p))(contrib, vec_pos)
   # average over tasks
-  es_grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
+  es_grad = jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
 
   return jnp.mean((pos_loss + neg_loss) / 2.0), es_grad
 
@@ -139,8 +139,8 @@ def traj_loss_antithetic_es(
   else:
     # use numpy here to prevent an expensive jit.
     tree_zip = tree_utils.tree_zip_onp
-  p_ys = jax.tree_map(flat_first, tree_zip(p_yses))
-  n_ys = jax.tree_map(flat_first, tree_zip(n_yses))
+  p_ys = jax.tree_util.tree_map(flat_first, tree_zip(p_yses))
+  n_ys = jax.tree_util.tree_map(flat_first, tree_zip(n_yses))
 
   # mean over the num steps axis.
   if loss_type == "avg":
@@ -197,8 +197,8 @@ def pmap_traj_loss_antithetic_es(
   else:
     # use numpy here to prevent an expensive jit.
     tree_zip = tree_utils.tree_zip_onp
-  p_ys = jax.tree_map(flat_first, tree_zip(p_yses))
-  n_ys = jax.tree_map(flat_first, tree_zip(n_yses))
+  p_ys = jax.tree_util.tree_map(flat_first, tree_zip(p_yses))
+  n_ys = jax.tree_util.tree_map(flat_first, tree_zip(n_yses))
 
   # mean over the num steps axis.
   if loss_type == "avg":
@@ -221,7 +221,8 @@ def pmap_traj_loss_antithetic_es(
   # Keep dims here to fake this being pmap.
   # We just grab the first element when used anyway.
   loss = jnp.mean(loss, axis=0, keepdims=True)
-  grad = jax.tree_map(lambda x: jnp.mean(x, axis=0, keepdims=True), grad)
+  grad = jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0, keepdims=True),
+                                grad)
   return loss, grad, p_ys
 
 
@@ -302,10 +303,10 @@ def last_recompute_antithetic_es(
 
   contrib = delta_loss / (2 * std**2)
 
-  vec_es_grad = jax.vmap(lambda c, p: jax.tree_map(lambda e: e * c, p))(contrib,
-                                                                        vec_pos)
+  vec_es_grad = jax.vmap(
+      lambda c, p: jax.tree_util.tree_map(lambda e: e * c, p))(contrib, vec_pos)
 
-  es_grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
+  es_grad = jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
 
   return jnp.mean((pos_loss + neg_loss) / 2.0), es_grad
 
@@ -464,7 +465,7 @@ class FullES(gradient_learner.GradientEstimator):
       with profile.Profile("step"):
         # Because we are training with antithetic sampling we need to unroll
         # both models using the same random key and same data.
-        datas = jax.tree_map(jnp.asarray, datas)
+        datas = jax.tree_util.tree_map(jnp.asarray, datas)
 
         p_state, n_state = tree_utils.strip_weak_type((p_state, n_state))
 
@@ -491,9 +492,9 @@ class FullES(gradient_learner.GradientEstimator):
         # this is done on the -2th value to still allow jax to do some async
         # computation
         if len(metrics) > 2:
-          metrics[-2] = jax.tree_map(onp.asarray, metrics[-2])
-          p_yses[-2] = jax.tree_map(onp.asarray, p_yses[-2])
-          n_yses[-2] = jax.tree_map(onp.asarray, n_yses[-2])
+          metrics[-2] = jax.tree_util.tree_map(onp.asarray, metrics[-2])
+          p_yses[-2] = jax.tree_util.tree_map(onp.asarray, p_yses[-2])
+          n_yses[-2] = jax.tree_util.tree_map(onp.asarray, n_yses[-2])
 
     if hasattr(p_state, "inner_step"):
       metrics.append({"sample||end_inner_step": p_state.inner_step[0]})
@@ -719,7 +720,7 @@ class PMAPFullES(FullES):
       with profile.Profile("step"):
         # Because we are training with antithetic sampling we need to unroll
         # both models using the same random key and same data.
-        datas = jax.tree_map(jnp.asarray, datas)
+        datas = jax.tree_util.tree_map(jnp.asarray, datas)
 
         # TODO(lmetz) Explore cache hitting / missing to see if we need
         # something like the following for pmap.
@@ -738,9 +739,9 @@ class PMAPFullES(FullES):
         # this is done on the -2th value to still allow jax to do some async
         # computation
         if len(metrics) > 2:
-          metrics[-2] = jax.tree_map(onp.asarray, metrics[-2])
-          p_yses[-2] = jax.tree_map(onp.asarray, p_yses[-2])
-          n_yses[-2] = jax.tree_map(onp.asarray, n_yses[-2])
+          metrics[-2] = jax.tree_util.tree_map(onp.asarray, metrics[-2])
+          p_yses[-2] = jax.tree_util.tree_map(onp.asarray, p_yses[-2])
+          n_yses[-2] = jax.tree_util.tree_map(onp.asarray, n_yses[-2])
 
     if hasattr(p_state, "inner_step"):
       metrics.append({"sample||end_inner_step": p_state.inner_step[0]})

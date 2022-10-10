@@ -89,7 +89,7 @@ class ParametricLMRNN(base.TaskFamily):
 
       # Make learnable initial states.
       template_state = rnn_core.initial_state(1)
-      leaves, treedef = jax.tree_flatten(template_state)
+      leaves, treedef = jax.tree_util.tree_flatten(template_state)
 
       def param_like(d, di):
         return hk.get_parameter(
@@ -99,8 +99,8 @@ class ParametricLMRNN(base.TaskFamily):
             init=jnp.zeros)
 
       learnable_leaves = [param_like(d, di) for di, d in enumerate(leaves)]
-      single_state = jax.tree_unflatten(treedef, learnable_leaves)
-      initial_state = jax.tree_map(
+      single_state = jax.tree_util.tree_unflatten(treedef, learnable_leaves)
+      initial_state = jax.tree_util.tree_map(
           lambda x: jnp.tile(x, [inp.shape[0]] + [1] * (len(x.shape) - 1)),
           single_state)
 
@@ -119,8 +119,8 @@ class ParametricLMRNN(base.TaskFamily):
       def init(self, rng: PRNGKey) -> Params:
         init_net, unused_apply_net = hk.without_apply_rng(
             hk.transform(_forward))
-        batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                             self.datasets.abstract_batch)
+        batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                                       self.datasets.abstract_batch)
         seq = batch["obs"]
         return init_net(rng, seq)
 

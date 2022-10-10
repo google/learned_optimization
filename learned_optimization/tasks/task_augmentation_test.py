@@ -166,7 +166,7 @@ class TaskAugmentationTest(absltest.TestCase):
     task = DummyTask()
     task = task_augmentation.ConvertFloatDType(task, dtype=jnp.bfloat16)
     params = task.init(jax.random.PRNGKey(0))
-    p = jax.tree_leaves(params)[0]
+    p = jax.tree_util.tree_leaves(params)[0]
     self.assertEqual(p.dtype, jnp.bfloat16)
     test_utils.smoketest_task(task)
 
@@ -176,13 +176,13 @@ class TaskAugmentationTest(absltest.TestCase):
         task_family, dtype=jnp.bfloat16)
     task = task_family.sample_task(jax.random.PRNGKey(0))
     params = task.init(jax.random.PRNGKey(0))
-    p = jax.tree_leaves(params)[0]
+    p = jax.tree_util.tree_leaves(params)[0]
     self.assertEqual(p.dtype, jnp.bfloat16)
     test_utils.smoketest_task_family(task_family)
 
   def test_ModifyTaskGradient(self):
     task = DummyTask()
-    fn = lambda tree, key: jax.tree_map(lambda x: x * 0 + 9, tree)
+    fn = lambda tree, key: jax.tree_util.tree_map(lambda x: x * 0 + 9, tree)
     task = task_augmentation.ModifyTaskGradient(task, fn)
     params = task.init(jax.random.PRNGKey(0))
     batch = next(task.datasets.train)

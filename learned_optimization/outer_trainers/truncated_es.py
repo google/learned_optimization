@@ -67,8 +67,8 @@ def compute_es_grad(
   def flat_first(x):
     return x.reshape([x.shape[0] * x.shape[1]] + list(x.shape[2:]))
 
-  p_ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(p_yses))
-  n_ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(n_yses))
+  p_ys = jax.tree_util.tree_map(flat_first, tree_utils.tree_zip_jnp(p_yses))
+  n_ys = jax.tree_util.tree_map(flat_first, tree_utils.tree_zip_jnp(n_yses))
 
   # mean over the num steps axis.
   pos_loss = jnp.sum(p_ys.loss * p_ys.mask, axis=0) / jnp.sum(p_ys.mask, axis=0)
@@ -80,10 +80,10 @@ def compute_es_grad(
 
   contrib = delta_loss / (2 * std**2)
 
-  vec_es_grad = jax.vmap(lambda c, p: jax.tree_map(lambda e: e * c, p))(contrib,
-                                                                        vec_pos)
+  vec_es_grad = jax.vmap(
+      lambda c, p: jax.tree_util.tree_map(lambda e: e * c, p))(contrib, vec_pos)
 
-  es_grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
+  es_grad = jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
 
   return jnp.mean((pos_loss + neg_loss) / 2.0), es_grad, p_ys, delta_loss
 
@@ -187,8 +187,10 @@ class TruncatedES(gradient_learner.GradientEstimator):
 
       # force all to be non weak type. This is for cache hit reasons.
       # TODO(lmetz) consider instead just setting the weak type flag?
-      p_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), p_state)
-      n_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), n_state)
+      p_state = jax.tree_util.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype),
+                                       p_state)
+      n_state = jax.tree_util.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype),
+                                       n_state)
 
       key = next(rng)
 

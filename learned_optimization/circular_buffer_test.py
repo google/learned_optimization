@@ -29,7 +29,7 @@ class CircularBufferTest(absltest.TestCase):
 
   def test_circular_buffer(self):
     s = freeze({"a": jnp.ones([1, 3])})
-    av = jax.tree_map(lambda x: x.aval, s)
+    av = jax.tree_util.tree_map(lambda x: x.aval, s)
 
     buffer = circular_buffer.CircularBuffer(av, 5)
 
@@ -66,7 +66,7 @@ class CircularBufferTest(absltest.TestCase):
 
   def test_gather(self):
     s = freeze({"a": jnp.ones([3])})
-    av = jax.tree_map(lambda x: x.aval, s)
+    av = jax.tree_util.tree_map(lambda x: x.aval, s)
 
     buffer = circular_buffer.CircularBuffer(av, 5)
 

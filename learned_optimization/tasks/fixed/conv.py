@@ -79,8 +79,8 @@ class _ConvTask(base.Task):
     return params
 
   def init_with_state(self, key) -> Tuple[Params, ModelState]:
-    batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                         self.datasets.abstract_batch)
+    batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                                   self.datasets.abstract_batch)
     return self._mod.init(key, batch)
 
   def loss(self, params, key, data):

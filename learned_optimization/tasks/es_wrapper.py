@@ -34,12 +34,12 @@ ValueGradFN = Callable
 @jax.jit
 def _sample_perturbations(variables: ArrayTree, key: PRNGKey,
                           std: float) -> ArrayTree:
-  flat, tree_def = jax.tree_flatten(variables)
+  flat, tree_def = jax.tree_util.tree_flatten(variables)
   keys = jax.random.split(key, len(flat))
   perturbs = []
   for key, f in zip(keys, flat):
     perturbs.append(jax.random.normal(key, shape=f.shape, dtype=f.dtype) * std)
-  return jax.tree_unflatten(tree_def, perturbs)
+  return jax.tree_util.tree_unflatten(tree_def, perturbs)
 
 
 @functools.partial(jax.jit, static_argnums=(3,))
@@ -50,8 +50,8 @@ def _vector_sample_perturbations(
 
   def _fn(key: PRNGKey) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     pos = _sample_perturbations(theta, key, std=std)
-    p_theta = jax.tree_map(lambda t, a: t + a, theta, pos)
-    n_theta = jax.tree_map(lambda t, a: t - a, theta, pos)
+    p_theta = jax.tree_util.tree_map(lambda t, a: t + a, theta, pos)
+    n_theta = jax.tree_util.tree_map(lambda t, a: t - a, theta, pos)
     return pos, p_theta, n_theta
 
   keys = jax.random.split(key, num_samples)
@@ -91,28 +91,29 @@ def antithetic_es_value_and_grad(
     pos = _sample_perturbations(theta, es_key, std=std)
 
     if vmap:
-      stack = jax.tree_map(lambda t, a: jnp.asarray([t + a, t - a]), theta, pos)
+      stack = jax.tree_util.tree_map(lambda t, a: jnp.asarray([t + a, t - a]),
+                                     theta, pos)
       aux_and_losses = jax.vmap(lambda t: loss_fn(t, *args, **kwargs))(stack)
     else:
-      p_theta = jax.tree_map(lambda t, a: t + a, theta, pos)
+      p_theta = jax.tree_util.tree_map(lambda t, a: t + a, theta, pos)
       aux_and_loss_p = loss_fn(p_theta, *args, **kwargs)
-      n_theta = jax.tree_map(lambda t, a: t - a, theta, pos)
+      n_theta = jax.tree_util.tree_map(lambda t, a: t - a, theta, pos)
       aux_and_loss_n = loss_fn(n_theta, *args, **kwargs)
 
-      aux_and_losses = jax.tree_map(lambda p, n: jnp.asarray([p, n]),
-                                    aux_and_loss_p, aux_and_loss_n)
+      aux_and_losses = jax.tree_util.tree_map(lambda p, n: jnp.asarray([p, n]),
+                                              aux_and_loss_p, aux_and_loss_n)
     if has_aux:
       losses, aux = aux_and_losses
       if not vec_aux:
-        aux = jax.tree_map(lambda x: x[0], aux_and_losses[1])
+        aux = jax.tree_util.tree_map(lambda x: x[0], aux_and_losses[1])
     else:
       losses = aux_and_losses
 
     assert losses.shape == (2,)
     pos_loss, neg_loss = losses
 
-    es_grad = jax.tree_map(lambda e: e * (pos_loss - neg_loss) / (2 * std**2),
-                           pos)
+    es_grad = jax.tree_util.tree_map(
+        lambda e: e * (pos_loss - neg_loss) / (2 * std**2), pos)
 
     if has_aux:
       return (jnp.mean(losses), aux), es_grad
@@ -157,12 +158,12 @@ def multi_antithetic_es_value_and_grad(
     keys = jax.random.split(es_key, n_pairs)
     if has_aux:
       (value, aux), grad = jax.vmap(new_vmap)(keys)
-      aux = jax.tree_map(lambda x: x[0], aux)
+      aux = jax.tree_util.tree_map(lambda x: x[0], aux)
     else:
       value, grad = jax.vmap(new_vmap)(keys)
 
-    grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), grad)
-    value = jax.tree_map(lambda x: jnp.mean(x, axis=0), value)
+    grad = jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), grad)
+    value = jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), value)
 
     if has_aux:
       return (value, aux), grad
@@ -203,7 +204,7 @@ class ESTask(base.Task):
           loss_fn, has_aux=True, std=std, n_pairs=n_pairs)(
               params, state, es_key=key)
 
-      o_params = jax.tree_map(lambda a: a * dloss, grad)
+      o_params = jax.tree_util.tree_map(lambda a: a * dloss, grad)
       # TODO(lmetz) this only supports gradients wrt params.
       # add support for gradients wrt other arguments and/or error?
       return (o_params, None, None, None)

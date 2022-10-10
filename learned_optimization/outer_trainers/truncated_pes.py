@@ -77,8 +77,8 @@ def compute_pes_grad(
   def flat_first(x):
     return x.reshape([x.shape[0] * x.shape[1]] + list(x.shape[2:]))
 
-  p_ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(p_yses))
-  n_ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(n_yses))
+  p_ys = jax.tree_util.tree_map(flat_first, tree_utils.tree_zip_jnp(p_yses))
+  n_ys = jax.tree_util.tree_map(flat_first, tree_utils.tree_zip_jnp(n_yses))
 
   delta_losses = p_ys.loss - n_ys.loss
 
@@ -109,22 +109,23 @@ def compute_pes_grad(
   def reshape_to(loss, p):
     return loss.reshape((num_tasks,) + (1,) * (len(p.shape) - 1)) * factor * p
 
-  es_grad_from_accum = jax.tree_map(
+  es_grad_from_accum = jax.tree_util.tree_map(
       functools.partial(reshape_to, last_unroll_loss), accumulator)
 
-  es_grad_from_new_perturb = jax.tree_map(
+  es_grad_from_new_perturb = jax.tree_util.tree_map(
       functools.partial(reshape_to, new_unroll_loss), vec_pos)
 
-  vec_es_grad = jax.tree_map(lambda a, b: a + b, es_grad_from_accum,
-                             es_grad_from_new_perturb)
+  vec_es_grad = jax.tree_util.tree_map(lambda a, b: a + b, es_grad_from_accum,
+                                       es_grad_from_new_perturb)
 
-  es_grad = jax.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
+  es_grad = jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
 
   def _switch_one_accum(a, b):
     shape = [num_tasks] + [1] * (len(a.shape) - 1)
     return jnp.where(jnp.reshape(has_finished[-1], shape), a, b)
 
-  new_accumulator = jax.tree_map(_switch_one_accum, vec_pos, accumulator)
+  new_accumulator = jax.tree_util.tree_map(_switch_one_accum, vec_pos,
+                                           accumulator)
 
   pos_loss = jnp.sum(p_ys.loss * p_ys.mask, axis=0) / jnp.sum(p_ys.mask, axis=0)
   neg_loss = jnp.sum(n_ys.loss * n_ys.mask, axis=0) / jnp.sum(n_ys.mask, axis=0)
@@ -179,7 +180,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
         theta, worker_weights.outer_state, key, theta_is_vector=False)
     neg_unroll_state = pos_unroll_state
 
-    accumulator = jax.tree_map(
+    accumulator = jax.tree_util.tree_map(
         lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),
         theta)
 
@@ -229,8 +230,10 @@ class TruncatedPES(gradient_learner.GradientEstimator):
 
       # force all to be non weak type. This is for cache hit reasons.
       # TODO(lmetz) consider instead just setting the weak type flag?
-      p_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), p_state)
-      n_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), n_state)
+      p_state = jax.tree_util.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype),
+                                       p_state)
+      n_state = jax.tree_util.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype),
+                                       n_state)
 
       key = next(rng)
 
@@ -371,7 +374,7 @@ class TruncatedPESPMAP(TruncatedPES):
                                                  keys)
     neg_unroll_state = pos_unroll_state
 
-    accumulator = jax.tree_map(
+    accumulator = jax.tree_util.tree_map(
         lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),
         theta)
     accumulator = flax_jax_utils.replicate(accumulator)
@@ -423,8 +426,10 @@ class TruncatedPESPMAP(TruncatedPES):
 
       # force all to be non weak type. This is for cache hit reasons.
       # TODO(lmetz) consider instead just setting the weak type flag?
-      p_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), p_state)
-      n_state = jax.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype), n_state)
+      p_state = jax.tree_util.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype),
+                                       p_state)
+      n_state = jax.tree_util.tree_map(lambda x: jnp.asarray(x, dtype=x.dtype),
+                                       n_state)
 
       vec_key1, vec_key = vec_key_split(vec_key)
       (p_state, p_ys), m = self.pmap_unroll_next_state(  # pylint: disable=unbalanced-tuple-unpacking

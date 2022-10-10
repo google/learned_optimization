@@ -131,7 +131,7 @@ class MetaSGDWD(lopt_base.LearnedOptimizer):
         def _update_one(p, g):
           return p - g * lr - p * wd
 
-        next_params = jax.tree_map(_update_one, opt_state.params, grads)
+        next_params = jax.tree_util.tree_map(_update_one, opt_state.params, grads)
         # Pack the new parameters back up
         return LOptState(
             params=next_params,
@@ -264,7 +264,7 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
         # In addition to params, model state, and iteration, we also need the
         # initial momentum values.
 
-        momentums = jax.tree_map(jnp.zeros_like, params)
+        momentums = jax.tree_util.tree_map(jnp.zeros_like, params)
 
         return PerParamState(
             params=params,
@@ -283,7 +283,7 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
         def _update_one_momentum(m, g):
           return m * parent.decay + (g * (1 - parent.decay))
 
-        next_moms = jax.tree_map(_update_one_momentum, opt_state.momentums,
+        next_moms = jax.tree_util.tree_map(_update_one_momentum, opt_state.momentums,
                                  grads)
 
         # Update all the params
@@ -291,7 +291,7 @@ class PerParamMLP(lopt_base.LearnedOptimizer):
           step = parent.net.apply(theta["nn"], g, m, p)
           return p - step
 
-        next_params = jax.tree_map(_update_one, opt_state.params, grads,
+        next_params = jax.tree_util.tree_map(_update_one, opt_state.params, grads,
                                    next_moms)
 
         # Pack the new parameters back up
@@ -324,7 +324,7 @@ outputId: 7f736eb0-d3a5-4d25-c6e0-4dcde27f406c
 lopt = PerParamMLP()
 key = jax.random.PRNGKey(0)
 theta = lopt.init(key)
-jax.tree_map(lambda x: (x.shape, x.dtype), theta)
+jax.tree_util.tree_map(lambda x: (x.shape, x.dtype), theta)
 ```
 
 +++ {"id": "NSywvQWJRCIU"}
@@ -496,7 +496,7 @@ class HParamControllerLOPT(lopt_base.LearnedOptimizer):
         def update_one(p, g):
           return p - g * lr
 
-        next_params = jax.tree_map(update_one, opt_state.params, grads)
+        next_params = jax.tree_util.tree_map(update_one, opt_state.params, grads)
 
         return HParamControllerInnerOptState(
             params=next_params,
@@ -533,7 +533,7 @@ params = {"a": jnp.ones([3, 2]), "b": jnp.ones([2, 1])}
 opt_state = opt.init(params)
 fake_grads = {"a": -jnp.ones([3, 2]), "b": -jnp.ones([2, 1])}
 opt_state = opt.update(opt_state, fake_grads, loss=1.0)
-jax.tree_map(lambda x: x.shape, opt_state)
+jax.tree_util.tree_map(lambda x: x.shape, opt_state)
 ```
 
 +++ {"id": "RLAJP-MdU_5I"}

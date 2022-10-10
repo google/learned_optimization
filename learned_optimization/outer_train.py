@@ -409,7 +409,7 @@ def train_worker(
           total_inner_steps=total_inner_steps,
           gen_id=dist_data.gen_id,
           outer_trainer_grads=gradient_worker_out.to_put)
-      to_put_grads = jax.tree_map(onp.asarray, to_put_grads)
+      to_put_grads = jax.tree_util.tree_map(onp.asarray, to_put_grads)
       outer_step = onp.asarray(outer_step)
 
     with profile.Profile("put_grads"):
@@ -529,7 +529,7 @@ def _threaded_write_summary(
 def _str_struct(a):
   """converts the structure to a string for logging purposes."""
   shape_dtype = lambda x: (jnp.asarray(x).shape, str(jnp.asarray(x).dtype))
-  return str(jax.tree_map(shape_dtype, a))
+  return str(jax.tree_util.tree_map(shape_dtype, a))
 
 
 def summarize_outer_cfg(outer_cfg: Sequence[str]) -> Mapping[str, float]:
@@ -1001,7 +1001,7 @@ def local_train(
           gen_id="no_gen_id",
           outer_trainer_grads=gradient_worker_out.to_put)
 
-      to_put_grads = jax.tree_map(onp.asarray, to_put_grads)
+      to_put_grads = jax.tree_util.tree_map(onp.asarray, to_put_grads)
       step = int(step)
       # Because we are training on a single machine here, we are only using
       # a single GradientsFromWorker object, so we pass a list containing 1

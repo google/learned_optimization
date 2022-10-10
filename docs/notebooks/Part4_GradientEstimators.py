@@ -184,7 +184,7 @@ gradient_estimator_state = gradient_estimator.init_worker_state(
 # Now let's look at what this state contains.
 
 # + executionInfo={"elapsed": 55, "status": "ok", "timestamp": 1647560745260, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 240} id="u1QQxUYf31fy" outputId="5afa0dd5-a4af-4c40-feaa-f4b89438c8d5"
-jax.tree_map(lambda x: x.shape, gradient_estimator_state)
+jax.tree_util.tree_map(lambda x: x.shape, gradient_estimator_state)
 
 # + [markdown] id="6meGBWzt45KV"
 # First, this contains 2 instances of SingleState -- one for the positive perturbation, and one for the negative perturbation. Each one of these contains all the necessary state required to keep track of the training run. This means the opt_state, details from the truncation, the task parameters (sample from the task family), the inner_step, and a bool to determine if done or not.
@@ -202,7 +202,7 @@ out, metrics = gradient_estimator.compute_gradient_estimate(
 out.grad
 
 # + executionInfo={"elapsed": 55, "status": "ok", "timestamp": 1647560751802, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 240} id="82oSxk2i5-3L" outputId="099bd011-2590-4da0-8e6a-11d72c09d347"
-jax.tree_map(lambda x: x.shape, out.unroll_state)
+jax.tree_util.tree_map(lambda x: x.shape, out.unroll_state)
 
 # + [markdown] id="MLqCPmkx6cja"
 # One could simply use these gradients to meta-train, and then use the unroll_states as the next state passed into the compute gradient estimate. For example:
@@ -241,7 +241,7 @@ gradient_estimator_state = gradient_estimator.init_worker_state(
     worker_weights, key=key)
 
 # + executionInfo={"elapsed": 3, "status": "ok", "timestamp": 1647560757822, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 240} id="AnawJAj84Dn-" outputId="b8821827-9bec-4671-d9ba-f8b063e24e52"
-jax.tree_map(lambda x: x.shape, gradient_estimator_state)
+jax.tree_util.tree_map(lambda x: x.shape, gradient_estimator_state)
 
 # + executionInfo={"elapsed": 4768, "status": "ok", "timestamp": 1647560762830, "user": {"displayName": "Luke Metz", "photoUrl": "https://lh3.googleusercontent.com/a-/AOh14Gif9m36RuSe53tMVslYQLofCkRX0_Y47HVoDh3u=s64", "userId": "07706439306199750899"}, "user_tz": 240} id="b9NXPpmc4Dn-"
 out, metrics = gradient_estimator.compute_gradient_estimate(

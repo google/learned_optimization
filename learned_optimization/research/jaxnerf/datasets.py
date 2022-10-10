@@ -87,7 +87,7 @@ class FasterBlender(datasets.Dataset):
     Returns:
       batch: dict, has "pixels" and "rays".
     """
-    return jax.tree_map(jnp.asarray, self.queue.get())
+    return jax.tree_util.tree_map(jnp.asarray, self.queue.get())
 
   def peek(self):
     """Peek at the next training batch or test example without dequeuing it.
@@ -96,7 +96,7 @@ class FasterBlender(datasets.Dataset):
       batch: dict, has "pixels" and "rays".
     """
     x = self.queue.queue[0].copy()  # Make a copy of the front of the queue.
-    return jax.tree_map(jnp.asarray, x)
+    return jax.tree_util.tree_map(jnp.asarray, x)
 
 
 @functools.lru_cache(2)

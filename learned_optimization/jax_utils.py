@@ -57,7 +57,7 @@ Y = TypeVar("Y")
 @functools.partial(jax.jit, static_argnames=("reverse",))
 def _stack(ys, reverse=False):
   maybe_reversed = reversed if reverse else lambda x: x
-  return jax.tree_map(lambda *y: jnp.vstack(y), *maybe_reversed(ys))
+  return jax.tree_util.tree_map(lambda *y: jnp.vstack(y), *maybe_reversed(ys))
 
 
 def scan(f: Callable[[Carry, X], Tuple[Carry, Y]],
@@ -70,15 +70,15 @@ def scan(f: Callable[[Carry, X], Tuple[Carry, Y]],
   if in_jit():
     return jax.lax.scan(f, init, xs, length, reverse, unroll)
   else:
-    xs_flat, xs_tree = jax.tree_flatten(xs)
+    xs_flat, xs_tree = jax.tree_util.tree_flatten(xs)
     if length is None:
-      length = jax.tree_leaves(xs)[0].shape[0]
+      length = jax.tree_util.tree_leaves(xs)[0].shape[0]
     carry = init
     ys = []
     maybe_reversed = reversed if reverse else lambda x: x
     for i in maybe_reversed(range(length)):
       xs_slice = [x[i] for x in xs_flat]
-      carry, y = f(carry, jax.tree_unflatten(xs_tree, xs_slice))
+      carry, y = f(carry, jax.tree_util.tree_unflatten(xs_tree, xs_slice))
       ys.append(y)
     stacked_y = _stack(ys, reverse=reverse)
     return carry, stacked_y
@@ -100,9 +100,9 @@ def print_arg_shapes(fn):
     print("Called:", fn.__name__)
     print("\t Args:")
     for a in args:
-      print("\t\t", jax.tree_map(_print_aval, a))
+      print("\t\t", jax.tree_util.tree_map(_print_aval, a))
     for k, v in kwargs.values():
-      print(f"\t\t {k}={jax.tree_map(_print_aval, v)}")
+      print(f"\t\t {k}={jax.tree_util.tree_map(_print_aval, v)}")
     return fn(*args, **kwargs)
 
   return f

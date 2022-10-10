@@ -172,8 +172,8 @@ class NAdamW(base.Optimizer):
     return NAdamWState(
         iteration=jnp.asarray(0, dtype=jnp.int64),
         params=params,
-        grad_acc=jax.tree_map(jnp.zeros_like, params),
-        grad_sqr_acc=jax.tree_map(jnp.zeros_like, params),
+        grad_acc=jax.tree_util.tree_map(jnp.zeros_like, params),
+        grad_sqr_acc=jax.tree_util.tree_map(jnp.zeros_like, params),
         num_steps=jnp.asarray(num_steps, dtype=jnp.int64),
         state=model_state)
 
@@ -196,22 +196,24 @@ class NAdamW(base.Optimizer):
 
     # the following flattens, applies a map, extracts values out via zip,
     # then unflattens.
-    flat_gs, tree_def = jax.tree_flatten(grads)
-    flat_ps = jax.tree_leaves(opt_state.params)
-    flat_s0 = jax.tree_leaves(opt_state.grad_acc)
-    flat_s1 = jax.tree_leaves(opt_state.grad_sqr_acc)
+    flat_gs, tree_def = jax.tree_util.tree_flatten(grads)
+    flat_ps = jax.tree_util.tree_leaves(opt_state.params)
+    flat_s0 = jax.tree_util.tree_leaves(opt_state.grad_acc)
+    flat_s1 = jax.tree_util.tree_leaves(opt_state.grad_sqr_acc)
 
-    next_param_states = jax.tree_map(update_one, flat_gs, flat_ps, flat_s0,
-                                     flat_s1)
+    next_param_states = jax.tree_util.tree_map(update_one, flat_gs, flat_ps,
+                                               flat_s0, flat_s1)
 
     flat_step, flat_next_ss = zip(*next_param_states)
     flat_next_grad_acc, flat_next_grad_sq_acc = zip(*flat_next_ss)
 
-    step = jax.tree_unflatten(tree_def, flat_step)
-    next_grad_acc = jax.tree_unflatten(tree_def, flat_next_grad_acc)
-    next_grad_sq_acc = jax.tree_unflatten(tree_def, flat_next_grad_sq_acc)
+    step = jax.tree_util.tree_unflatten(tree_def, flat_step)
+    next_grad_acc = jax.tree_util.tree_unflatten(tree_def, flat_next_grad_acc)
+    next_grad_sq_acc = jax.tree_util.tree_unflatten(tree_def,
+                                                    flat_next_grad_sq_acc)
 
-    next_params = jax.tree_map(lambda x, b: x + b, opt_state.params, step)
+    next_params = jax.tree_util.tree_map(lambda x, b: x + b, opt_state.params,
+                                         step)
 
     next_params = tree_utils.match_type(next_params, opt_state.params)
     next_grad_sq_acc = tree_utils.match_type(next_grad_sq_acc,

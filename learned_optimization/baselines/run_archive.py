@@ -83,8 +83,8 @@ def maybe_get_hparam_set(
       logging.info(f"Failed to find enough results in dir {path}. "  # pylint: disable=logging-fstring-interpolation
                    f"Expected {len(res)}")
       return None
-    trimmed_results.append(jax.tree_map(stack, *res[0:rep]))
-  stacked = jax.tree_map(stack, *trimmed_results)
+    trimmed_results.append(jax.tree_util.tree_map(stack, *res[0:rep]))
+  stacked = jax.tree_util.tree_map(stack, *trimmed_results)
   return stacked
 
 

@@ -49,7 +49,9 @@ class EsWrapperTest(parameterized.TestCase):
 
     self.assertAlmostEqual(float(aux), 4)
     self.assertLess(onp.abs(loss - 3), 1)
-    self.assertEqual(jax.tree_structure(grads), jax.tree_structure(params))
+    self.assertEqual(
+        jax.tree_util.tree_structure(grads),
+        jax.tree_util.tree_structure(params))
 
   def test_multi_antithetic_es_value_and_grad(self):
     key = jax.random.PRNGKey(0)

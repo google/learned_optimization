@@ -57,7 +57,8 @@ def _cached_configs():
 
 def _get_optimizer_config(idx: int) -> Dict[Text, Any]:
   """Get the optimizer config from the list of hparams at the given index."""
-  values = jax.tree_map(lambda x: jnp.asarray(x)[idx], _cached_configs())
+  values = jax.tree_util.tree_map(lambda x: jnp.asarray(x)[idx],
+                                  _cached_configs())
   lr_sched = learning_rate_schedules.CosineLearningRateSchedule(
       learning_rate=values.pop("learning_rate"),
       min_learning_rate_mult=values.pop("min_learning_rate_mult"),

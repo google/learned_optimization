@@ -41,8 +41,8 @@ class FakeGradientEstimator(gradient_learner.GradientEstimator):
   def compute_gradient_estimate(self, worker_weights, key, state, with_summary):
     out = gradient_learner.GradientEstimatorOut(
         1.0,
-        grad=jax.tree_map(lambda x: x * 0 + self.grad_val,
-                          worker_weights.theta),
+        grad=jax.tree_util.tree_map(lambda x: x * 0 + self.grad_val,
+                                    worker_weights.theta),
         unroll_state=state + 1,
         unroll_info=None)
     return out, {"mean||metric": 1}
@@ -60,11 +60,11 @@ class GradientLearnerTest(absltest.TestCase):
 
     theta = lopt.init(key)
     ones_g = gradient_learner.AggregatedGradient(
-        theta_grads=jax.tree_map(lambda x: x * 0 + 1, theta),
+        theta_grads=jax.tree_util.tree_map(lambda x: x * 0 + 1, theta),
         theta_model_state=None,
         mean_loss=0.0)
     zeros_g = gradient_learner.AggregatedGradient(
-        theta_grads=jax.tree_map(lambda x: x * 0, theta),
+        theta_grads=jax.tree_util.tree_map(lambda x: x * 0, theta),
         theta_model_state=None,
         mean_loss=0.0)
 
@@ -124,7 +124,7 @@ class GradientLearnerTest(absltest.TestCase):
       theta_opt = opt_base.SGD(3)
       key = jax.random.PRNGKey(0)
       theta = lopt.init(key)
-      theta = jax.tree_map(lambda x: (x + 1) * 10, theta)
+      theta = jax.tree_util.tree_map(lambda x: (x + 1) * 10, theta)
 
       # save a checkpoint.
       params = gradient_learner.ParameterCheckpoint(
@@ -137,8 +137,8 @@ class GradientLearnerTest(absltest.TestCase):
       grad_state = learner.init(key)
       restore_theta = theta_opt.get_params(grad_state.theta_opt_state)
 
-      restore_val = jax.tree_leaves(restore_theta)[0]
-      base_val = jax.tree_leaves(theta)[0]
+      restore_val = jax.tree_util.tree_leaves(restore_theta)[0]
+      base_val = jax.tree_util.tree_leaves(theta)[0]
 
       self.assertAlmostEqual(restore_val, base_val)
 
@@ -152,7 +152,7 @@ class GradientLearnerTest(absltest.TestCase):
       grad_state = learner.init(key)
 
       # modify everything, including the opt_state iteration.
-      grad_state = jax.tree_map(lambda x: x + 11, grad_state)
+      grad_state = jax.tree_util.tree_map(lambda x: x + 11, grad_state)
 
       # save a checkpoint.
       opt_checkpoint = gradient_learner.OptCheckpoint(

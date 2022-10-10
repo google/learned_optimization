@@ -60,8 +60,8 @@ class _ResnetTask(base.Task):
     return jnp.mean(loss)
 
   def init_with_state(self, key: chex.PRNGKey) -> base.Params:
-    batch = jax.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                         self.datasets.abstract_batch)
+    batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
+                                   self.datasets.abstract_batch)
     return self._net.init(key, batch)
 
   def loss_with_state(self, params, state, key, data):

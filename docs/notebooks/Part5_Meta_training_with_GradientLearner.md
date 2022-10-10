@@ -113,7 +113,7 @@ outputId: 9c275261-c03f-4de4-804f-b48efd1ea4ed
 ---
 key = jax.random.PRNGKey(0)
 outer_trainer_state = outer_trainer.init(key)
-jax.tree_map(lambda x: jnp.asarray(x).shape, outer_trainer_state)
+jax.tree_util.tree_map(lambda x: jnp.asarray(x).shape, outer_trainer_state)
 ```
 
 +++ {"id": "bR6qSqckl6XG"}
@@ -250,7 +250,7 @@ outputId: de50cad0-aabd-4f71-9a0b-85cb20a94487
 ---
 key = jax.random.PRNGKey(0)
 central_state = central_learner.init(key)
-jax.tree_map(lambda x: jnp.asarray(x).shape, central_state)
+jax.tree_util.tree_map(lambda x: jnp.asarray(x).shape, central_state)
 ```
 
 +++ {"id": "YmbKXLcL3zDB"}

@@ -38,7 +38,7 @@ class TreeUtilsTest(absltest.TestCase):
     partitions, unflattener = tree_utils.partition(
         [lambda k, v: jnp.asarray(v).dtype == jnp.int32], c)
 
-    partitions[1] = jax.tree_map(lambda x: x * 2, partitions[1])
+    partitions[1] = jax.tree_util.tree_map(lambda x: x * 2, partitions[1])
 
     tree_utils.partition_unflatten(unflattener, partitions)
     data = unflattener(partitions)

@@ -78,9 +78,9 @@ def restore_checkpoint(ckpt_dir: str, value: T, prefix: str) -> T:
   """
   checkpoint_state_new = checkpoints.restore_checkpoint(
       ckpt_dir, value, prefix=prefix)
-  tree = jax.tree_structure(value)
-  leaves_new = jax.tree_leaves(checkpoint_state_new)
-  checkpoint_state = jax.tree_unflatten(tree, leaves_new)
+  tree = jax.tree_util.tree_structure(value)
+  leaves_new = jax.tree_util.tree_leaves(checkpoint_state_new)
+  checkpoint_state = jax.tree_util.tree_unflatten(tree, leaves_new)
   return checkpoint_state
 
 
@@ -261,6 +261,6 @@ def load_state(path: str, state: T) -> T:
   logging.info("Restoring state %s", path)
   with filesystem.file_open(path, "rb") as fp:
     state_new = serialization.from_bytes(state, fp.read())
-  tree = jax.tree_structure(state)
-  leaves_new = jax.tree_leaves(state_new)
-  return jax.tree_unflatten(tree, leaves_new)
+  tree = jax.tree_util.tree_structure(state)
+  leaves_new = jax.tree_util.tree_leaves(state_new)
+  return jax.tree_util.tree_unflatten(tree, leaves_new)

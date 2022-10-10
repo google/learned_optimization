@@ -142,7 +142,7 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
       def flat_first(x):
         return x.reshape([x.shape[0] * x.shape[1]] + list(x.shape[2:]))
 
-      ys = jax.tree_map(flat_first, tree_utils.tree_zip_jnp(outputs))
+      ys = jax.tree_util.tree_map(flat_first, tree_utils.tree_zip_jnp(outputs))
 
       assert ys.loss.shape == (self.unroll_length,
                                self.truncated_step.num_tasks)

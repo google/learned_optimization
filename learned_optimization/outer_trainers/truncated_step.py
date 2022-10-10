@@ -214,7 +214,8 @@ class VectorizedTruncatedStep(TruncatedStep):
 
     keys = jax.random.split(key, self.num_tasks)
     if stack_antithetic_samples:
-      keys = jax.tree_map(lambda x: jnp.concatenate([x, x], axis=0), keys)
+      keys = jax.tree_util.tree_map(lambda x: jnp.concatenate([x, x], axis=0),
+                                    keys)
 
     in_axes = (0 if theta_is_vector else None, 0, 0, 0, None)
     return jax.vmap(

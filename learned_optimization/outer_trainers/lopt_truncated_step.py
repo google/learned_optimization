@@ -473,7 +473,7 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     self.meta_loss_with_aux_key = meta_loss_with_aux_key
     self._task_name = task_name
 
-    self.data_shape = jax.tree_map(
+    self.data_shape = jax.tree_util.tree_map(
         lambda x: jax.ShapedArray(shape=x.shape, dtype=x.dtype),
         training.vec_get_batch(
             task_family, num_tasks, split="train", numpy=True))
@@ -584,8 +584,8 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     # the antithetic samples.
     vec_keys = jax.random.split(key1, self.num_tasks)
     if stack_antithetic_samples:
-      vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
-                              vec_keys)
+      vec_keys = jax.tree_util.tree_map(
+          lambda a: jnp.concatenate([a, a], axis=0), vec_keys)
 
     fn = truncated_unroll_one_step_vec_theta if theta_is_vector else truncated_unroll_one_step
     next_unroll_state_, ys = fn(self.task_family, self.learned_opt,
@@ -597,8 +597,8 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     if meta_data is not None:
       vec_keys = jax.random.split(key2, self.num_tasks)
       if stack_antithetic_samples:
-        vec_keys = jax.tree_map(lambda a: jnp.concatenate([a, a], axis=0),
-                                vec_keys)
+        vec_keys = jax.tree_util.tree_map(
+            lambda a: jnp.concatenate([a, a], axis=0), vec_keys)
       loss, aux = vectorized_loss_and_aux(self.task_family, self.learned_opt,
                                           theta,
                                           next_unroll_state_.inner_opt_state,

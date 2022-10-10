@@ -117,7 +117,7 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
     # for the step when the particle resets,
     # we exclude that step's contributed gradient
     loss_sum = 0.
-    g_sum = jax.tree_map(jnp.zeros_like, theta)
+    g_sum = jax.tree_util.tree_map(jnp.zeros_like, theta)
     # cannot use jnp.zeros(shape=1) for total_count (this will be a length 1 array which is undesired)
     total_count = 0.
 
@@ -134,14 +134,14 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
             worker_weights.outer_state)
 
       loss_sum += loss_sum_step
-      g_sum = jax.tree_map(lambda x, y: x + y, g_sum, g_sum_step)
+      g_sum = jax.tree_util.tree_map(lambda x, y: x + y, g_sum, g_sum_step)
       total_count += count
 
     # average over both particle and number of unroll step (this makes sure we are optimizing the average loss over all time steps)
     # because each particle over one step contributes both a pos and neg loss
     # we divide 2 times total_count
     mean_loss = loss_sum / (2 * total_count)
-    g = jax.tree_map(lambda x: x / total_count, g_sum)
+    g = jax.tree_util.tree_map(lambda x: x / total_count, g_sum)
 
     # unroll_info = gradient_learner.UnrollInfo(
     #     loss=p_ys.loss,
@@ -172,10 +172,10 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
 
     # compute the perturbation for this unroll step
     # there is one perturbed pos/neg theta for each trajectory
-    pos_perturbed_thetas = jax.tree_map(lambda a, b: jnp.expand_dims(a, 0) + b,
-                                        theta, epsilons)
-    neg_perturbed_thetas = jax.tree_map(lambda a, b: jnp.expand_dims(a, 0) - b,
-                                        theta, epsilons)
+    pos_perturbed_thetas = jax.tree_util.tree_map(
+        lambda a, b: jnp.expand_dims(a, 0) + b, theta, epsilons)
+    neg_perturbed_thetas = jax.tree_util.tree_map(
+        lambda a, b: jnp.expand_dims(a, 0) - b, theta, epsilons)
 
     key1, key2 = jax.random.split(key)
     pos_unroll_states, pos_outs = \
@@ -209,7 +209,7 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
     # g_sum_step is equal to the sum of gradient estimates for all particles
     # which has non trivial gradient estimates (this excludes the particles)
     # that has reset in this unroll.
-    g_sum_step = jax.tree_map(
+    g_sum_step = jax.tree_util.tree_map(
         lambda eps: jnp.
         sum(  # sum over all particles (each particle is working on one trajectory)
             eps * jnp.reshape(multiplier, [multiplier.shape[0]] + [1] *
@@ -230,8 +230,7 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
                                    (len(eps.shape) - 1))
       return eps * (1 - reshape_isdone) + new_eps * (reshape_isdone)
 
-    epsilons = jax.tree_map(lambda eps, new_eps: update_eps(eps, new_eps),
-                            epsilons, new_epsilons)
+    epsilons = jax.tree_util.tree_map(update_eps, epsilons, new_epsilons)
 
     return (TruncatedESSharedNoiseAttributes(
         pos_unroll_states=pos_unroll_states,

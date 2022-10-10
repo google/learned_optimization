@@ -345,7 +345,8 @@ def preload_tfds_image_classification_datasets(
             def index_into(idxs, x):
               return x[idxs]
 
-            yield jax.tree_map(functools.partial(index_into, idxs), data)
+            yield jax.tree_util.tree_map(
+                functools.partial(index_into, idxs), data)
 
       return prefetch_iterator.PrefetchIterator(iter_fn(), prefetch_batches)
 

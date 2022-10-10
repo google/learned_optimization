@@ -34,85 +34,91 @@ def _is_scalar(x):
 
 @jax.jit
 def tree_add(treea, treeb):
-  return jax.tree_map(lambda a, b: a + b, treea, treeb)
+  return jax.tree_util.tree_map(lambda a, b: a + b, treea, treeb)
 
 
 @jax.jit
 def tree_sub(treea, scalar_or_treeb):
   if _is_scalar(scalar_or_treeb):
-    return jax.tree_map(lambda a: a - scalar_or_treeb, treea)
+    return jax.tree_util.tree_map(lambda a: a - scalar_or_treeb, treea)
   else:
-    return jax.tree_map(lambda a, b: a - b, treea, scalar_or_treeb)
+    return jax.tree_util.tree_map(lambda a, b: a - b, treea, scalar_or_treeb)
 
 
 @jax.jit
 def tree_mean_abs(val):
-  num_entry = sum(map(lambda x: onp.prod(x.shape), jax.tree_leaves(val)))
-  sum_abs = sum(map(lambda x: jnp.sum(jnp.abs(x)), jax.tree_leaves(val)))
+  num_entry = sum(
+      map(lambda x: onp.prod(x.shape), jax.tree_util.tree_leaves(val)))
+  sum_abs = sum(
+      map(lambda x: jnp.sum(jnp.abs(x)), jax.tree_util.tree_leaves(val)))
   return sum_abs / num_entry
 
 
 @jax.jit
 def tree_mean(val):
-  num_entry = sum(map(lambda x: onp.prod(x.shape), jax.tree_leaves(val)))
-  return sum(map(jnp.sum, jax.tree_leaves(val))) / num_entry
+  num_entry = sum(
+      map(lambda x: onp.prod(x.shape), jax.tree_util.tree_leaves(val)))
+  return sum(map(jnp.sum, jax.tree_util.tree_leaves(val))) / num_entry
 
 
 @jax.jit
 def tree_norm(val):
-  sum_squared = sum(map(lambda x: jnp.sum(jnp.square(x)), jax.tree_leaves(val)))
+  sum_squared = sum(
+      map(lambda x: jnp.sum(jnp.square(x)), jax.tree_util.tree_leaves(val)))
   return jnp.sqrt(sum_squared)
 
 
 @jax.jit
 def tree_div(treea, scalar_or_treeb):
   if _is_scalar(scalar_or_treeb):
-    return jax.tree_map(lambda a: a / scalar_or_treeb, treea)
+    return jax.tree_util.tree_map(lambda a: a / scalar_or_treeb, treea)
   else:
-    return jax.tree_map(lambda a, b: a / b, treea, scalar_or_treeb)
+    return jax.tree_util.tree_map(lambda a, b: a / b, treea, scalar_or_treeb)
 
 
 @jax.jit
 def tree_mul(treea, scalar_or_treeb):
   if _is_scalar(scalar_or_treeb):
-    return jax.tree_map(lambda a: a * scalar_or_treeb, treea)
+    return jax.tree_util.tree_map(lambda a: a * scalar_or_treeb, treea)
   else:
-    return jax.tree_map(lambda a, b: a * b, treea, scalar_or_treeb)
+    return jax.tree_util.tree_map(lambda a, b: a * b, treea, scalar_or_treeb)
 
 
 @jax.jit
 def tree_dot(treea, treeb):
-  mult = jax.tree_map(lambda a, b: a * b, treea, treeb)
-  return sum(map(jnp.sum, jax.tree_leaves(mult)))
+  mult = jax.tree_util.tree_map(lambda a, b: a * b, treea, treeb)
+  return sum(map(jnp.sum, jax.tree_util.tree_leaves(mult)))
 
 
 def tree_zip_onp(xs):
   xs = list(xs)
-  _, tree_def = jax.tree_flatten(xs[0])
-  ys = map(onp.asarray, zip(*map(lambda x: jax.tree_flatten(x)[0], xs)))
-  return jax.tree_unflatten(tree_def, ys)
+  _, tree_def = jax.tree_util.tree_flatten(xs[0])
+  ys = map(onp.asarray,
+           zip(*map(lambda x: jax.tree_util.tree_flatten(x)[0], xs)))
+  return jax.tree_util.tree_unflatten(tree_def, ys)
 
 
 @jax.jit
 def tree_zip_jnp(xs):
   xs = list(xs)
-  _, tree_def = jax.tree_flatten(xs[0])
-  ys = map(jnp.asarray, zip(*map(lambda x: jax.tree_flatten(x)[0], xs)))
-  return jax.tree_unflatten(tree_def, ys)
+  _, tree_def = jax.tree_util.tree_flatten(xs[0])
+  ys = map(jnp.asarray,
+           zip(*map(lambda x: jax.tree_util.tree_flatten(x)[0], xs)))
+  return jax.tree_util.tree_unflatten(tree_def, ys)
 
 
 def first_dim(a):
-  return jax.tree_flatten(a)[0][0].shape[0]
+  return jax.tree_util.tree_flatten(a)[0][0].shape[0]
 
 
 def match_type(struct1, struct2):
-  leaves = jax.tree_leaves(struct2)
+  leaves = jax.tree_util.tree_leaves(struct2)
   for l in leaves:
     if not hasattr(l, "dtype"):
       raise ValueError("The target struct doesn't have dtype specified?"
                        f" Value found: {l}")
-  return jax.tree_map(lambda a, b: jnp.asarray(a, dtype=b.dtype), struct1,
-                      struct2)
+  return jax.tree_util.tree_map(lambda a, b: jnp.asarray(a, dtype=b.dtype),
+                                struct1, struct2)
 
 
 def map_named(function: Callable[[str, Any], Any],
@@ -162,7 +168,7 @@ def strip_weak_type(pytree):
       x.weak_type = False
     return x
 
-  return jax.tree_map(maybe_remove_weak, pytree)
+  return jax.tree_util.tree_map(maybe_remove_weak, pytree)
 
 
 FilterFN = Callable[[str, chex.Array], bool]
@@ -195,13 +201,13 @@ def partition(functions: Sequence[FilterFN],
     unflattener: A pytree which can be used to unflatten values.
   """
 
-  vals, struct = jax.tree_flatten(values)
+  vals, struct = jax.tree_util.tree_flatten(values)
 
   def get_name(k, v):
     del v
     return k
 
-  keys = jax.tree_leaves(map_named(get_name, "", values))
+  keys = jax.tree_util.tree_leaves(map_named(get_name, "", values))
   keys = [str(i) for i, v in enumerate(vals)]
   if not strict:
     functions = list(functions) + [lambda k, v: True]
@@ -241,4 +247,4 @@ def partition_unflatten(unflattener: PartitionUnflatten,
     for n, p in zip(name, part):
       to_fill[unmap[n]] = p
 
-  return jax.tree_unflatten(struct, to_fill)
+  return jax.tree_util.tree_unflatten(struct, to_fill)

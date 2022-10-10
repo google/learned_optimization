@@ -106,15 +106,15 @@ def _first_second_rolling() -> _InitUpdate:
 
   def init_fn(p):
     return MeanAndMeanSquareAccumulator(
-        m=jax.tree_map(jnp.zeros_like, p),
-        rms=jax.tree_map(jnp.zeros_like, p),
+        m=jax.tree_util.tree_map(jnp.zeros_like, p),
+        rms=jax.tree_util.tree_map(jnp.zeros_like, p),
         t=jnp.asarray(0))
 
   def update_fn(state, grad, beta1, beta2):
-    m = jax.tree_map(lambda a, b, b1: b1 * a + (1 - b1) * b, state.m, grad,
-                     beta1)
-    rms = jax.tree_map(lambda a, b, b2: b2 * a + (1 - b2) * (b * b), state.rms,
-                       grad, beta2)
+    m = jax.tree_util.tree_map(lambda a, b, b1: b1 * a + (1 - b1) * b, state.m,
+                               grad, beta1)
+    rms = jax.tree_util.tree_map(lambda a, b, b2: b2 * a + (1 - b2) * (b * b),
+                                 state.rms, grad, beta2)
     return MeanAndMeanSquareAccumulator(m=m, rms=rms, t=state.t + 1)
 
   return _InitUpdate(init_fn, update_fn)
@@ -131,7 +131,7 @@ class _Invertable:
   @functools.partial(jax.jit, static_argnums=0)
   def tree_inverse_forward(self, val):
     f = lambda v: self.forward(self.inverse(v))
-    return jax.tree_map(f, val)
+    return jax.tree_util.tree_map(f, val)
 
 
 _scaled_lr = _Invertable(
@@ -264,8 +264,8 @@ class NNAdam(lopt_base.LearnedOptimizer):
         if num_steps is None:
           raise ValueError("Must specify number of steps for this lopt!")
 
-        n_states = len(jax.tree_leaves(params))
-        lstm_hidden_state = jax.tree_map(
+        n_states = len(jax.tree_util.tree_leaves(params))
+        lstm_hidden_state = jax.tree_util.tree_map(
             lambda x: jnp.tile(x, [n_states] + [1] * len(x.shape[1:])),
             theta["lstm_init_state"])
 
@@ -275,13 +275,14 @@ class NNAdam(lopt_base.LearnedOptimizer):
             iteration=jnp.asarray(0, dtype=jnp.int32),
             state=model_state,
             lstm_hidden_state=lstm_hidden_state,
-            per_layer_lr=jax.tree_map(lambda x: theta["per_layer_lr"], params),
-            per_layer_beta1=jax.tree_map(lambda x: theta["per_layer_beta1"],
-                                         params),
-            per_layer_beta2=jax.tree_map(lambda x: theta["per_layer_beta2"],
-                                         params),
-            per_layer_epsilon=jax.tree_map(lambda x: theta["per_layer_epsilon"],
-                                           params),
+            per_layer_lr=jax.tree_util.tree_map(lambda x: theta["per_layer_lr"],
+                                                params),
+            per_layer_beta1=jax.tree_util.tree_map(
+                lambda x: theta["per_layer_beta1"], params),
+            per_layer_beta2=jax.tree_util.tree_map(
+                lambda x: theta["per_layer_beta2"], params),
+            per_layer_epsilon=jax.tree_util.tree_map(
+                lambda x: theta["per_layer_epsilon"], params),
         )
 
       def lstm_features_for_tensor(self, p: jnp.ndarray, g: jnp.ndarray,
@@ -346,7 +347,8 @@ class NNAdam(lopt_base.LearnedOptimizer):
                  **kwargs) -> NNAdamState:
         theta = self.theta
 
-        grads = jax.tree_map(lambda x: jnp.clip(x, -1000., 1000.), grads)
+        grads = jax.tree_util.tree_map(lambda x: jnp.clip(x, -1000., 1000.),
+                                       grads)
 
         summary.tree_scalar_mean("beta1_pre", opt_state.per_layer_beta1)
         summary.tree_scalar_mean("beta2_pre", opt_state.per_layer_beta2)
@@ -355,13 +357,13 @@ class NNAdam(lopt_base.LearnedOptimizer):
 
         # Map the current hparams to the correct space so that we can apply
         # an update.
-        b1 = jax.tree_map(_scaled_one_minus_log.inverse,
-                          opt_state.per_layer_beta1)
-        b2 = jax.tree_map(_scaled_one_minus_log.inverse,
-                          opt_state.per_layer_beta2)
-        epsilon = jax.tree_map(_scaled_epsilon.inverse,
-                               opt_state.per_layer_epsilon)
-        lr = jax.tree_map(_scaled_lr.inverse, opt_state.per_layer_lr)
+        b1 = jax.tree_util.tree_map(_scaled_one_minus_log.inverse,
+                                    opt_state.per_layer_beta1)
+        b2 = jax.tree_util.tree_map(_scaled_one_minus_log.inverse,
+                                    opt_state.per_layer_beta2)
+        epsilon = jax.tree_util.tree_map(_scaled_epsilon.inverse,
+                                         opt_state.per_layer_epsilon)
+        lr = jax.tree_util.tree_map(_scaled_lr.inverse, opt_state.per_layer_lr)
 
         summary.tree_scalar_mean("beta1_post", b1)
         summary.tree_scalar_mean("beta2_post", b2)
@@ -383,39 +385,42 @@ class NNAdam(lopt_base.LearnedOptimizer):
           return step
 
         # Compute a update step.
-        update = jax.tree_map(compute_step_for_tensor, m, rms, lr, epsilon)
+        update = jax.tree_util.tree_map(compute_step_for_tensor, m, rms, lr,
+                                        epsilon)
 
         summary.tree_step("nn_adam_step", update)
 
         # apply the step to current parameters
-        new_params = jax.tree_map(lambda a, b: a - b, opt_state.params, update)
+        new_params = jax.tree_util.tree_map(lambda a, b: a - b,
+                                            opt_state.params, update)
 
         # run the LSTM on transformed features
-        rnn_inputs = jax.tree_map(self.lstm_features_for_tensor,
-                                  opt_state.params, grads, m, rms,
-                                  opt_state.per_layer_lr,
-                                  opt_state.per_layer_beta1,
-                                  opt_state.per_layer_beta2,
-                                  opt_state.per_layer_epsilon)
+        rnn_inputs = jax.tree_util.tree_map(self.lstm_features_for_tensor,
+                                            opt_state.params, grads, m, rms,
+                                            opt_state.per_layer_lr,
+                                            opt_state.per_layer_beta1,
+                                            opt_state.per_layer_beta2,
+                                            opt_state.per_layer_epsilon)
 
-        stack = jnp.asarray(jax.tree_leaves(rnn_inputs))
+        stack = jnp.asarray(jax.tree_util.tree_leaves(rnn_inputs))
         lstm_out, next_lstm_hidden_state = parent.rnn_apply(
             theta["rnn_params"], stack, opt_state.lstm_hidden_state)
 
         deltas = parent.rnn_to_controls.apply(theta["rnn_to_controls_params"],
                                               lstm_out)
-        treedef = jax.tree_structure(opt_state.params)
-        deltas = jax.tree_unflatten(treedef, list(deltas))
+        treedef = jax.tree_util.tree_structure(opt_state.params)
+        deltas = jax.tree_util.tree_unflatten(treedef, list(deltas))
 
-        deltas = jax.tree_map(lambda x: x * parent.output_scale, deltas)
+        deltas = jax.tree_util.tree_map(lambda x: x * parent.output_scale,
+                                        deltas)
 
         # Extract out the values wich we use to update the hparams
-        assert jax.tree_leaves(deltas)[0].shape[0] == 4
+        assert jax.tree_util.tree_leaves(deltas)[0].shape[0] == 4
 
-        lr = jax.tree_map(lambda x: x[0], deltas)
-        beta1 = jax.tree_map(lambda x: x[1], deltas)
-        beta2 = jax.tree_map(lambda x: x[2], deltas)
-        epsilon = jax.tree_map(lambda x: x[3], deltas)
+        lr = jax.tree_util.tree_map(lambda x: x[0], deltas)
+        beta1 = jax.tree_util.tree_map(lambda x: x[1], deltas)
+        beta2 = jax.tree_util.tree_map(lambda x: x[2], deltas)
+        epsilon = jax.tree_util.tree_map(lambda x: x[3], deltas)
 
         summary.tree_scalar_mean("lr_step", lr)
         summary.tree_scalar_mean("beta1_step", beta1)
@@ -424,7 +429,7 @@ class NNAdam(lopt_base.LearnedOptimizer):
 
         # Update the current hparams by adding the prediction to the previous
         # value.
-        tree_add = lambda a, b: jax.tree_map(lambda x, y: x + y, a, b)
+        tree_add = lambda a, b: jax.tree_util.tree_map(lambda x, y: x + y, a, b)
 
         new_lr = tree_add(opt_state.per_layer_lr, lr)
         new_b1 = tree_add(opt_state.per_layer_beta1, beta1)

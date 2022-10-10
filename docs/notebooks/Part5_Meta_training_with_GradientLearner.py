@@ -105,7 +105,7 @@ outer_trainer = gradient_learner.SingleMachineGradientLearner(
 # + executionInfo={"elapsed": 2924, "status": "ok", "timestamp": 1647562738598, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="N78WoigVkmUb" outputId="9c275261-c03f-4de4-804f-b48efd1ea4ed"
 key = jax.random.PRNGKey(0)
 outer_trainer_state = outer_trainer.init(key)
-jax.tree_map(lambda x: jnp.asarray(x).shape, outer_trainer_state)
+jax.tree_util.tree_map(lambda x: jnp.asarray(x).shape, outer_trainer_state)
 
 # + [markdown] id="bR6qSqckl6XG"
 # This SingleMachineState contains the state of the `gradient_learner` (or the weights of the learned optimizer being trained as well as any variables needed to train these weights such as momentums (`theta_opt_state`).
@@ -163,7 +163,7 @@ central_learner = gradient_learner.GradientLearner(lopt, theta_opt)
 # + executionInfo={"elapsed": 60, "status": "ok", "timestamp": 1647562789178, "user": {"displayName": "", "photoUrl": "", "userId": ""}, "user_tz": 240} id="SuKABLjk3D9R" outputId="de50cad0-aabd-4f71-9a0b-85cb20a94487"
 key = jax.random.PRNGKey(0)
 central_state = central_learner.init(key)
-jax.tree_map(lambda x: jnp.asarray(x).shape, central_state)
+jax.tree_util.tree_map(lambda x: jnp.asarray(x).shape, central_state)
 
 # + [markdown] id="YmbKXLcL3zDB"
 # We can see here that this just contains the weights of the learned optimizer, plus the extra accumulators used by adam.

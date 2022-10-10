@@ -95,9 +95,9 @@ def load_state(path, state):
   logging.info("Restoring state %s:", path)
   with filesystem.file_open(path, "rb") as fp:
     state_new = serialization.from_bytes(state, fp.read())
-  tree = jax.tree_structure(state)
-  leaves_new = jax.tree_leaves(state_new)
-  return jax.tree_unflatten(tree, leaves_new)
+  tree = jax.tree_util.tree_structure(state)
+  leaves_new = jax.tree_util.tree_leaves(state_new)
+  return jax.tree_util.tree_unflatten(tree, leaves_new)
 
 
 def get_data_iterators(fake_data=False):

@@ -61,15 +61,15 @@ def state_compare_log_mag_dir_steps(prev_src_state: UnrollState,
                                 state.inner_opt_state.params)
 
   s_n = tree_utils.tree_norm(s_steps)
-  s_norm_steps = jax.tree_map(lambda s: s / (1e-8 + s_n), s_steps)
+  s_norm_steps = jax.tree_util.tree_map(lambda s: s / (1e-8 + s_n), s_steps)
 
   t_n = tree_utils.tree_norm(t_steps)
-  t_norm_steps = jax.tree_map(lambda s: s / (1e-8 + t_n), t_steps)
+  t_norm_steps = jax.tree_util.tree_map(lambda s: s / (1e-8 + t_n), t_steps)
 
   mse_log_mag = jnp.mean(jnp.square(jnp.log(s_n + 1e-8) - jnp.log(t_n + 1e-8)))
-  squared_cosine_dist = jax.tree_map(lambda s, t: jnp.sum(jnp.square(s - t)),
-                                     s_norm_steps, t_norm_steps)
-  loss = sum(jax.tree_leaves(squared_cosine_dist)) + mse_log_mag
+  squared_cosine_dist = jax.tree_util.tree_map(
+      lambda s, t: jnp.sum(jnp.square(s - t)), s_norm_steps, t_norm_steps)
+  loss = sum(jax.tree_util.tree_leaves(squared_cosine_dist)) + mse_log_mag
 
   # extra square is to penalize the larger losses more.
   return jnp.square(loss)
@@ -84,7 +84,8 @@ def state_compare_mse_params(prev_src_state: UnrollState,
   del prev_state, prev_src_state
   src_p = src_state.inner_opt_state.params
   p = state.inner_opt_state.params
-  return tree_utils.tree_mean(jax.tree_map(lambda a, b: (a - b)**2, src_p, p))
+  return tree_utils.tree_mean(
+      jax.tree_util.tree_map(lambda a, b: (a - b)**2, src_p, p))
 
 
 @functools.partial(
@@ -112,7 +113,7 @@ def distill_truncated_unroll(
 ) -> Any:
   """Unroll both truncated steps, and compare state at each step."""
   num_tasks = tree_utils.first_dim(state)
-  summary.summary("theta", jnp.mean(jax.tree_leaves(theta)[0]))
+  summary.summary("theta", jnp.mean(jax.tree_util.tree_leaves(theta)[0]))
 
   if outer_param_noise > 0.0:
     key, key1 = jax.random.split(key)
@@ -121,7 +122,7 @@ def distill_truncated_unroll(
   else:
     theta_is_vector = False
 
-  if jax.tree_leaves(datas):
+  if jax.tree_util.tree_leaves(datas):
     assert tree_utils.first_dim(datas) == unroll_length, (
         f"got a mismatch in data size. Expected to have data of size: {unroll_length} "
         f"but got data of size {tree_utils.first_dim(datas)}")
@@ -176,7 +177,7 @@ def _multi_perturb(theta: T, key: chex.PRNGKey, std: float,
 
   def _fn(key):
     pos = common.sample_perturbations(theta, key, std=std)
-    p_theta = jax.tree_map(lambda t, a: t + a, theta, pos)
+    p_theta = jax.tree_util.tree_map(lambda t, a: t + a, theta, pos)
     return p_theta
 
   keys = jax.random.split(key, num_samples)
@@ -263,7 +264,9 @@ class TruncatedDistill(gradient_learner.GradientEstimator):
       key,
       state,
       with_summary=False,
+      datas_list: Any = None,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
+    del datas_list
     # set the parameters. This is hard as everything is in truncated step
     # abstraction... for now we will assume all the truncated steps are lopt and
     # do the surgery on that.
@@ -332,7 +335,7 @@ class TruncatedDistill(gradient_learner.GradientEstimator):
     outs = unroll_outs.replace(loss=distill_loss)
     if self.clip_gradient_amount is not None:
       clip = float(self.clip_gradient_amount)
-      grad = jax.tree_map(lambda x: jnp.clip(x, -clip, clip), grad)
+      grad = jax.tree_util.tree_map(lambda x: jnp.clip(x, -clip, clip), grad)
 
     return gradient_learner.GradientEstimatorOut(
         distill_loss, grad=grad, unroll_state=next_state,

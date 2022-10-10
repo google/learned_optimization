@@ -61,7 +61,7 @@ class TruncatedPESNoHystSameData(gradient_learner.GradientEstimator):
                                                sign_delta_loss_scalar)
     self.data_buffer_size = data_buffer_size
 
-    self.step_abstract_shape = jax.tree_map(
+    self.step_abstract_shape = jax.tree_util.tree_map(
         lambda x: jax.ShapedArray(x.shape, x.dtype),
         self.truncated_step.get_batch(self.steps_per_jit))
 
@@ -74,7 +74,7 @@ class TruncatedPESNoHystSameData(gradient_learner.GradientEstimator):
                         key: PRNGKey):
     nt = self.truncated_step.num_tasks
     theta = worker_weights.theta
-    epsilon = jax.tree_map(
+    epsilon = jax.tree_util.tree_map(
         lambda x: jax.ShapedArray([nt] + list(x.shape), x.dtype), theta)
     state = self.grad_est.init_worker_state(worker_weights, key)
 
@@ -85,10 +85,12 @@ class TruncatedPESNoHystSameData(gradient_learner.GradientEstimator):
             "epsilon":
                 epsilon,
             "key":
-                jax.tree_map(lambda x: jax.ShapedArray(x.shape, x.dtype), key),
+                jax.tree_util.tree_map(
+                    lambda x: jax.ShapedArray(x.shape, x.dtype), key),
             "p_state":
-                jax.tree_map(lambda x: jax.ShapedArray(x.shape, x.dtype),
-                             state.pos_state),
+                jax.tree_util.tree_map(
+                    lambda x: jax.ShapedArray(x.shape, x.dtype),
+                    state.pos_state),
         }, self.data_buffer_size)
 
     # fill the buffer with a single epsilon and data.
@@ -117,8 +119,10 @@ class TruncatedPESNoHystSameData(gradient_learner.GradientEstimator):
       worker_weights: gradient_learner.WorkerWeights,
       key: PRNGKey,
       state,
-      with_summary: bool = False
+      with_summary: bool = False,
+      datas_list: Any = None,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
+    del datas_list
     state, buffer_state = state
 
     rng = hk.PRNGSequence(key)
@@ -131,14 +135,14 @@ class TruncatedPESNoHystSameData(gradient_learner.GradientEstimator):
     # (by intention). This is fine, as eventualy the inner problem will reset
     # and start computing the right thing. If we really wanted we could re-init
     # the state here.
-    p_state = jax.tree_map(lambda x: x[0], reordered_data["p_state"])
+    p_state = jax.tree_util.tree_map(lambda x: x[0], reordered_data["p_state"])
     n_state = p_state
 
     def sliced(i, dat):
       return dat[i]
 
     for i in range(self.data_buffer_size):
-      elements_from_buffer = jax.tree_map(
+      elements_from_buffer = jax.tree_util.tree_map(
           functools.partial(sliced, i), reordered_data)
       datas = elements_from_buffer["data"]
       epsilon = elements_from_buffer["epsilon"]

@@ -334,7 +334,7 @@ executionInfo:
 id: u1QQxUYf31fy
 outputId: 5afa0dd5-a4af-4c40-feaa-f4b89438c8d5
 ---
-jax.tree_map(lambda x: x.shape, gradient_estimator_state)
+jax.tree_util.tree_map(lambda x: x.shape, gradient_estimator_state)
 ```
 
 +++ {"id": "6meGBWzt45KV"}
@@ -395,7 +395,7 @@ executionInfo:
 id: 82oSxk2i5-3L
 outputId: 099bd011-2590-4da0-8e6a-11d72c09d347
 ---
-jax.tree_map(lambda x: x.shape, out.unroll_state)
+jax.tree_util.tree_map(lambda x: x.shape, out.unroll_state)
 ```
 
 +++ {"id": "MLqCPmkx6cja"}
@@ -503,7 +503,7 @@ executionInfo:
 id: AnawJAj84Dn-
 outputId: b8821827-9bec-4671-d9ba-f8b063e24e52
 ---
-jax.tree_map(lambda x: x.shape, gradient_estimator_state)
+jax.tree_util.tree_map(lambda x: x.shape, gradient_estimator_state)
 ```
 
 ```{code-cell}

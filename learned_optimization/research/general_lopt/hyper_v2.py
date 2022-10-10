@@ -531,7 +531,7 @@ class HyperV2(lopt_base.LearnedOptimizer):
     step = step.reshape(p.shape)
     if self.precondition_output:
       # extract out the last rms.
-      norms = jax.tree_map(lambda x: x[..., -1], rms)
+      norms = jax.tree_util.tree_map(lambda x: x[..., -1], rms)
       assert norms.shape == step.shape
       step = step * lax.rsqrt(norms + 1e-6)
 
@@ -684,8 +684,8 @@ class HyperV2(lopt_base.LearnedOptimizer):
         else:
           loss_buffer = parent.buffer_loss_fns.init(num_steps)
 
-        n_states = len(jax.tree_leaves(params))
-        lstm_hidden_state = jax.tree_map(
+        n_states = len(jax.tree_util.tree_leaves(params))
+        lstm_hidden_state = jax.tree_util.tree_map(
             lambda x: jnp.tile(x, [n_states] + [1] * len(x.shape[1:])),
             theta["lstm_init_state"])
 
@@ -717,7 +717,8 @@ class HyperV2(lopt_base.LearnedOptimizer):
             opt_state.loss_buffer, loss)
         to_lstm_from_loss = parent.buffer_loss_fns.features(next_loss_buffer)
 
-        grads = jax.tree_map(lambda x: jnp.clip(x, -1000., 1000.), grads)
+        grads = jax.tree_util.tree_map(lambda x: jnp.clip(x, -1000., 1000.),
+                                       grads)
         # Run the LSTM to get params for ff.
 
         fraction_trained = opt_state.iteration / jnp.asarray(
@@ -733,12 +734,13 @@ class HyperV2(lopt_base.LearnedOptimizer):
           summary_prefix = tree_utils.map_named(lambda k, v: k,
                                                 opt_state.params)
         else:
-          summary_prefix = jax.tree_map(lambda x: "None", opt_state.params)
+          summary_prefix = jax.tree_util.tree_map(lambda x: "None",
+                                                  opt_state.params)
 
-        rnn_inputs = jax.tree_map(ff, opt_state.params, grads, m, rms,
-                                  summary_prefix)
+        rnn_inputs = jax.tree_util.tree_map(ff, opt_state.params, grads, m, rms,
+                                            summary_prefix)
 
-        stack = jnp.asarray(jax.tree_leaves(rnn_inputs))
+        stack = jnp.asarray(jax.tree_util.tree_leaves(rnn_inputs))
 
         lstm_hidden_state = opt_state.lstm_hidden_state
 
@@ -760,7 +762,7 @@ class HyperV2(lopt_base.LearnedOptimizer):
         if parent.summarize_all_control:
           for pi, p in enumerate(control_params):
             summary.summary(f"control_param/{pi}", p, "tensor")
-        struct = jax.tree_structure(grads)
+        struct = jax.tree_util.tree_structure(grads)
 
         control_params = struct.unflatten(control_params)
         lr_mult = struct.unflatten([lr for lr in lr_mult])
@@ -785,7 +787,8 @@ class HyperV2(lopt_base.LearnedOptimizer):
             c = jnp.reshape(control_param, target)
             return 100. * jnp.mean(ff_p * c, axis=0)
 
-          ff_param = jax.tree_map(interpolate_theta, theta["ff_mod_stack"])
+          ff_param = jax.tree_util.tree_map(interpolate_theta,
+                                            theta["ff_mod_stack"])
           next_p = parent.ff_mod.apply(
               ff_param,
               key,
@@ -801,15 +804,14 @@ class HyperV2(lopt_base.LearnedOptimizer):
               fac_vec_v=v)
           return next_p
 
-        l, struct = jax.tree_flatten(control_params)
+        l, struct = jax.tree_util.tree_flatten(control_params)
         key, key1 = jax.random.split(key)
         keys = struct.unflatten([k for k in jax.random.split(key1, len(l))])
-        next_params = jax.tree_map(apply_one, control_params, keys, lr_mult,
-                                   opt_state.params, grads, next_mom_rolling.m,
-                                   next_rms_rolling.rms, fac_g,
-                                   next_adafac_rolling.v_col,
-                                   next_adafac_rolling.v_row,
-                                   next_adafac_rolling.v_diag)
+        next_params = jax.tree_util.tree_map(
+            apply_one, control_params, keys, lr_mult, opt_state.params, grads,
+            next_mom_rolling.m, next_rms_rolling.rms, fac_g,
+            next_adafac_rolling.v_col, next_adafac_rolling.v_row,
+            next_adafac_rolling.v_diag)
 
         ss = State(
             params=next_params,

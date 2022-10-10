@@ -339,7 +339,7 @@ unroll_state = truncated_step.init_step_state(theta, None, key)
 print("Iteration=", unroll_state.iteration)
 
 for i in range(10):
-  batch = jax.tree_map(lambda x: x[0], truncated_step.get_batch(1))
+  batch = jax.tree_util.tree_map(lambda x: x[0], truncated_step.get_batch(1))
   unroll_state, out = truncated_step.unroll_step(theta, unroll_state, key,
                                                  batch, None)
   print("Iteration=", unroll_state.iteration, "Loss=", out.loss, "Mask=",
@@ -360,7 +360,7 @@ unroll_state = truncated_step.init_step_state(theta, None, key)
 print("Iteration=", unroll_state.iteration)
 
 for i in range(10):
-  batch = jax.tree_map(lambda x: x[0], truncated_step.get_batch(1))
+  batch = jax.tree_util.tree_map(lambda x: x[0], truncated_step.get_batch(1))
   unroll_state, out = truncated_step.unroll_step(theta, unroll_state, key,
                                                  batch, None)
   print("Iteration=", unroll_state.iteration, "Loss=", out.loss, "Mask=",
@@ -390,7 +390,7 @@ unroll_state = truncated_step.init_step_state(theta, None, key)
 print("Iteration=", unroll_state.inner_step)
 
 for i in range(10):
-  batch = jax.tree_map(lambda x: x[0], truncated_step.get_batch(1))
+  batch = jax.tree_util.tree_map(lambda x: x[0], truncated_step.get_batch(1))
   unroll_state, out = truncated_step.unroll_step(theta, unroll_state, key,
                                                  batch, None)
   print("Iteration=", unroll_state.inner_step, "Loss=", out.loss, "Mask=",

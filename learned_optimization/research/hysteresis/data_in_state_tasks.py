@@ -103,7 +103,7 @@ def all_data(datasetname, split, image_size, seed=0):
   data = tfds.as_numpy(datasets_base._image_map_fn(cfg, dataset))  # pylint:disable=protected-access
   idx = onp.arange(data["image"].shape[0])
   onp.random.RandomState(seed).shuffle(idx)
-  return jax.tree_map(lambda x: jnp.asarray(x[idx]), data)
+  return jax.tree_util.tree_map(lambda x: jnp.asarray(x[idx]), data)
 
 
 def batch_from_idx(datasetname, image_size, split, batch_size, idx, seed=0):

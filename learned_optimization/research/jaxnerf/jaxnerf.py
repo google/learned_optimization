@@ -104,7 +104,7 @@ class JaxNeRFTask(tasks_base.Task):
     self.datasets = lopt_datasets
     key = jax.random.PRNGKey(1)
     b = next(self.datasets.train)
-    b = jax.tree_map(lambda x: jnp.expand_dims(x, axis=1), b)
+    b = jax.tree_util.tree_map(lambda x: jnp.expand_dims(x, axis=1), b)
     self.model, _ = models.get_model(key, b, jaxnerf_cfg)
 
   def init(self, key):

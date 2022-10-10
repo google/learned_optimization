@@ -65,17 +65,17 @@ class ReparamWeights(base.Task):
   def _match_param_scale_to_pytree(self, params: Params) -> Params:
     if isinstance(self._param_scale,
                   (jnp.ndarray, onp.ndarray, float, int, onp.float32)):
-      return jax.tree_map(lambda x: self._param_scale, params)
+      return jax.tree_util.tree_map(lambda x: self._param_scale, params)
     else:
-      tree = jax.tree_structure(params)
-      tree_scale = jax.tree_structure(self._param_scale)
+      tree = jax.tree_util.tree_structure(params)
+      tree_scale = jax.tree_util.tree_structure(self._param_scale)
       assert tree == tree_scale, f"Structures: {tree} AND {tree_scale}"
       return self._param_scale
 
   def init_with_state(self, key: PRNGKey) -> Tuple[Params, ModelState]:
     params, state = self.task.init_with_state(key)
     scales = self._match_param_scale_to_pytree(params)
-    params = jax.tree_map(lambda x, scale: x / scale, params, scales)
+    params = jax.tree_util.tree_map(lambda x, scale: x / scale, params, scales)
     return params, state
 
   def init(self, key: PRNGKey) -> Params:
@@ -86,7 +86,7 @@ class ReparamWeights(base.Task):
       self, params: Params, state: ModelState, key: PRNGKey,
       data: Batch) -> Tuple[jnp.ndarray, ModelState, Mapping[str, jnp.ndarray]]:
     scales = self._match_param_scale_to_pytree(params)
-    params = jax.tree_map(lambda x, scale: x * scale, params, scales)
+    params = jax.tree_util.tree_map(lambda x, scale: x * scale, params, scales)
     return self.task.loss_with_state_and_aux(params, state, key, data)
 
   def loss(self, params: Params, key: PRNGKey, data: Batch) -> jnp.ndarray:
@@ -148,7 +148,7 @@ class ReparamWeightsFamily(base.TaskFamily):
             key, p.shape, minval=jnp.log(min_val), maxval=jnp.log(max_val))
         return jnp.exp(param_scale)
 
-      param_scale = jax.tree_map(single, abstract_params, keys)
+      param_scale = jax.tree_util.tree_map(single, abstract_params, keys)
 
     task = self.task_family.task_fn(sub_config)
 
@@ -175,9 +175,10 @@ class ReparamWeightsFamily(base.TaskFamily):
       abstract_params, _ = jax.eval_shape(
           lambda key: self.task_family.sample_task(key).init_with_state(key),
           jax.random.PRNGKey(0))
-      leaves, tree = jax.tree_flatten(abstract_params)
-      keys = jax.tree_unflatten(tree, jax.random.split(key2, len(leaves)))
-      param_scale = jax.tree_map(self._single_random, keys)
+      leaves, tree = jax.tree_util.tree_flatten(abstract_params)
+      keys = jax.tree_util.tree_unflatten(tree,
+                                          jax.random.split(key2, len(leaves)))
+      param_scale = jax.tree_util.tree_map(self._single_random, keys)
       return cfgobject.CFGNamed("ReparamWeightsFamily", {
           "sub_cfg": sub_config,
           "param_scale": LogFeat(param_scale)
@@ -189,8 +190,9 @@ class ReparamWeightsFamily(base.TaskFamily):
       abstract_params, _ = jax.eval_shape(
           lambda key: self.task_family.sample_task(key).init_with_state(key),
           jax.random.PRNGKey(0))
-      leaves, tree = jax.tree_flatten(abstract_params)
-      keys = jax.tree_unflatten(tree, jax.random.split(key2, len(leaves)))
+      leaves, tree = jax.tree_util.tree_flatten(abstract_params)
+      keys = jax.tree_util.tree_unflatten(tree,
+                                          jax.random.split(key2, len(leaves)))
       return cfgobject.CFGNamed("ReparamWeightsFamily", {
           "sub_cfg": sub_config,
           "param_scale_keys": keys,
@@ -227,10 +229,10 @@ class ReducedBatchsizeTask(base.Task):
       bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
       return jax.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
 
-    abstract_batch = jax.tree_map(reduce_abstract_bs,
-                                  self.task.datasets.abstract_batch)
+    abstract_batch = jax.tree_util.tree_map(reduce_abstract_bs,
+                                            self.task.datasets.abstract_batch)
     self.datasets = datasets_base.datasets_map(
-        functools.partial(jax.tree_map, reduce_bs), task.datasets,
+        functools.partial(jax.tree_util.tree_map, reduce_bs), task.datasets,
         abstract_batch)
 
 
@@ -254,10 +256,10 @@ class ReducedBatchsizeFamily(base.TaskFamily):
       bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
       return jax.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
 
-    abstract_batch = jax.tree_map(reduce_abstract_bs,
-                                  self.task_family.datasets.abstract_batch)
+    abstract_batch = jax.tree_util.tree_map(
+        reduce_abstract_bs, self.task_family.datasets.abstract_batch)
     self.datasets = datasets_base.datasets_map(
-        functools.partial(jax.tree_map, reduce_bs),
+        functools.partial(jax.tree_util.tree_map, reduce_bs),
         task_family.datasets,
         abstract_batch=abstract_batch)
 
@@ -304,12 +306,12 @@ class ConvertFloatDType(base.Task):
 
   def loss_with_state(self, params, state, key, data):
     f = lambda x: jnp.asarray(x, self.dtype) if x.dtype == jnp.float32 else x
-    data = jax.tree_map(f, data)
+    data = jax.tree_util.tree_map(f, data)
     return self.task.loss_with_state(params, state, key, data)
 
   def loss_with_state_and_aux(self, params, state, key, data):
     f = lambda x: jnp.asarray(x, self.dtype) if x.dtype == jnp.float32 else x
-    data = jax.tree_map(f, data)
+    data = jax.tree_util.tree_map(f, data)
     return self.task.loss_with_state_and_aux(params, state, key, data)
 
   def loss(self, params, key, data):
@@ -318,7 +320,8 @@ class ConvertFloatDType(base.Task):
 
   def init_with_state(self, key):
     params, state = self.task.init_with_state(key)
-    params = jax.tree_map(lambda x: jnp.asarray(x, dtype=self.dtype), params)
+    params = jax.tree_util.tree_map(lambda x: jnp.asarray(x, dtype=self.dtype),
+                                    params)
     return params, state
 
   def init(self, key):
@@ -384,7 +387,7 @@ def NormalizeTaskGradient(task):  # pylint: disable=invalid-name
   def norm_fn(tree, key):
     del key
     norm = tree_utils.tree_norm(tree)
-    return jax.tree_map(lambda x: x / norm, tree)
+    return jax.tree_util.tree_map(lambda x: x / norm, tree)
 
   return ModifyTaskGradient(task, norm_fn)
 
@@ -399,12 +402,12 @@ def NormalizeTaskGradientTaskFamily(task_family):  # pylint: disable=invalid-nam
 
 def _sample_perturbations(variables: chex.ArrayTree,
                           key: chex.PRNGKey) -> chex.ArrayTree:
-  flat, tree_def = jax.tree_flatten(variables)
+  flat, tree_def = jax.tree_util.tree_flatten(variables)
   keys = jax.random.split(key, len(flat))
   perturbs = []
   for key, f in zip(keys, flat):
     perturbs.append(jax.random.normal(key, shape=f.shape, dtype=f.dtype))
-  perturb = jax.tree_unflatten(tree_def, perturbs)
+  perturb = jax.tree_util.tree_unflatten(tree_def, perturbs)
   norm = tree_utils.tree_norm(perturb)
   return tree_utils.tree_div(perturb, norm)
 
@@ -431,12 +434,12 @@ def SubsampleDirectionsTaskGradient(task, directions=1, sign_direction=False):  
     amt = tree_utils.tree_dot(tree, perturb)
     if sign_direction:
       amt = jnp.sign(amt)
-    return jax.tree_map(lambda x: x * amt, perturb)
+    return jax.tree_util.tree_map(lambda x: x * amt, perturb)
 
   def subsample_many(tree, key):
     keys = jax.random.split(key, directions)
     dirs = jax.vmap(subsample_one, in_axes=(None, 0))(tree, keys)
-    return jax.tree_map(lambda x: jnp.sum(x, axis=0), dirs)
+    return jax.tree_util.tree_map(lambda x: jnp.sum(x, axis=0), dirs)
 
   return ModifyTaskGradient(task, subsample_many)
 

@@ -70,7 +70,7 @@ class GradientAccumulator(base.Optimizer):
 
     inner_opt_state = self.opt.init(
         p, num_steps=rescale_num_steps, model_state=model_state, **kwargs)
-    grad_accum = jax.tree_map(jnp.zeros_like, p)
+    grad_accum = jax.tree_util.tree_map(jnp.zeros_like, p)
     loss_accum = jnp.asarray(0.0, jnp.float32)
     return GradientAccumulatorState(
         grad_accum,
@@ -85,8 +85,8 @@ class GradientAccumulator(base.Optimizer):
              model_state=None,
              loss: Optional[jnp.ndarray] = None,
              **kwargs):
-    new_grad_accum = jax.tree_map(lambda a, b: a + b, opt_state.grad_accum,
-                                  grad)
+    new_grad_accum = jax.tree_util.tree_map(lambda a, b: a + b,
+                                            opt_state.grad_accum, grad)
     new_loss_accum = opt_state.loss_accum + loss
     new_iteration = opt_state.iteration + 1
 
@@ -96,8 +96,8 @@ class GradientAccumulator(base.Optimizer):
     def do_update(args):
       opt_state, new_loss_accum, new_grad_accum = args
       scaled_loss_accum = new_loss_accum / self.num_average
-      scaled_grad_accum = jax.tree_map(lambda x: x / self.num_average,
-                                       new_grad_accum)
+      scaled_grad_accum = jax.tree_util.tree_map(lambda x: x / self.num_average,
+                                                 new_grad_accum)
 
       new_opt_state = self.opt.update(
           opt_state,
@@ -106,7 +106,7 @@ class GradientAccumulator(base.Optimizer):
           model_state=model_state,
           **kwargs)
       return (new_opt_state, jnp.zeros_like(new_loss_accum),
-              jax.tree_map(jnp.zeros_like, new_grad_accum))
+              jax.tree_util.tree_map(jnp.zeros_like, new_grad_accum))
 
     new_inner_opt_state, new_loss_accum, new_grad_accum = jax_utils.maybe_do(
         should_update, do_update,
