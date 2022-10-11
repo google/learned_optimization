@@ -164,8 +164,6 @@ def strip_weak_type(pytree):
   def maybe_remove_weak(x):
     if not isinstance(x, jnp.ndarray):
       x = jnp.asarray(x)
-    if x.weak_type:
-      x.weak_type = False
     return x
 
   return jax.tree_util.tree_map(maybe_remove_weak, pytree)
