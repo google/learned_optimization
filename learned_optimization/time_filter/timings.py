@@ -326,4 +326,4 @@ def task_family_runtime_stats(
 
   if clear_buffers:
     _jax_clear_device_buffers()
-  return ret
+  return ret  # pytype: disable=bad-return-type
