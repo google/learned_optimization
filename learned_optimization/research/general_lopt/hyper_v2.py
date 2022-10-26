@@ -493,7 +493,7 @@ class HyperV2(lopt_base.LearnedOptimizer):
         for oi, oo in enumerate(o):
           o_tmp = o_tmp + oo @ w[oi]
       else:
-        o_tmp = o @ w
+        o_tmp = o @ w  # pytype: disable=unsupported-operands
 
       o = o_tmp + jnp.broadcast_to(b,
                                    list(o_tmp.shape[0:-1]) + [o_tmp.shape[-1]])
