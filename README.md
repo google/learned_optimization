@@ -62,6 +62,20 @@ Each test can be run directly, or with pytest (e.g. `python3 -m pytest learned_o
 
 If something is broken please file an issue and we will take a look!
 
+## Citing *learned\_optimization*
+
+To cite this repository:
+
+```
+@inproceedings{metz2022practical,
+  title={Practical tradeoffs between memory, compute, and performance in learned optimizers},
+  author={Metz, Luke and Freeman, C Daniel and Harrison, James and Maheswaranathan, Niru and Sohl-Dickstein, Jascha},
+  booktitle = {Conference on Lifelong Learning Agents (CoLLAs)},
+  year = {2022},
+  url = {http://github.com/google/learned_optimization},
+}
+```
+
 ## Disclaimer
 
 *learned\_optimization* is not an official Google product.
