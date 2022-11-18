@@ -1,6 +1,6 @@
 # VeLO: Training Versatile Learned Optimizers by Scaling Up
 
-<a href="https://arxiv.org/abs/id"><img src="https://img.shields.io/badge/arXiv-2211.09760-00ff00.svg" height=22.5></a>
+<a href="https://arxiv.org/abs/2211.09760"><img src="https://img.shields.io/badge/arXiv-2211.09760-00ff00.svg" height=20></a>
 <a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/learned_optimization/research/general_lopt/Demo_for_training_a_model_with_a_learned_optimizer.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 > While deep learning models have replaced hand-designed features across many domains,
