@@ -105,8 +105,11 @@ def monitor_checkpoint_dir(
   # Save or restore the state of this function -- namely the last checkpoint
   # we have seen.
   initial_step = jnp.asarray(0)
-  step = checkpoints.restore_checkpoint(
-      log_dir, initial_step, prefix="evaluation_on_checkpoint_")
+  try:
+    step = checkpoints.restore_checkpoint(
+        log_dir, initial_step, prefix="evaluation_on_checkpoint_")
+  except ValueError:
+    step = initial_step
 
   while True:
     with profile.Profile("waiting"):
