@@ -56,7 +56,7 @@ class TruncatedPESNoHyst(gradient_learner.GradientEstimator):
     return self.grad_est.init_worker_state(worker_weights, key)
 
   @profile.wrap()
-  def compute_gradient_estimate(
+  def compute_gradient_estimate(  # pytype: disable=signature-mismatch
       self,
       worker_weights: gradient_learner.WorkerWeights,
       key: PRNGKey,
