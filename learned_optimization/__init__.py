@@ -14,3 +14,7 @@
 # limitations under the License.
 
 """learned_optimizer module."""
+
+from .py_utils import patch_os_path_get_sep
+
+_OLD_OS_PATH_GET_SEP = patch_os_path_get_sep()
