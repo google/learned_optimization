@@ -46,7 +46,9 @@ def maybe_do(pred, do_fn, operand):
 
 def in_jit() -> bool:
   """Returns true if tracing jit."""
-  return jax.core.cur_sublevel().level > 0
+  return "DynamicJaxprTrace" in str(
+      jax.core.thread_local_state.trace_state.trace_stack
+  )
 
 
 Carry = TypeVar("Carry")
