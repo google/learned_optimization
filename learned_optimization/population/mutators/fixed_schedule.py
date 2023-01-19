@@ -46,7 +46,7 @@ class FixedSchedule(population.Mutate):
     steps = cache[worker.generation_id]
 
     # grab the last checkpoint here.
-    last_checkpoint = steps.values()[-1]
+    last_checkpoint = steps.values()[-1]  # pytype: disable=unsupported-operands
     logging.info("Active worker: %s", str(worker))
     logging.info("last checkpoint : %s", str(last_checkpoint))
 

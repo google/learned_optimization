@@ -62,11 +62,12 @@ class WinnerTakeAllGenetic(population.Mutate):
         return None, current_workers
 
       if self._steps_per_exploit:
-        if (cache[genid].keys()[-1] -
-            cache[genid].keys()[0]) < self._steps_per_exploit:
+        if (
+            cache[genid].keys()[-1] - cache[genid].keys()[0]  # pytype: disable=unsupported-operands
+        ) < self._steps_per_exploit:
           return None, current_workers
 
-        to_test = cache[genid].keys()[0] + self._steps_per_exploit
+        to_test = cache[genid].keys()[0] + self._steps_per_exploit  # pytype: disable=unsupported-operands
         valid_values = [
             x.value
             for (s, x) in cache[genid].items()
