@@ -38,6 +38,9 @@ from learned_optimization.population import population as population_mod
 import numpy as onp
 
 
+flax.config.update("flax_use_orbax_checkpointing", False)
+
+
 def _last_checkpoint_idx(ckpt_dir: str, prefix: str) -> Optional[int]:
   """Get the index of the last checkpoint."""
   glob_path = os.path.join(ckpt_dir, f"{prefix}*")
