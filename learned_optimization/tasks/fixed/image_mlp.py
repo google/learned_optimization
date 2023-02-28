@@ -57,7 +57,7 @@ class _MLPImageTask(base.Task):
                                    self.datasets.abstract_batch)
     return self._mod.init(key, batch["image"])
 
-  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
+  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
     num_classes = self.datasets.extra_info["num_classes"]
     logits = self._mod.apply(params, key, data["image"])
     labels = jax.nn.one_hot(data["label"], num_classes)

@@ -553,8 +553,15 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
         num_tensors = len(jax.tree_util.tree_leaves(opt_state.params))
 
         def to_map_get_mlp_features(m, rms, g, v, ff_inputs):
-          return self.mlp_features_for_tensor(m, rms, g, v, ff_inputs,
-                                              opt_state.iteration, num_tensors)
+          return self.mlp_features_for_tensor(
+              m,
+              rms,
+              g,
+              v,
+              ff_inputs,  # pytype: disable=wrong-arg-types  # jax-ndarray
+              opt_state.iteration,
+              num_tensors,
+          )
 
         # Prep the features
         ff_feats = jax.tree_util.tree_map(to_map_get_mlp_features, ms, rms,

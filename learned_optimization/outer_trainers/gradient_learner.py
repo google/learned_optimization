@@ -284,7 +284,7 @@ class GradientLearner:
       metrics["none||theta_grad_norm"] = tree_utils.tree_norm(grads)
       metrics["none||theta_grad_abs_mean"] = tree_utils.tree_mean_abs(grads)
 
-    return GradientLearnerState(theta_opt_state), metrics
+    return GradientLearnerState(theta_opt_state), metrics  # pytype: disable=bad-return-type  # jax-ndarray
 
 
 class GradientEstimator(abc.ABC):

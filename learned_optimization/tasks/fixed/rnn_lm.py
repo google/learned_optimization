@@ -81,7 +81,7 @@ class TeacherForcedRNNLM(base.Task):
                                    self.datasets.abstract_batch)
     return self._mod.init(key, batch["obs"])
 
-  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
+  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
     obs = data["obs"]
     target = data["target"]
 

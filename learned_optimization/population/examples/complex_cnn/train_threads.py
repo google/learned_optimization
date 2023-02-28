@@ -159,28 +159,21 @@ def main(_):
     oml_beta2 = onp.log(1 - meta_params["beta2"])
     beta2 = 1 - onp.exp(oml_beta2 + onp.random.normal() * 0.03)
 
-    return {
-        "learning_rate":
-            onp.exp(loglr + offset),
-        "beta1":
-            beta1,
-        "beta2":
-            beta2,
-        "hue":
-            onp.clip(onp.random.normal() * 0.03 + meta_params["hue"], 0, 1),
-        "contrast_high":
-            contrast_high,
-        "contrast_low":
-            contrast_low,
-        "saturation_high":
-            saturation_high,
-        "saturation_low":
-            saturation_low,
-        "smooth_labels":
-            onp.clip(onp.random.normal() * 0.03 + meta_params["smooth_labels"],
-                     0, 1),
-        "batch_size":
-            int(meta_params["batch_size"] * (1 + onp.random.normal() * 0.1)),
+    return {  # pytype: disable=bad-return-type  # jax-ndarray
+        "learning_rate": onp.exp(loglr + offset),
+        "beta1": beta1,
+        "beta2": beta2,
+        "hue": onp.clip(onp.random.normal() * 0.03 + meta_params["hue"], 0, 1),
+        "contrast_high": contrast_high,
+        "contrast_low": contrast_low,
+        "saturation_high": saturation_high,
+        "saturation_low": saturation_low,
+        "smooth_labels": onp.clip(
+            onp.random.normal() * 0.03 + meta_params["smooth_labels"], 0, 1
+        ),
+        "batch_size": int(
+            meta_params["batch_size"] * (1 + onp.random.normal() * 0.1)
+        ),
     }
 
   num_workers = 5
@@ -203,7 +196,7 @@ def main(_):
   }
 
   initial_population = [initial_meta for _ in range(num_workers)]
-  initial_population = [mutate_fn(m) for m in initial_population]
+  initial_population = [mutate_fn(m) for m in initial_population]  # pytype: disable=wrong-arg-types  # jax-ndarray
   population = population_mod.PopulationController(initial_population, mutator)
   server = population_mod.start_courier_server("population", population)  # pylint: disable=unused-variable
 

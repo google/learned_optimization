@@ -55,11 +55,12 @@ class OptaxOptimizer(base.Optimizer):
            model_state: Optional[ModelState] = None,
            num_steps: Optional[int] = None,
            key: Optional[chex.PRNGKey] = None):
-    return OptaxState(
+    return OptaxState(  # pytype: disable=wrong-arg-types  # jax-ndarray
         params=params,
         optax_opt_state=self.opt.init(params),
         state=model_state,
-        iteration=0)
+        iteration=0,
+    )
 
   @functools.partial(jax.jit, static_argnums=(0,))
   def update(self,
@@ -391,12 +392,13 @@ class SM3(OptaxOptimizer):
     should_reshape = jax.tree_util.tree_map(lambda x: len(x.shape) == 0, params)  # pylint: disable=g-explicit-length-test
     params = jax.tree_util.tree_map(_expand_scalar, params, should_reshape)
     out = super().init(params, model_state, num_steps, key)
-    return SM3OptState(
+    return SM3OptState(  # pytype: disable=wrong-arg-types  # jax-ndarray
         params=out.params,
         state=out.state,
         optax_opt_state=out.optax_opt_state,
         iteration=out.iteration,
-        should_reshape=should_reshape)
+        should_reshape=should_reshape,
+    )
 
   def update(self,
              opt_state: SM3OptState,

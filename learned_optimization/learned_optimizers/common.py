@@ -66,12 +66,14 @@ def _vmap_accumulator(accumulator: Callable[[float], _InitUpdate],
   """Helper function that vmaps an accumulator fn to run on multiple decays."""
 
   def init_fn(p):
-    return jax.vmap(lambda d: accumulator(d).init(p), out_axes=-1)(decays)
+    return jax.vmap(lambda d: accumulator(d).init(p), out_axes=-1)(decays)  # pytype: disable=wrong-arg-types  # jax-ndarray
 
   def update(state, grads):
     return jax.vmap(
-        lambda s, d: accumulator(d).update(s, grads), in_axes=-1,
-        out_axes=-1)(state, decays)
+        lambda s, d: accumulator(d).update(s, grads),  # pytype: disable=wrong-arg-types  # jax-ndarray
+        in_axes=-1,
+        out_axes=-1,
+    )(state, decays)
 
   return _InitUpdate(init=init_fn, update=update)
 

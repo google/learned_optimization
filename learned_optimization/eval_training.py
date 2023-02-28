@@ -243,14 +243,14 @@ def single_task_training_curves(
     ret["eval/last_eval_batches"] = onp.asarray(last_eval_batches)
     ret["eval/eval_batches"] = onp.asarray(eval_batches)
     ret = {**ret, **stacked_metrics}
-  return ret
+  return ret  # pytype: disable=bad-return-type  # jax-ndarray
 
 
 @functools.partial(jax.pmap, static_broadcasted_argnums=(1,))
 @functools.partial(jax.vmap, in_axes=(0, None))
 def _pmap_vector_random_split(key: PRNGKey, n_split: int) -> PRNGKey:
   key1, key2 = jax.random.split(key)
-  return jax.random.split(key1, n_split), key2
+  return jax.random.split(key1, n_split), key2  # pytype: disable=bad-return-type  # jax-ndarray
 
 
 @dataclasses.dataclass

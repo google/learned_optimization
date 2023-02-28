@@ -178,7 +178,7 @@ def aggregate_metric_list(
     keys = [None] * len(all_metrics)
   for ki, (k, vs) in enumerate(all_metrics.items()):
     metrics[k] = aggregate_metric(k, vs, use_jnp=use_jnp, key=keys[ki])
-  return metrics
+  return metrics  # pytype: disable=bad-return-type  # jax-ndarray
 
 
 def aggregate_metric(k: str,

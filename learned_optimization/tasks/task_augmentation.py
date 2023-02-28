@@ -89,7 +89,7 @@ class ReparamWeights(base.Task):
     params = jax.tree_util.tree_map(lambda x, scale: x * scale, params, scales)
     return self.task.loss_with_state_and_aux(params, state, key, data)
 
-  def loss(self, params: Params, key: PRNGKey, data: Batch) -> jnp.ndarray:
+  def loss(self, params: Params, key: PRNGKey, data: Batch) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
     loss, _, _ = self.loss_with_state_and_aux(params, None, key, data)
     return loss
 

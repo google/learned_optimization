@@ -403,12 +403,13 @@ def train_worker(
     total_inner_steps = onp.asarray(0, dtype=onp.int64)
 
     with profile.Profile("grads_to_onp"):
-      to_put_grads = GradientsFromWorker(
+      to_put_grads = GradientsFromWorker(  # pytype: disable=wrong-arg-types  # jax-ndarray
           metrics=gradient_worker_out.metrics,
           worker_id=worker_id,
           total_inner_steps=total_inner_steps,
           gen_id=dist_data.gen_id,
-          outer_trainer_grads=gradient_worker_out.to_put)
+          outer_trainer_grads=gradient_worker_out.to_put,
+      )
       to_put_grads = jax.tree_util.tree_map(onp.asarray, to_put_grads)
       outer_step = onp.asarray(outer_step)
 
@@ -994,12 +995,13 @@ def local_train(
     metrics = gradient_worker_out.metrics
 
     with profile.Profile("grads_to_onp"):
-      to_put_grads = GradientsFromWorker(
+      to_put_grads = GradientsFromWorker(  # pytype: disable=wrong-arg-types  # jax-ndarray
           metrics=gradient_worker_out.metrics,
           worker_id=0,
           total_inner_steps=total_inner_steps,
           gen_id="no_gen_id",
-          outer_trainer_grads=gradient_worker_out.to_put)
+          outer_trainer_grads=gradient_worker_out.to_put,
+      )
 
       to_put_grads = jax.tree_util.tree_map(onp.asarray, to_put_grads)
       step = int(step)

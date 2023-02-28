@@ -150,20 +150,22 @@ class BraxEnvTruncatedStep(truncated_step.TruncatedStep):
       action = self.policy.apply(theta, key, unroll_state.env_state.obs)
       next_env_state = self.env.step(unroll_state.env_state, action)
 
-      out = truncated_step.TruncatedUnrollOut(
+      out = truncated_step.TruncatedUnrollOut(  # pytype: disable=wrong-arg-types  # jax-ndarray
           loss=-next_env_state.reward,
           is_done=False,
           task_param=None,
           iteration=unroll_state.iteration,
-          mask=True)
+          mask=True,
+      )
       return BraxEnvState(
           env_state=next_env_state,
           iteration=unroll_state.iteration + 1,
       ), out
 
     def reset(unroll_state):
-      out = truncated_step.TruncatedUnrollOut(
-          loss=0., is_done=True, task_param=None, iteration=0, mask=False)
+      out = truncated_step.TruncatedUnrollOut(  # pytype: disable=wrong-arg-types  # jax-ndarray
+          loss=0.0, is_done=True, task_param=None, iteration=0, mask=False
+      )
       unroll_state = BraxEnvState(
           env_state=self.env.reset(key),
           iteration=jnp.asarray(0, dtype=jnp.int32))
