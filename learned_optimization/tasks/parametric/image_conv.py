@@ -91,7 +91,7 @@ class ParametricImageConv(base.TaskFamily):
         image = next(self.datasets.train)["image"]
         return init_net(rng, image)
 
-      def loss(self, params: Params, rng: PRNGKey, data: Batch) -> jnp.ndarray:
+      def loss(self, params: Params, rng: PRNGKey, data: Batch) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
         unused_init_net, apply_net = hk.without_apply_rng(
             hk.transform(_forward))
 

@@ -124,7 +124,7 @@ class ParametricLMRNN(base.TaskFamily):
         seq = batch["obs"]
         return init_net(rng, seq)
 
-      def loss(self, params: Params, rng: PRNGKey, data: Batch) -> jnp.ndarray:
+      def loss(self, params: Params, rng: PRNGKey, data: Batch) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
         net = hk.without_apply_rng(hk.transform(_forward))
         obs = data["obs"]
         target = data["target"]
