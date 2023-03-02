@@ -123,7 +123,7 @@ class JaxNeRFTask(tasks_base.Task):
   def loss_with_state_and_aux(self, params, state, key, data):
     return self.loss(params, key, data), state, {}
 
-  def loss(self, params, key, data) -> jnp.ndarray:
+  def loss(self, params, key, data) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
     loss_val, _ = _nerf_loss_fn(self.model, key, params, data,
                                 self.cfg.randomized, self.cfg.weight_decay_mult)
     return jnp.mean(loss_val)
