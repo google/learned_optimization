@@ -56,17 +56,19 @@ def _get_gin_name(gin_arg_name: str, fallback: str) -> str:
 
 @profile.wrap()
 @gin.configurable
-def inner_train_task(task: tasks_base.Task = gin.REQUIRED,
-                     opt: opt_base.Optimizer = gin.REQUIRED,
-                     num_steps: int = gin.REQUIRED,
-                     eval_every: int = 10,
-                     eval_batches: int = 5,
-                     last_eval_batches: int = 10,
-                     eval_task: Optional[tasks_base.Task] = None,
-                     task_name: Optional[str] = None,
-                     eval_task_name: Optional[str] = None,
-                     opt_name: Optional[str] = None,
-                     device: Optional[jax.lib.xla_client.Device] = None):
+def inner_train_task(
+    task: tasks_base.Task = gin.REQUIRED,
+    opt: opt_base.Optimizer = gin.REQUIRED,
+    num_steps: int = gin.REQUIRED,
+    eval_every: int = 10,
+    eval_batches: int = 5,
+    last_eval_batches: int = 10,
+    eval_task: Optional[tasks_base.Task] = None,
+    task_name: Optional[str] = None,
+    eval_task_name: Optional[str] = None,
+    opt_name: Optional[str] = None,
+    device: Optional[jax.Device] = None,
+):
   """Train and save results of a single training run.
 
   Args:

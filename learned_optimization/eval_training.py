@@ -109,7 +109,7 @@ def _batch_eval(
     key: PRNGKey,
     data_iter: Iterator[Any],
     eval_batches: int,
-    device: Optional[jax.lib.xla_client.Device] = None
+    device: Optional[jax.Device] = None,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, Mapping[str, jnp.ndarray]]:
   """Compute loss and auxilary data over `eval_batches` of data."""
   eval_losses = []
@@ -143,7 +143,7 @@ def single_task_training_curves(
     eval_batches: int = 5,
     last_eval_batches: int = 20,
     eval_task: Optional[tasks_base.Task] = None,
-    device: Optional[jax.lib.xla_client.Device] = None,
+    device: Optional[jax.Device] = None,
     metrics_every: Optional[int] = None,
     summary_writer: Optional[summary.SummaryWriterBase] = None,
 ) -> Mapping[str, jnp.ndarray]:

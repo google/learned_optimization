@@ -296,7 +296,7 @@ def train_worker(
     summary_every_n: int = 10,
     worker_id: Optional[int] = None,
     stochastic_resample_frequency: int = 200,
-    device: Optional[jax.lib.xla_client.Device] = None,
+    device: Optional[jax.Device] = None,
     train_log_dir: Optional[str] = None,
     num_steps: Optional[int] = None,
     learner_address: Optional[str] = None,

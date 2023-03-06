@@ -352,7 +352,8 @@ def gradient_worker_compute(
     with_metrics: bool,
     clip_nan_loss_to_value: Optional[float] = 20.0,
     extra_metrics: bool = True,
-    device: Optional[jax.lib.xla_client.Device] = None) -> WorkerComputeOut:
+    device: Optional[jax.Device] = None,
+) -> WorkerComputeOut:
   """Compute a gradient signal to meta-train with.
 
   This function performs unrolls for each of the unroll_states with the

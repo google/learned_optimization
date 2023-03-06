@@ -31,16 +31,18 @@ import numpy as onp
 
 
 @gin.configurable
-def inner_train_task(train_log_dir,
-                     task: tasks_base.Task = gin.REQUIRED,
-                     opt: opt_base.Optimizer = gin.REQUIRED,
-                     num_steps: int = gin.REQUIRED,
-                     eval_every: int = 10,
-                     eval_batches: int = 5,
-                     last_eval_batches: int = 10,
-                     eval_task: Optional[tasks_base.Task] = None,
-                     metrics_every: Optional[int] = None,
-                     device: Optional[jax.lib.xla_client.Device] = None):
+def inner_train_task(
+    train_log_dir,
+    task: tasks_base.Task = gin.REQUIRED,
+    opt: opt_base.Optimizer = gin.REQUIRED,
+    num_steps: int = gin.REQUIRED,
+    eval_every: int = 10,
+    eval_batches: int = 5,
+    last_eval_batches: int = 10,
+    eval_task: Optional[tasks_base.Task] = None,
+    metrics_every: Optional[int] = None,
+    device: Optional[jax.Device] = None,
+):
   """Train and save results of a single training run.
 
   Args:

@@ -42,8 +42,8 @@ setuptools.setup(
     install_requires=[
         'absl-py==0.12.0',
         'numpy>=1.18',
-        'jax>=0.2.6',
-        'jaxlib>=0.1.68',
+        'jax>=0.4.3',
+        'jaxlib>=0.4.3',
         'nose',
         'dm-launchpad-nightly',
         'tqdm>=4.62.3',
