@@ -16,7 +16,7 @@
 """Tests for brax_env_truncated_step."""
 
 from absl.testing import absltest
-import brax
+import brax.v1 as brax
 import jax
 from learned_optimization.outer_trainers import full_es
 from learned_optimization.outer_trainers import test_utils

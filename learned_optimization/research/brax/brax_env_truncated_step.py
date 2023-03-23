@@ -24,7 +24,7 @@ in this case are the parameters of the policy.
 import functools
 from typing import Any, Optional, Tuple
 
-import brax.envs
+import brax.v1.envs
 import chex
 import flax.core
 import gin
@@ -49,8 +49,9 @@ class BraxEnvPolicy():
       hidden_size: int = 128,
   ):
     if env_name:
-      env = brax.envs.create(
-          env_name, auto_reset=False, episode_length=int(1e6))
+      env = brax.v1.envs.create(
+          env_name, auto_reset=False, episode_length=int(1e6)
+      )
       obs_size = env.observation_size
       action_size = env.action_size
 
@@ -111,8 +112,9 @@ class BraxEnvTruncatedStep(truncated_step.TruncatedStep):
                episode_length: int = 1000,
                random_initial_iteration_offset: int = 0):
     # use large number for episode length as this class will manage it.
-    self.env = brax.envs.create(
-        env_name, auto_reset=False, episode_length=int(1e6))
+    self.env = brax.v1.envs.create(
+        env_name, auto_reset=False, episode_length=int(1e6)
+    )
     self.policy = policy
     self.episode_length = episode_length
     self.random_initial_iteration_offset = random_initial_iteration_offset
