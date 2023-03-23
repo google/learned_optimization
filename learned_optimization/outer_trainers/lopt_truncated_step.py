@@ -279,7 +279,7 @@ def progress_or_reset_inner_opt_state(
     return next_inner_opt_state, task_param, next_inner_step, jnp.asarray(
         meta_loss, dtype=jnp.float32)
 
-  next_inner_opt_state, task_param, next_inner_step, meta_loss = cond_fn(
+  next_inner_opt_state, task_param, next_inner_step, meta_loss = cond_fn(  # pytype: disable=wrong-arg-types  # jax-types
       jnp.logical_not(is_done), false_fn, true_fn, key)
 
   return next_inner_opt_state, task_param, next_inner_step, meta_loss

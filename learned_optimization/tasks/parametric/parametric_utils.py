@@ -32,7 +32,7 @@ PRNGKey = jnp.ndarray
 
 
 def choice(key, vals):
-  return vals[jax.random.randint(key, [], 0, len(vals))]
+  return vals[jax.random.randint(key, [], 0, len(vals))]  # pytype: disable=unsupported-operands  # jax-types
 
 
 def log_int(key, lower, upper):
@@ -94,7 +94,7 @@ class SampleActivation:
 
   @classmethod
   def sample(cls, key) -> Mapping[str, int]:
-    return {"index": jax.random.randint(key, [], 0, len(cls.acts))}
+    return {"index": jax.random.randint(key, [], 0, len(cls.acts))}  # pytype: disable=bad-return-type  # jax-types
 
   @classmethod
   def get_dynamic(cls, act):
