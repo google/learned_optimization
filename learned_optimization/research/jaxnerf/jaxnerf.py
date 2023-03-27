@@ -162,8 +162,9 @@ def _nerf_loss_fn(model, key, variables, batch, randomized, weight_decay_mult):
       tree_sum_fn(lambda z: jnp.sum(z**2)) /
       tree_sum_fn(lambda z: jnp.prod(jnp.array(z.shape))))
 
-  stats = utils.Stats(
-      loss=loss, psnr=psnr, loss_c=loss_c, psnr_c=psnr_c, weight_l2=weight_l2)
+  stats = utils.Stats(  # pytype: disable=wrong-arg-types  # jax-types
+      loss=loss, psnr=psnr, loss_c=loss_c, psnr_c=psnr_c, weight_l2=weight_l2
+  )
   return loss + loss_c + weight_decay_mult * weight_l2, stats
 
 
