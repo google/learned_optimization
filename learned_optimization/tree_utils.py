@@ -205,7 +205,7 @@ def partition(functions: Sequence[FilterFN],
     del v
     return k
 
-  keys = jax.tree_util.tree_leaves(map_named(get_name, "", values))
+  keys = jax.tree_util.tree_leaves(map_named(get_name, "", values))  # pytype: disable=wrong-arg-types  # numpy-scalars
   keys = [str(i) for i, v in enumerate(vals)]
   if not strict:
     functions = list(functions) + [lambda k, v: True]
