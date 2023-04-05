@@ -25,6 +25,7 @@ from absl import logging
 from flax.training import prefetch_iterator
 import haiku as hk
 import jax
+from jax import core
 import jax.numpy as jnp
 from learned_optimization import filesystem
 from learned_optimization import profile
@@ -266,11 +267,10 @@ def tfds_image_classification_datasets(
     output_channel = (1,)
 
   abstract_batch = {
-      "image":
-          jax.ShapedArray(
-              (batch_size,) + image_size + output_channel, dtype=jnp.float32),
-      "label":
-          jax.ShapedArray((batch_size,), dtype=jnp.int32)
+      "image": core.ShapedArray(
+          (batch_size,) + image_size + output_channel, dtype=jnp.float32
+      ),
+      "label": core.ShapedArray((batch_size,), dtype=jnp.int32),
   }
   return Datasets(
       *[make_iter(split) for split in splits],
@@ -364,11 +364,10 @@ def preload_tfds_image_classification_datasets(
     output_channel = (1,)
 
   abstract_batch = {
-      "image":
-          jax.ShapedArray(
-              (batch_size,) + image_size + output_channel, dtype=jnp.float32),
-      "label":
-          jax.ShapedArray((batch_size,), dtype=jnp.int32)
+      "image": core.ShapedArray(
+          (batch_size,) + image_size + output_channel, dtype=jnp.float32
+      ),
+      "label": core.ShapedArray((batch_size,), dtype=jnp.int32),
   }
   return Datasets(
       *[make_python_iter(split) for split in splits],
@@ -497,8 +496,8 @@ def tfrecord_image_classification_datasets(
     shape = (batch_size,) + image_size + (stack_channels,)
 
   abstract_batch = {
-      "image": jax.ShapedArray(shape, jnp.float32),
-      "label": jax.ShapedArray((batch_size,), jnp.int32)
+      "image": core.ShapedArray(shape, jnp.float32),
+      "label": core.ShapedArray((batch_size,), jnp.int32),
   }
 
   return Datasets(

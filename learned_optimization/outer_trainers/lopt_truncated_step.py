@@ -22,6 +22,7 @@ import chex
 import flax
 import gin
 import jax
+from jax import core
 import jax.numpy as jnp
 from learned_optimization import summary
 from learned_optimization import training
@@ -480,9 +481,11 @@ class VectorizedLOptTruncatedStep(truncated_step.VectorizedTruncatedStep,
     self._task_name = task_name
 
     self.data_shape = jax.tree_util.tree_map(
-        lambda x: jax.ShapedArray(shape=x.shape, dtype=x.dtype),
+        lambda x: core.ShapedArray(shape=x.shape, dtype=x.dtype),
         training.vec_get_batch(
-            task_family, num_tasks, split="train", numpy=True))
+            task_family, num_tasks, split="train", numpy=True
+        ),
+    )
 
   def outer_init(self, key):
     return self.learned_opt.init(key)

@@ -24,6 +24,7 @@ import chex
 import flax
 import gin
 import jax
+from jax import core
 import jax.numpy as jnp
 from learned_optimization import checkpoints
 from learned_optimization import profile
@@ -384,7 +385,8 @@ def gradient_worker_compute(
   theta_model_state = worker_weights.theta_model_state
 
   theta_shape = jax.tree_util.tree_map(
-      lambda x: jax.ShapedArray(x.shape, x.dtype), theta)
+      lambda x: core.ShapedArray(x.shape, x.dtype), theta
+  )
   grads_accum = _tree_zeros_on_device(theta_shape, device)
 
   metrics_list = []

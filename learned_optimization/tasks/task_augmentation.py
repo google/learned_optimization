@@ -27,6 +27,7 @@ from typing import Any, Callable, Mapping, Tuple, Union, Optional
 import chex
 import gin
 import jax
+from jax import core
 import jax.numpy as jnp
 from learned_optimization import circular_buffer
 from learned_optimization import summary
@@ -227,7 +228,7 @@ class ReducedBatchsizeTask(base.Task):
 
     def reduce_abstract_bs(x):
       bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
-      return jax.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
+      return core.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
 
     abstract_batch = jax.tree_util.tree_map(reduce_abstract_bs,
                                             self.task.datasets.abstract_batch)
@@ -254,7 +255,7 @@ class ReducedBatchsizeFamily(base.TaskFamily):
 
     def reduce_abstract_bs(x):
       bs = onp.maximum(1, int(x.shape[0] * self._fraction_of_batchsize))
-      return jax.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
+      return core.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
 
     abstract_batch = jax.tree_util.tree_map(
         reduce_abstract_bs, self.task_family.datasets.abstract_batch)

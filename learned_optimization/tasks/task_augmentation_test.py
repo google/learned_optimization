@@ -19,6 +19,7 @@ from typing import Any, Tuple
 
 from absl.testing import absltest
 import jax
+from jax import core
 import jax.numpy as jnp
 from learned_optimization.tasks import base
 from learned_optimization.tasks import task_augmentation
@@ -39,7 +40,8 @@ def dummary_datasets():
       it(),
       it(),
       it(),
-      abstract_batch=jax.ShapedArray([32], dtype=jnp.int32))
+      abstract_batch=core.ShapedArray([32], dtype=jnp.int32),
+  )
 
 
 class DummyTask(base.Task):

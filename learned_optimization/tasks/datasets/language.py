@@ -20,7 +20,7 @@ from typing import Tuple
 
 import gin
 import haiku as hk
-import jax
+from jax import core
 import jax.numpy as jnp
 from learned_optimization.tasks.datasets import base
 import seqio
@@ -94,8 +94,8 @@ def _make_datasets(tfds_datasetname: str,
 
   train, inner_valid, outer_valid, test = [make(split) for split in splits]
   abstract_batch = {
-      'obs': jax.ShapedArray((batch_size, sequence_length), jnp.int32),
-      'target': jax.ShapedArray((batch_size, sequence_length), jnp.int32),
+      'obs': core.ShapedArray((batch_size, sequence_length), jnp.int32),
+      'target': core.ShapedArray((batch_size, sequence_length), jnp.int32),
   }
   return base.Datasets(
       train=train,

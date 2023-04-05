@@ -20,6 +20,7 @@ from typing import Any, Mapping, Optional, Tuple
 import gin
 import haiku as hk
 import jax
+from jax import core
 import jax.numpy as jnp
 from learned_optimization import circular_buffer
 from learned_optimization import profile
@@ -62,8 +63,9 @@ class TruncatedPESNoHystSameData(gradient_learner.GradientEstimator):
     self.data_buffer_size = data_buffer_size
 
     self.step_abstract_shape = jax.tree_util.tree_map(
-        lambda x: jax.ShapedArray(x.shape, x.dtype),
-        self.truncated_step.get_batch(self.steps_per_jit))
+        lambda x: core.ShapedArray(x.shape, x.dtype),
+        self.truncated_step.get_batch(self.steps_per_jit),
+    )
 
     # The shape of theta is not known at gradient estimator initialization time
     # as such we cannot initialize the circular buffer here.
@@ -75,23 +77,23 @@ class TruncatedPESNoHystSameData(gradient_learner.GradientEstimator):
     nt = self.truncated_step.num_tasks
     theta = worker_weights.theta
     epsilon = jax.tree_util.tree_map(
-        lambda x: jax.ShapedArray([nt] + list(x.shape), x.dtype), theta)
+        lambda x: core.ShapedArray([nt] + list(x.shape), x.dtype), theta
+    )
     state = self.grad_est.init_worker_state(worker_weights, key)
 
     self.circular_buffer = circular_buffer.CircularBuffer(
         {
-            "data":
-                self.step_abstract_shape,
-            "epsilon":
-                epsilon,
-            "key":
-                jax.tree_util.tree_map(
-                    lambda x: jax.ShapedArray(x.shape, x.dtype), key),
-            "p_state":
-                jax.tree_util.tree_map(
-                    lambda x: jax.ShapedArray(x.shape, x.dtype),
-                    state.pos_state),
-        }, self.data_buffer_size)
+            "data": self.step_abstract_shape,
+            "epsilon": epsilon,
+            "key": jax.tree_util.tree_map(
+                lambda x: core.ShapedArray(x.shape, x.dtype), key
+            ),
+            "p_state": jax.tree_util.tree_map(
+                lambda x: core.ShapedArray(x.shape, x.dtype), state.pos_state
+            ),
+        },
+        self.data_buffer_size,
+    )
 
     # fill the buffer with a single epsilon and data.
     p_state = state.pos_state
