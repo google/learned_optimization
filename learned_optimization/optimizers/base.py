@@ -140,7 +140,7 @@ class GraftedOptimizer(Optimizer):
         dir_opt_state=self.direction_opt.init(
             params, model_state=model_state, num_steps=num_steps, **kwargs))
 
-  def update(self, opt_state, grad, model_state=None, **kwargs):
+  def update(self, opt_state, grad, model_state=None, **kwargs):  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     base_params = opt_state.params
 
     next_mag_opt_state = self.magnitude_opt.update(

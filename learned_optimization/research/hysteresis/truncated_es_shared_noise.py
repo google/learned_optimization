@@ -97,15 +97,13 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
         epsilons=epsilons)
 
   @profile.wrap()
-  def compute_gradient_estimate(
+  def compute_gradient_estimate(  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
       self,
       worker_weights,
       key: PRNGKey,
-      state:
-      TruncatedESSharedNoiseAttributes,  # this is the same state returned by init_worker_state
+      state: TruncatedESSharedNoiseAttributes,  # this is the same state returned by init_worker_state
       with_summary=False,
   ) -> Tuple[gradient_learner.GradientEstimatorOut, Mapping[str, jnp.ndarray]]:
-
     # because we have a for loop we let haiku manages the key
     rng = hk.PRNGSequence(key)
 

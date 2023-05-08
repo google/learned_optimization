@@ -222,7 +222,7 @@ class SumOptimizer(opt_base.Optimizer):
   def get_state(self, state):
     return self.opts[0].get_state(state.inner_opt_states[0])
 
-  def update(self, opt_state, grad, model_state=None, **kwargs):
+  def update(self, opt_state, grad, model_state=None, **kwargs):  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     # apply to both opts
     new_opt_states = [
         opt.update(os, grad, model_state=model_state, **kwargs)

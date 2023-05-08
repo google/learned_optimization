@@ -404,14 +404,15 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
             iteration=jnp.asarray(0, dtype=jnp.int32),
             num_steps=jnp.asarray(num_steps))
 
-      def update(self,
-                 opt_state: AdafacMLPLOptState,
-                 grad: opt_base.Gradient,
-                 loss: jnp.ndarray,
-                 model_state: Optional[opt_base.ModelState] = None,
-                 is_valid: bool = False,
-                 key: Optional[PRNGKey] = None) -> AdafacMLPLOptState:
-
+      def update(
+          self,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+          opt_state: AdafacMLPLOptState,
+          grad: opt_base.Gradient,
+          loss: jnp.ndarray,
+          model_state: Optional[opt_base.ModelState] = None,
+          is_valid: bool = False,
+          key: Optional[PRNGKey] = None,
+      ) -> AdafacMLPLOptState:
         mom_roll, rms_roll, fac_vec_roll = self._get_rolling()
         next_mom_rolling = mom_roll.update(opt_state.mom_rolling, grad)
         next_rms_rolling = rms_roll.update(opt_state.rms_rolling, grad)

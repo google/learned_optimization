@@ -115,14 +115,15 @@ class MLPLOpt(lopt_base.LearnedOptimizer):
             rolling_features=common.vec_rolling_mom(decays).init(params),
             iteration=jnp.asarray(0, dtype=jnp.int32))
 
-      def update(self,
-                 opt_state: MLPLOptState,
-                 grad: Any,
-                 loss: float,
-                 model_state: Any = None,
-                 is_valid: bool = False,
-                 key: Optional[PRNGKey] = None) -> MLPLOptState:
-
+      def update(
+          self,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+          opt_state: MLPLOptState,
+          grad: Any,
+          loss: float,
+          model_state: Any = None,
+          is_valid: bool = False,
+          key: Optional[PRNGKey] = None,
+      ) -> MLPLOptState:
         next_rolling_features = common.vec_rolling_mom(decays).update(
             opt_state.rolling_features, grad)
 
