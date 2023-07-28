@@ -31,7 +31,7 @@ from learned_optimization import filesystem
 from learned_optimization import profile
 import numpy as onp
 import tensorflow as tf
-import tensorflow_datasets as tfds
+#import tensorflow_datasets as tfds
 
 Batch = Any
 
