@@ -40,22 +40,6 @@ setuptools.setup(
     # don't play nice with newer versions of other libraries.
     # TODO(lmetz) add oryx to this!
     install_requires=[
-        'absl-py==0.12.0',
-        'numpy>=1.18',
-        'jax>=0.4.3',
-        'jaxlib>=0.4.3',
-        'nose',
-        'dm-launchpad-nightly',
-        'tqdm>=4.62.3',
-        'flax',
-        'dm-haiku==0.0.5',
-        'optax>=0.0.9',
-        'tensorflow>=2.7.0',
-#        'tensorflow-datasets>=4.4.0',
-#        'tensorflow-metadata==1.5.0',
-        'tensorboard>=2.7.0',
-        'gin-config>=0.5.0',
-        'oryx',
     ],
     url='https://github.com/google/learned_optimization',
     license='Apache-2.0',
