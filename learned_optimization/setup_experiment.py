@@ -25,21 +25,25 @@ import gin
 import jax
 from learned_optimization import filesystem
 
-flags.DEFINE_multi_string("gin_bindings", None,
-                          "Newline separated list of Gin parameter bindings.")
+flags.DEFINE_multi_string(
+    "gin_bindings", None, "Newline separated list of Gin parameter bindings."
+)
 
 flags.DEFINE_multi_string("gin_import", None, "List of modules to import")
 
-flags.DEFINE_multi_string("config_file", None,
-                          "List of paths to the config files for Gin.")
+flags.DEFINE_multi_string(
+    "config_file", None, "List of paths to the config files for Gin."
+)
 
 flags.DEFINE_integer("task", 0, "Task / index of the replica for this job.")
 
-flags.DEFINE_string("train_log_dir", None,
-                    "Training directory to save summaries/checkpoints.")
+flags.DEFINE_string(
+    "train_log_dir", None, "Training directory to save summaries/checkpoints."
+)
 
-flags.DEFINE_string("train_log_dir_suffix", None,
-                    "suffix to add to train_log_dir path.")
+flags.DEFINE_string(
+    "train_log_dir_suffix", None, "suffix to add to train_log_dir path."
+)
 
 FLAGS = flags.FLAGS
 
@@ -72,7 +76,7 @@ def parse_and_set_gin_config(finalize: bool, skip_unknown: bool):
       split = g.split("=")
       key, value = split[0], "=".join(split[1:])
       new_v = value.strip()
-      if new_v[0:2] in ["\"@"]:
+      if new_v[0:2] in ['"@']:
         new_v = new_v[1:-1]  # strip quotes
       FLAGS.gin_bindings[i] = key.strip() + "=" + new_v
 
@@ -91,9 +95,11 @@ def parse_and_set_gin_config(finalize: bool, skip_unknown: bool):
 
 
 
-def setup_experiment(gin_finalize: bool = True,
-                     gin_skip_unknown: bool = True,
-                     make_dir: bool = False) -> Optional[str]:
+def setup_experiment(
+    gin_finalize: bool = True,
+    gin_skip_unknown: bool = True,
+    make_dir: bool = False,
+) -> Optional[str]:
   """Setup an experiment.
 
   This function manages flags ensuring gin flags are parsed correctly,
@@ -118,8 +124,9 @@ def setup_experiment(gin_finalize: bool = True,
     filesystem.make_dirs(FLAGS.train_log_dir)
 
   if FLAGS.train_log_dir:
-    logging.info("Setup experiment! Training directory located: %s",
-                 FLAGS.train_log_dir)
+    logging.info(
+        "Setup experiment! Training directory located: %s", FLAGS.train_log_dir
+    )
     return FLAGS.train_log_dir
   else:
     logging.info("Setup experiment! No training directory specified")
