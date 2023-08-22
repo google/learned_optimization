@@ -23,7 +23,7 @@ Our [documentation](https://learned-optimization.readthedocs.io/en/latest/) can 
 ### Build a learned optimizer from scratch
 
 Simple, self-contained, learned optimizer example that does not depend on the *learned\_optimization* library:
-<a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/docs/notebooks/no_dependency_learned_optimizer.ipynb.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+<a href="https://colab.research.google.com/github/google/learned_optimization/blob/main/docs/notebooks/no_dependency_learned_optimizer.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 
 ## Local Installation
