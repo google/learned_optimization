@@ -384,11 +384,13 @@ class SM3(OptaxOptimizer):
 
   # SM3 doesn't support scalars, so we have to reshape the params and grads.
 
-  def init(self,
-           params: Any,
-           model_state: Optional[Any] = None,
-           num_steps: Optional[int] = None,
-           key: chex.PRNGKey = None) -> SM3OptState:
+  def init(  # type: ignore
+      self,
+      params: Any,
+      model_state: Optional[Any] = None,
+      num_steps: Optional[int] = None,
+      key: chex.PRNGKey = None,
+  ) -> SM3OptState:
     should_reshape = jax.tree_util.tree_map(lambda x: len(x.shape) == 0, params)  # pylint: disable=g-explicit-length-test
     params = jax.tree_util.tree_map(_expand_scalar, params, should_reshape)
     out = super().init(params, model_state, num_steps, key)
