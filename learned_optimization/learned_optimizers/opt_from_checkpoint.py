@@ -133,7 +133,6 @@ def opt_from_checkpoint(
           logging.info("Parsing bindings")
           for b in bindings:
             logging.info(b)
-            print(b)
           gin.parse_config(bindings, skip_unknown=True)
 
         configurable = gin.query_parameter(f"{scope}/run_train.lopt")
