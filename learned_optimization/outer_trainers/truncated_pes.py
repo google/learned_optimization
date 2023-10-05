@@ -130,8 +130,13 @@ def compute_pes_grad(
   pos_loss = jnp.sum(p_ys.loss * p_ys.mask, axis=0) / jnp.sum(p_ys.mask, axis=0)
   neg_loss = jnp.sum(n_ys.loss * n_ys.mask, axis=0) / jnp.sum(n_ys.mask, axis=0)
 
-  return jnp.mean(
-      (pos_loss + neg_loss) / 2.0), es_grad, new_accumulator, p_ys, delta_losses
+  return (  # pytype: disable=bad-return-type  # jnp-type
+      jnp.mean((pos_loss + neg_loss) / 2.0),
+      es_grad,
+      new_accumulator,
+      p_ys,
+      delta_losses,
+  )
 
 
 @gin.configurable

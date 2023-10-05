@@ -269,20 +269,24 @@ class NNAdam(lopt_base.LearnedOptimizer):
             lambda x: jnp.tile(x, [n_states] + [1] * len(x.shape[1:])),
             theta["lstm_init_state"])
 
-        return NNAdamState(
+        return NNAdamState(  # pytype: disable=wrong-arg-types  # jnp-type
             params=params,
             rolling_features=rolling.init(params),
             iteration=jnp.asarray(0, dtype=jnp.int32),
             state=model_state,
             lstm_hidden_state=lstm_hidden_state,
-            per_layer_lr=jax.tree_util.tree_map(lambda x: theta["per_layer_lr"],
-                                                params),
+            per_layer_lr=jax.tree_util.tree_map(
+                lambda x: theta["per_layer_lr"], params
+            ),
             per_layer_beta1=jax.tree_util.tree_map(
-                lambda x: theta["per_layer_beta1"], params),
+                lambda x: theta["per_layer_beta1"], params
+            ),
             per_layer_beta2=jax.tree_util.tree_map(
-                lambda x: theta["per_layer_beta2"], params),
+                lambda x: theta["per_layer_beta2"], params
+            ),
             per_layer_epsilon=jax.tree_util.tree_map(
-                lambda x: theta["per_layer_epsilon"], params),
+                lambda x: theta["per_layer_epsilon"], params
+            ),
         )
 
       def lstm_features_for_tensor(self, p: jnp.ndarray, g: jnp.ndarray,

@@ -308,7 +308,7 @@ def last_recompute_antithetic_es(
 
   es_grad = jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), vec_es_grad)
 
-  return jnp.mean((pos_loss + neg_loss) / 2.0), es_grad
+  return jnp.mean((pos_loss + neg_loss) / 2.0), es_grad  # pytype: disable=bad-return-type  # jnp-type
 
 
 @gin.configurable
