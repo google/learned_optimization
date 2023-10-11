@@ -82,7 +82,7 @@ class NNAdamState:
   """
   params: Any
   state: Any
-  iteration: int
+  iteration: jax.Array
   rolling_features: MeanAndMeanSquareAccumulator
   per_layer_lr: Any
   per_layer_beta1: Any

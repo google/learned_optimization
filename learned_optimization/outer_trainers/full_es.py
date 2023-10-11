@@ -249,7 +249,7 @@ def last_recompute_antithetic_es(
     recompute_samples: int,
     clip_loss_diff: Optional[float] = None,
     sign_delta_loss_scalar: Optional[float] = None,
-) -> Tuple[float, MetaParams]:
+) -> Tuple[jax.Array, MetaParams]:
   """Compute an ES gradient estimate by recomputing the loss on both unrolls.
 
   Args:

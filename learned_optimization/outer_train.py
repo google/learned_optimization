@@ -207,7 +207,7 @@ def metrics_and_info_from_gradients(
     gathered_grads: Sequence[GradientsFromWorker],
     steps: Sequence[int],
     current_step: int,
-) -> Tuple[Mapping[str, float], Sequence[int], int]:
+) -> Tuple[Mapping[str, float], Sequence[Union[int, jax.Array]], int]:
   """Perform one outer-iteration on a batch of gradients from workers.
 
   Args:
@@ -222,17 +222,17 @@ def metrics_and_info_from_gradients(
     applied_inner_steps: number if inner steps performed this outer step.
   """
 
-  worker_ids = jnp.asarray([t.worker_id for t in gathered_grads])
-  inner_steps = onp.asarray([t.total_inner_steps for t in gathered_grads])
+  worker_ids = [t.worker_id for t in gathered_grads]
+  inner_steps = [t.total_inner_steps for t in gathered_grads]
 
-  applied_inner_steps = onp.sum(inner_steps)
+  applied_inner_steps = int(onp.sum(inner_steps))
   metrics = {}
   metrics["unique_worker"] = float(len(onp.unique(worker_ids)))
 
-  avg_stale = current_step - onp.mean(steps)
+  avg_stale = current_step - float(onp.mean(steps))
   metrics["avg_staleness"] = avg_stale
 
-  max_stale = current_step - onp.min(steps)
+  max_stale = current_step - float(onp.min(steps))
   metrics["max_staleness"] = max_stale
 
   return metrics, worker_ids, applied_inner_steps
