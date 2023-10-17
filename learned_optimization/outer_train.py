@@ -235,7 +235,7 @@ def metrics_and_info_from_gradients(
   max_stale = current_step - onp.min(steps)
   metrics["max_staleness"] = max_stale
 
-  return metrics, worker_ids, applied_inner_steps
+  return metrics, worker_ids, applied_inner_steps  # pytype: disable=bad-return-type
 
 
 def maybe_resample_gradient_estimators(
