@@ -212,7 +212,7 @@ def single_task_training_curves(
       if summary_writer:
         summary_writer.scalar("train/loss", l, step=i)
 
-      if metrics_every:
+      if metrics_every and with_metrics:
         if summary_writer:
           for k, v in m.items():
             agg, k = k.split("||")
