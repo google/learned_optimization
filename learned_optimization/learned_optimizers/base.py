@@ -73,8 +73,8 @@ class LearnableSGD(LearnedOptimizer):
   def opt_fn(self, theta, is_training=False) -> opt_base.Optimizer:
     lr = jnp.exp(theta["log_lr"])
 
-    summary.summary("learnable_sgd/pre_lr", theta["log_lr"])
-    summary.summary("learnable_sgd/lr", lr)
+    # summary.summary("learnable_sgd/pre_lr", theta["log_lr"])
+    # summary.summary("learnable_sgd/lr", lr)
 
     return optax_opts.SGD(lr)
 

@@ -89,8 +89,8 @@ class _GinScopeClass:
 def opt_from_checkpoint(
     checkpoint_path: str,
     config_path: Optional[str] = None,
-    extra_bindings=tuple([])
-) -> opt_base.Optimizer:
+    extra_bindings=tuple([]),
+):
   """Load an optimizer from a checkpoint path, and gin config.
 
   Args:

@@ -220,7 +220,7 @@ def progress_or_reset_inner_opt_state(
     meta_loss_with_aux_key: Optional[str] = None,
 ) -> Tuple[T, G, int, jnp.ndarray]:
   """Train a single step, or reset the current inner problem."""
-  summary.summary("num_steps", num_steps, aggregation="sample")  # pytype: disable=wrong-arg-types  # jax-ndarray
+  # summary.summary("num_steps", num_steps, aggregation="sample")  # pytype: disable=wrong-arg-types  # jax-ndarray
 
   def true_fn(key):
     """Reset the state of the inner-problem."""
@@ -234,7 +234,7 @@ def progress_or_reset_inner_opt_state(
     p, s = task_family.task_fn(task_param).init_with_state(key2)
 
     next_inner_opt_state = opt.init(p, s, num_steps=num_steps, key=key3)
-    summary.summary("opt_init_num_steps", num_steps)  # pytype: disable=wrong-arg-types  # jax-ndarray
+    # summary.summary("opt_init_num_steps", num_steps)  # pytype: disable=wrong-arg-types  # jax-ndarray
 
     return next_inner_opt_state, task_param, jnp.asarray(0), jnp.asarray(0.)
 
@@ -271,7 +271,7 @@ def progress_or_reset_inner_opt_state(
       g = jax.lax.pmean(g, axis_name=axis_name)
       l = jax.lax.pmean(l, axis_name=axis_name)
 
-    summary.summary("task_loss", l)
+    # summary.summary("task_loss", l)
 
     next_inner_opt_state = opt.update(
         inner_opt_state, g, loss=l, model_state=s, key=key2)
@@ -340,8 +340,8 @@ def _truncated_unroll_one_step(
       state.truncation_state, next_inner_step, key2, outer_state)
 
   # summaries
-  opt = learned_opt.opt_fn(theta, is_training=True)
-  summary.summarize_inner_params(opt.get_params(next_inner_opt_state))
+  # opt = learned_opt.opt_fn(theta, is_training=sTrue)
+  # summary.summarize_inner_params(opt.get_params(next_inner_opt_state))
 
   output_state = TruncatedUnrollState(  # pytype: disable=wrong-arg-types  # jax-ndarray
       inner_opt_state=next_inner_opt_state,
