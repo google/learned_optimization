@@ -41,6 +41,7 @@ flags.DEFINE_integer('bs', default=10, help='Batch size.')
 flags.DEFINE_integer('n_epochs', default=10, help='No. of training epochs.')
 flags.DEFINE_float('dropout', default=0.0, help='Dropout rate.')
 flags.DEFINE_bool('debug', default=False, help='Whether to run in debug mode.')
+flags.DEFINE_integer('seed', default=0, help='Jax PRNG seed.')
 
 
 def make_perm_spec_GRUCell(in_perm_num, h_perm_num):
@@ -222,12 +223,11 @@ def main(_):
       .batch(FLAGS.bs)
       .prefetch(tf.data.AUTOTUNE)
   )
-  del test_dset
 
   test_inp, _, _ = process_dset_example(next(iter(train_dset)))
   perm_spec = make_flattened_perm_spec()
 
-  rng = jax.random.PRNGKey(0)
+  rng = jax.random.PRNGKey(FLAGS.seed)
   rng, rng1 = jax.random.split(rng)
 
   predictor = make_predictor()
@@ -257,6 +257,7 @@ def main(_):
     return tau.correlation, rsq, preds, test_accs
 
   max_val_rsq, max_val_tau = float('-inf'), float('-inf')
+  max_test_rsq, max_test_tau = float('-inf'), float('-inf')
   for epoch in range(FLAGS.n_epochs):
     steps = 0
     start_time = time.time()
@@ -271,8 +272,11 @@ def main(_):
       steps += 1
     train_tau, train_rsq, _, _ = evaluate(train_dset)
     val_tau, val_rsq, _, _ = evaluate(val_dset)
+    test_tau, test_rsq, _, _ = evaluate(test_dset)
     max_val_tau = max(max_val_tau, val_tau)
     max_val_rsq = max(max_val_rsq, val_rsq)
+    max_test_tau = max(max_test_tau, test_tau)
+    max_test_rsq = max(max_test_rsq, test_rsq)
     writer.write_scalars(
         epoch,
         {
@@ -280,8 +284,12 @@ def main(_):
             'val_tau': val_tau,
             'train_rsq': train_rsq,
             'val_rsq': val_rsq,
+            'test_tau': test_tau,
+            'test_rsq': test_rsq,
             'max_val_tau': max_val_tau,
             'max_val_rsq': max_val_rsq,
+            'max_test_tau': max_test_tau,
+            'max_test_rsq': max_test_rsq,
             'steps_per_sec': steps / (time.time() - start_time),
         },
     )
