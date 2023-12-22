@@ -19,7 +19,6 @@
 from typing import Any, Callable, Optional, Tuple
 
 from flax import linen as nn
-from flax import nn as fnn
 import jax
 from jax import lax
 import jax.numpy as jnp
@@ -113,7 +112,7 @@ class ModulatedLayer(nn.Module):
   features: int = 32
   is_first: bool = False
   synthesis_act: Callable = jnp.sin
-  modulator_act: Callable = fnn.relu
+  modulator_act: Callable = nn.relu
   precision: Any = None
   dtype: Any = jnp.float32
   w0_first_layer: float = 30.0
@@ -196,7 +195,7 @@ class ModulatedSiren(nn.Module):
   output_dim: int = 3
   num_layers: int = 5
   synthesis_act: Callable = jnp.sin
-  modulator_act: Callable = fnn.relu
+  modulator_act: Callable = nn.relu
   final_activation: Callable = lambda x: x
   w0_first_layer: float = 30.0
   dtype: Any = jnp.float32
