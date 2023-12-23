@@ -153,6 +153,56 @@ def make_hk_irnn_perm_spec(mlp_params):
   return perm_spec
 
 
+def make_hk_transformer_perm_spec(mlp_params):
+  """Make perm spec for a transformer_lm.
+
+  Example:
+    {'transformer/embed': {'embeddings': (32100, 32)},
+    'transformer/h0_attn/key': {'b': (128,), 'w': (32, 128)},
+    'transformer/h0_attn/linear': {'b': (32,), 'w': (128, 32)},
+    'transformer/h0_attn/query': {'b': (128,), 'w': (32, 128)},
+    'transformer/h0_attn/value': {'b': (128,), 'w': (32, 128)},
+    'transformer/h0_ln_1': {'offset': (32,), 'scale': (32,)},
+    'transformer/h0_ln_2': {'offset': (32,), 'scale': (32,)},
+    'transformer/h0_mlp/linear': {'b': (128,), 'w': (32, 128)},
+    'transformer/h0_mlp/linear_1': {'b': (32,), 'w': (128, 32)},
+    'transformer/h1_attn/key': {'b': (128,), 'w': (32, 128)},
+    'transformer/h1_attn/linear': {'b': (32,), 'w': (128, 32)},
+    'transformer/h1_attn/query': {'b': (128,), 'w': (32, 128)},
+    'transformer/h1_attn/value': {'b': (128,), 'w': (32, 128)},
+    'transformer/h1_ln_1': {'offset': (32,), 'scale': (32,)},
+    'transformer/h1_ln_2': {'offset': (32,), 'scale': (32,)},
+    'transformer/h1_mlp/linear': {'b': (128,), 'w': (32, 128)},
+    'transformer/h1_mlp/linear_1': {'b': (32,), 'w': (128, 32)},
+    'transformer/h_f': {'offset': (32,), 'scale': (32,)},
+    'transformer/linear': {'b': (32100,), 'w': (32, 32100)}}
+  """
+  # -1,-2: vocab, 0: embed, 1: hidden, 2: embed_2, 3: hidden_2, 4: embed_3
+  del (mlp_params,)
+  perm_spec = {
+      'transformer/embed': {'embeddings': (-1, 0)},
+      'transformer/h0_attn/key': {'b': (1,), 'w': (0, 1)},
+      'transformer/h0_attn/linear': {'b': (0,), 'w': (1, 0)},
+      'transformer/h0_attn/query': {'b': (1,), 'w': (0, 1)},
+      'transformer/h0_attn/value': {'b': (1,), 'w': (0, 1)},
+      'transformer/h0_ln_1': {'offset': (0,), 'scale': (0,)},
+      'transformer/h0_ln_2': {'offset': (0,), 'scale': (0,)},
+      'transformer/h0_mlp/linear': {'b': (1,), 'w': (0, 1)},
+      'transformer/h0_mlp/linear_1': {'b': (2,), 'w': (1, 2)},
+      'transformer/h1_attn/key': {'b': (3,), 'w': (2, 3)},
+      'transformer/h1_attn/linear': {'b': (2,), 'w': (3, 2)},
+      'transformer/h1_attn/query': {'b': (3,), 'w': (2, 3)},
+      'transformer/h1_attn/value': {'b': (3,), 'w': (2, 3)},
+      'transformer/h1_ln_1': {'offset': (2,), 'scale': (2,)},
+      'transformer/h1_ln_2': {'offset': (2,), 'scale': (2,)},
+      'transformer/h1_mlp/linear': {'b': (3,), 'w': (2, 3)},
+      'transformer/h1_mlp/linear_1': {'b': (4,), 'w': (3, 4)},
+      'transformer/h_f': {'offset': (4,), 'scale': (4,)},
+      'transformer/linear': {'b': (-2,), 'w': (4, -2)},
+  }
+  return perm_spec
+
+
 class MLPForOpt(nn.Module):
   """MLP for learned opt."""
 
@@ -414,6 +464,8 @@ class ResidualOptNFN(ResidualOpt):
       perm_spec = make_hk_cnn_perm_spec(example_params)
     elif 'irnn/linear' in example_params:
       perm_spec = make_hk_irnn_perm_spec(example_params)
+    elif 'transformer/embed' in example_params:
+      perm_spec = make_hk_transformer_perm_spec(example_params)
     else:
       perm_spec = make_hk_perm_spec(example_params)
     network = UnivNFNForOpt(
