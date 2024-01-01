@@ -46,7 +46,9 @@ def compute_es_grad(
     vec_pos: MetaParams,
     std: float,
     sign_delta_loss_scalar: Optional[float] = None,
-) -> Tuple[float, MetaParams, truncated_step_mod.TruncatedUnrollOut, float]:
+) -> Tuple[
+    jax.Array, MetaParams, truncated_step_mod.TruncatedUnrollOut, jax.Array
+]:
   """Compute the ES gradient estimate from the outputs of many unrolls.
 
   Args:
