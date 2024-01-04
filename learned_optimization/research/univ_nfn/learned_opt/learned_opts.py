@@ -107,7 +107,7 @@ def make_hk_cnn_perm_spec(params):
       ln_name = 'layer_norm'
     else:
       conv_name = f'conv2_d_{i}'
-      ln_name = 'layer_norm_{i}'
+      ln_name = f'layer_norm_{i}'
     perm_spec[conv_name] = {
         'w': (-i, -(len(params) + i), i, i + 1),
         'b': (i + 1,),
