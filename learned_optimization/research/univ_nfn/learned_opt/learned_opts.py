@@ -97,22 +97,24 @@ def make_hk_perm_spec(mlp_params):
   return perm_spec
 
 
-def make_hk_cnn_perm_spec(mlp_params):
+def make_hk_cnn_perm_spec(params):
   """Produces perm spec for a haiku cnn."""
   perm_spec = {}
-  for i in range(len(mlp_params)):
-    if i < len(mlp_params) - 1:
-      if i == 0:
-        name = 'conv2_d'
-      else:
-        name = f'conv2_d_{i}'
-      perm_spec[name] = {
-          'w': (-i, -(len(mlp_params) + i), i, i + 1),
-          'b': (i + 1,),
-      }
+  num_convs = len([k for k in params if k.startswith('conv2_d')])
+  for i in range(num_convs):
+    if i == 0:
+      conv_name = 'conv2_d'
+      ln_name = 'layer_norm'
     else:
-      name = 'linear'
-      perm_spec[name] = {'w': (i, i + 1), 'b': (i + 1,)}
+      conv_name = f'conv2_d_{i}'
+      ln_name = 'layer_norm_{i}'
+    perm_spec[conv_name] = {
+        'w': (-i, -(len(params) + i), i, i + 1),
+        'b': (i + 1,),
+    }
+    if ln_name in params:  # layernorm is optional
+      perm_spec[ln_name] = {'offset': (i + 1,), 'scale': (i + 1,)}
+  perm_spec['linear'] = {'w': (num_convs, num_convs + 1), 'b': (num_convs + 1,)}  # final linear layer
   return perm_spec
 
 
