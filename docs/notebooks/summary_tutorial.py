@@ -348,20 +348,21 @@ value_grad_fn = jax.jit(jax.value_and_grad(loss, has_aux=True))
 print(to_look_at)
 
 # + [markdown] id="jNt9CNJf2HJN"
-# ### jax.experimental.host_callback
+# ### jax external callbacks
 #
-# Jax has some support to send data back from an accelerator back to the host while a ja program is running. This is exposed in jax.experimental.host_callback.
+# Jax has some support to send data back from an accelerator back to the host
+# while a jax program is running. This is exposed in
+# https://jax.readthedocs.io/en/latest/notebooks/external_callbacks.html.
 #
 # One can use this to print which is a quick way to get data out of a network.
 
 # + colab={"base_uri": "https://localhost:8080/"} id="1Ih2LxP22MZD" outputId="0dd0b8ec-2c9e-414d-eadf-843122b7b8ab"
-from jax.experimental import host_callback as hcb
 
 
 def loss(parameters):
   loss = jnp.mean(parameters**2)
   to_look_at = jnp.mean(123.)
-  hcb.id_print(to_look_at, name="to_look_at")
+  jax.debug.print("to_look_at={}", to_look_at)
   return loss
 
 
