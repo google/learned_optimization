@@ -80,4 +80,4 @@ def remove(path: str) -> bool:
   """Remove a file."""
   if _path_on_gcp(path):
     return tf.io.gfile.remove(path)
-  return shutil.rmtree(path)
+  return shutil.rmtree(path)  # pytype: disable=bad-return-type
