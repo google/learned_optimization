@@ -24,6 +24,8 @@ from learned_optimization.tasks import test_utils
 from learned_optimization.tasks.parametric import cfgobject
 from learned_optimization.tasks.parametric import lopt_trunc
 
+jax.config.update('jax_threefry_partitionable', False)
+
 
 class LOptTruncTest(absltest.TestCase):
 
