@@ -509,9 +509,9 @@ class AsyncDelayedGradients(base.Task):
 
   def init_with_state(self, key):
     params, state = self.task.init_with_state(key)
-    buffer = self.buffer.init()
+    buffer = self.buffer.init()  # pytype: disable=attribute-error  # jax-api-types
     for _ in range(self.delay_steps):
-      buffer = self.buffer.add(buffer, params)
+      buffer = self.buffer.add(buffer, params)  # pytype: disable=attribute-error  # jax-api-types
     return params, (buffer, state)
 
   def loss(self, params, key, data):
@@ -526,10 +526,10 @@ class AsyncDelayedGradients(base.Task):
 
   def loss_with_state_and_aux(self, params, state, key, data):
     buffer, state = state
-    last_entry = self.buffer.gather_from_present(buffer, -self.delay_steps + 1)
+    last_entry = self.buffer.gather_from_present(buffer, -self.delay_steps + 1)  # pytype: disable=attribute-error  # jax-api-types
     loss, next_state, aux = self.task.loss_with_state_and_aux(
         last_entry, state, key, data)
-    buffer = self.buffer.add(buffer, params)
+    buffer = self.buffer.add(buffer, params)  # pytype: disable=attribute-error  # jax-api-types
     return loss, (buffer, next_state), aux
 
 
