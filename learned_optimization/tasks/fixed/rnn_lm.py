@@ -138,11 +138,12 @@ cfgs = [
 def _partial(rnn_fn, embedding_dim, vocab_size, datasets):
 
   def tmp_fn():
-    return TeacherForcedRNNLM(
+    return TeacherForcedRNNLM(  # pytype: disable=wrong-arg-types
         rnn_fn,
         embedding_dim=embedding_dim,
         vocab_size=vocab_size,
-        datasets=datasets())
+        datasets=datasets(),
+    )
 
   return tmp_fn
 
