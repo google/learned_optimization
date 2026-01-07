@@ -105,7 +105,15 @@ def antithetic_es_value_and_grad(
     if has_aux:
       losses, aux = aux_and_losses
       if not vec_aux:
-        aux = jax.tree_util.tree_map(lambda x: x[0], aux_and_losses[1])
+        # Avoid degraded performance under the new jax.pmap. See
+        # https://docs.jax.dev/en/latest/migrate_pmap.html#int-indexing-into-sharded-arrays.
+        if jax.config.jax_pmap_shmap_merge:
+          aux = jax.tree_util.tree_map(
+              lambda x: x.addressable_shards[0].data.squeeze(0),
+              aux_and_losses[1],
+          )
+        else:
+          aux = jax.tree_util.tree_map(lambda x: x[0], aux_and_losses[1])
     else:
       losses = aux_and_losses
 
@@ -158,7 +166,14 @@ def multi_antithetic_es_value_and_grad(
     keys = jax.random.split(es_key, n_pairs)
     if has_aux:
       (value, aux), grad = jax.vmap(new_vmap)(keys)
-      aux = jax.tree_util.tree_map(lambda x: x[0], aux)
+      # Avoid degraded performance under the new jax.pmap. See
+      # https://docs.jax.dev/en/latest/migrate_pmap.html#int-indexing-into-sharded-arrays.
+      if jax.config.jax_pmap_shmap_merge:
+        aux = jax.tree_util.tree_map(
+            lambda x: x.addressable_shards[0].data.squeeze(0), aux
+        )
+      else:
+        aux = jax.tree_util.tree_map(lambda x: x[0], aux)
     else:
       value, grad = jax.vmap(new_vmap)(keys)
 
