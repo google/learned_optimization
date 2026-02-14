@@ -130,6 +130,7 @@ class TruncatedPESNoHystSameData(gradient_learner.GradientEstimator):
     rng = hk.PRNGSequence(key)
 
     # train on the circular buffer's data.
+    assert isinstance(self.circular_buffer, circular_buffer.CircularBuffer)
     reordered_data, unused_mask = self.circular_buffer.stack_reorder(
         buffer_state)
 
