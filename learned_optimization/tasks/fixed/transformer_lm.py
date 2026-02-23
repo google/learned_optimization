@@ -28,7 +28,7 @@ from learned_optimization.tasks.datasets import language
 
 
 class _TransformerTask(base.Task):
-  """Tranformer from a dictionary configuration."""
+  """Transformer from a dictionary configuration."""
 
   def __init__(self, cfg: Mapping[str, Any], name: str = '__TransformerTask'):
     self.datasets = language.lm1b_32k_datasets(cfg['batch_size'],

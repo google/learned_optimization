@@ -28,7 +28,7 @@ from learned_optimization.tasks.datasets import image
 
 
 class _ResnetTask(base.Task):
-  """Tranformer from a dictionary configuration."""
+  """Transformer from a dictionary configuration."""
 
   def __init__(self, cfg: Mapping[str, Any], name: str = '__Resnet'):
     dataset_map = {
