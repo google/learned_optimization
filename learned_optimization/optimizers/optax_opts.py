@@ -186,8 +186,9 @@ class PiecewiseLinearAdam(OptaxOptimizer):
                epsilon_root=1e-8):
     opt = optax.chain(
         optax.scale_by_adam(
-            b1=beta1, b2=beta2, eps=epsilon, eps_root=epsilon_root),
-        optax.scale_by_schedule(piecewise_linear(times, vals=lrs)),
+            b1=beta1, b2=beta2, eps=epsilon, eps_root=epsilon_root
+        ),
+        optax.scale_by_schedule(piecewise_linear(times, vals=lrs)),  # pytype: disable=wrong-arg-types  # jax-arraylike
         optax.scale(-1),
     )
     super().__init__(opt)
