@@ -112,7 +112,7 @@ def loss(parameters):
 
 Then we can transform the `loss` function with the function transformation: `summary.with_summary_output_reduced`.
 This transformation goes through the computation and extracts all the tagged values and returns them to us by name in a dictionary.
-In implementation, all the hard work here is done by the wonderful `oryx` library (in particular [harvest](https://github.com/tensorflow/probability/blob/main/spinoffs/oryx/oryx/core/interpreters/harvest.py)).
+In implementation, all the hard work here is done by the wonderful `oryx` library (in particular [harvest](https://github.com/jax-ml/oryx/tree/main/oryx/core/interpreters/harvest.py)).
 When we wrap a function this, we return a tuple containing the original result, and a dictionary with the desired metrics.
 
 ```{code-cell}
@@ -399,7 +399,7 @@ outputId: b1ccd1db-5615-45b9-b52c-0ae78ea9369f
 ---
 def monitor(a):
   summary.summary("with_input", a)
-  summary.summary("constant", 2.0)
+  summary.summary("constant", jnp.asarray(2.0))
   summary.summary("constant_with_inp", 2.0 + (a * 0))
   return a
 
