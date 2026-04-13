@@ -17,7 +17,7 @@
 import abc
 import hashlib
 import os
-import pickle
+from learned_optimization import serialization_utils
 import threading
 import time
 from typing import Any, MutableMapping, Optional, Sequence, Tuple, MutableSequence
@@ -273,7 +273,7 @@ class PopulationController:
       if filesystem.exists(path):
         with filesystem.file_open(path, "rb") as f:
           content = f.read()
-        self._active_workers, self._cached, self._mutate_state = pickle.loads(
+        self._active_workers, self._cached, self._mutate_state = serialization_utils.safe_unpack(
             content)
         return True
     return False
@@ -282,7 +282,7 @@ class PopulationController:
     """Serialize state of this object."""
     if self._log_dir:
       state = (self._active_workers, self._cached, self._mutate_state)
-      content = pickle.dumps(state)
+      content = serialization_utils.safe_pack(state)
       return content
     else:
       return None

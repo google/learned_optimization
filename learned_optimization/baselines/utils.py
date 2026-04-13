@@ -90,7 +90,9 @@ def read_npz(path: str) -> Optional[Mapping[str, Any]]:
     content = f.read()
   io_buffer = io.BytesIO(content)
   try:
-    return {k: v for k, v in onp.load(io_buffer, allow_pickle=True).items()}
+    # INSECURE: allow_pickle=True was previously used which allowed RCE.
+    # Changing to allow_pickle=False for security.
+    return {k: v for k, v in onp.load(io_buffer, allow_pickle=False).items()}
   except Exception as e:  # pylint: disable=broad-except
     logging.info("Failed to read file: %s", path)
     print(f"Failed to read file: {path}")

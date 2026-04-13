@@ -22,7 +22,7 @@ from typing import Any, Mapping, MutableMapping, MutableSequence, Optional, Sequ
 
 from absl import logging
 import courier
-import dill
+from learned_optimization import serialization_utils
 from learned_optimization import distributed
 from learned_optimization import filesystem
 from learned_optimization import profile
@@ -148,7 +148,7 @@ class TaskGroupChief(threading.Thread):
       try:
         if filesystem.exists(self._state_file):
           with filesystem.file_open(self._state_file, "rb") as f:
-            self._set_state(dill.loads(f.read()))
+            self._set_state(serialization_utils.safe_unpack(f.read()))
       except EOFError as e:
         logging.error("Caught a EOFError error. Not restoring.")
         logging.error(str(e))
@@ -164,8 +164,8 @@ class TaskGroupChief(threading.Thread):
     with filesystem.file_open(self._state_file + "_tmp", "wb") as f:
       if self.verbose:
         logging.info(f"Saving state: {self._get_state()}")  # pylint: disable=logging-fstring-interpolation
-      with profile.Profile("dill_dumps"):
-        content = dill.dumps(self._get_state())
+      with profile.Profile("msgpack_dumps"):
+        content = serialization_utils.safe_pack(self._get_state())
       f.write(content)
     filesystem.rename(self._state_file + "_tmp", self._state_file)
 
