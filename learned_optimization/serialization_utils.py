@@ -15,7 +15,9 @@
 
 """Serialization utilities for safe data persistence."""
 
+import io
 from typing import Any
+
 import msgpack
 import msgpack_numpy as m
 import numpy as np
@@ -24,25 +26,35 @@ import numpy as np
 m.patch()
 
 
+def _encode_ext(obj):
+    """Custom encoder for types not supported by msgpack."""
+    if hasattr(obj, "__dict__"):
+        # Handle generic objects/dataclasses by converting to dict
+        return {"__type__": obj.__class__.__name__, "data": obj.__dict__}
+    return obj
+
+
 def safe_pack(obj: Any) -> bytes:
-  """Pack an object into a secure msgpack binary format.
+    """Pack an object into a secure msgpack binary format.
 
-  Args:
-    obj: The object to serialize.
+    Args:
+      obj: The object to serialize.
 
-  Returns:
-    A bytes object representing the serialized data.
-  """
-  return msgpack.packb(obj, use_bin_type=True)
+    Returns:
+      A bytes object representing the serialized data.
+    """
+    return msgpack.packb(obj, default=_encode_ext, use_bin_type=True)
 
 
 def safe_unpack(data: bytes) -> Any:
-  """Unpack an object from a secure msgpack binary format.
+    """Unpack an object from a secure msgpack binary format.
 
-  Args:
-    data: The bytes object to deserialize.
+    Args:
+      data: The bytes object to deserialize.
 
-  Returns:
-    The reconstructed Python object.
-  """
-  return msgpack.unpackb(data, raw=False)
+    Returns:
+      The reconstructed Python object.
+    """
+    # For now returns raw dicts for custom types to avoid arbitrary class instantiation.
+    # This is the "Security by Design" part: we don't auto-instantiate classes.
+    return msgpack.unpackb(data, raw=False)
