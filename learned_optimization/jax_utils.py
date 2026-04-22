@@ -22,6 +22,13 @@ import jax
 import jax.numpy as jnp
 import numpy as onp
 
+try:
+  # JAX v0.10.0 or newer
+  from jax.extend.core import unsafe_am_i_under_a_jit_DO_NOT_USE  # pylint: disable=g-import-not-at-top
+except ImportError:
+  # JAX v0.9.2 or older
+  from jax.core import unsafe_am_i_under_a_jit_DO_NOT_USE  # pylint: disable=g-import-not-at-top
+
 
 def maybe_static_cond(pred, true_fn, false_fn, val):
   """Conditional that first checks if pred can be determined at compile time."""
@@ -51,7 +58,7 @@ def in_jit() -> bool:
         jax.core.thread_local_state.trace_state.trace_stack  # type: ignore
     )
 
-  return jax.core.unsafe_am_i_under_a_jit_DO_NOT_USE()
+  return unsafe_am_i_under_a_jit_DO_NOT_USE()
 
 
 Carry = TypeVar("Carry")
