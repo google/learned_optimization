@@ -15,3 +15,5 @@ tensorboard>=2.7.0
 gin-config>=0.5.0
 seqio>=0.0.7
 oryx
+msgpack>=1.0.0
+msgpack-numpy>=0.4.7
