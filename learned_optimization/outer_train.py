@@ -75,15 +75,15 @@ def iter_group_amount(it, n):
 @gin.configurable
 def build_gradient_estimators(
     *,
-    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,
+    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
     sample_task_family_fn: Callable[[PRNGKey],
-                                    tasks_base.TaskFamily] = gin.REQUIRED,
+                                    tasks_base.TaskFamily] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
     gradient_estimator_fn: Callable[
         [truncated_step_mod.VectorizedTruncatedStep],
-        gradient_learner.GradientLearner] = gin.REQUIRED,
+        gradient_learner.GradientLearner] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
     truncated_step_fn: Callable[
         [tasks_base.TaskFamily, lopt_base.LearnedOptimizer],
-        truncated_step_mod.VectorizedTruncatedStep] = lopt_truncated_step
+        truncated_step_mod.VectorizedTruncatedStep] = lopt_truncated_step  # pyrefly: ignore[bad-function-definition]
     .VectorizedLOptTruncatedStep,
     key: PRNGKey,
     num_gradient_estimators: int,
@@ -129,14 +129,14 @@ ListListTaskFamilyFn = Sequence[Sequence[Callable[[], tasks_base.TaskFamily]]]
 @gin.configurable
 def build_gradient_estimators_fixed(
     *,
-    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,
-    list_of_task_family_per_machine: ListListTaskFamilyFn = gin.REQUIRED,
+    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+    list_of_task_family_per_machine: ListListTaskFamilyFn = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
     gradient_estimator_fn: Callable[
         [truncated_step_mod.VectorizedTruncatedStep],
-        gradient_learner.GradientLearner] = gin.REQUIRED,
+        gradient_learner.GradientLearner] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
     truncated_step_fn: Callable[
         [tasks_base.TaskFamily, lopt_base.LearnedOptimizer],
-        truncated_step_mod.VectorizedTruncatedStep] = lopt_truncated_step
+        truncated_step_mod.VectorizedTruncatedStep] = lopt_truncated_step  # pyrefly: ignore[bad-function-definition]
     .VectorizedLOptTruncatedStep,
     key: PRNGKey,
     num_gradient_estimators: int,
@@ -285,7 +285,7 @@ def maybe_resample_gradient_estimators(
             worker_id=worker_id)
         gradient_estimators[j] = ests[0]
         unroll_states[j] = gradient_estimators[j].init_worker_state(
-            worker_weights, key2)
+            worker_weights, key2)  # pyrefly: ignore[bad-argument-type]
 
   return gradient_estimators, unroll_states
 
@@ -350,7 +350,7 @@ def train_worker(
     return estimators, unroll_states
 
   distributed_worker = distributed.DistributedWorker(
-      train_log_dir, worker_id, learner_address=learner_address)
+      train_log_dir, worker_id, learner_address=learner_address)  # pyrefly: ignore[bad-argument-type]
   last_outer_cfg = None
   grad_estimators = None
   worker_weights = None
@@ -390,12 +390,12 @@ def train_worker(
     gradient_worker_out = gradient_learner.gradient_worker_compute(
         worker_weights=worker_weights,
         gradient_estimators=[grad_estimators[gidx] for gidx in idxs],
-        unroll_states=[unroll_states[gidx] for gidx in idxs],
+        unroll_states=[unroll_states[gidx] for gidx in idxs],  # pyrefly: ignore[unbound-name]
         key=next(rng),
         with_metrics=with_m,
         device=device)
 
-    unroll_states = list(unroll_states)
+    unroll_states = list(unroll_states)  # pyrefly: ignore[unbound-name]
     for oidx, gidx in enumerate(idxs):
       unroll_states[gidx] = gradient_worker_out.unroll_states[oidx]
 
@@ -405,8 +405,8 @@ def train_worker(
     with profile.Profile("grads_to_onp"):
       to_put_grads = GradientsFromWorker(  # pytype: disable=wrong-arg-types  # jax-ndarray
           metrics=gradient_worker_out.metrics,
-          worker_id=worker_id,
-          total_inner_steps=total_inner_steps,
+          worker_id=worker_id,  # pyrefly: ignore[bad-argument-type]
+          total_inner_steps=total_inner_steps,  # pyrefly: ignore[bad-argument-type]
           gen_id=dist_data.gen_id,
           outer_trainer_grads=gradient_worker_out.to_put,
       )
@@ -683,7 +683,7 @@ def train_learner(
         experiment_name=train_log_dir,
         weights=DataForWorker(worker_weights, gen_id, outer_cfg),
         current_iteration=step,
-        num_workers=num_workers,
+        num_workers=num_workers,  # pyrefly: ignore[bad-argument-type]
         start_server=False,
         port=learner_port)
 
@@ -737,7 +737,7 @@ def train_learner(
     with profile.Profile("checkpoints"):
       opt_checkpoint = gradient_learner.OptCheckpoint(
           gradient_learner_state, jnp.asarray(elapsed_time, dtype=jnp.float64),
-          total_inner_steps)
+          total_inner_steps)  # pyrefly: ignore[bad-argument-type]
       param_checkpoint = gradient_learner.ParameterCheckpoint(
           outer_learner.get_meta_params(gradient_learner_state), gen_id, step)
       paths = checkpoints.periodically_save_checkpoint(
@@ -818,7 +818,7 @@ def train_learner(
           delta_inner_steps=applied_inner_steps,
       )
 
-      to_write = dict(**to_write, **summarize_outer_cfg(outer_cfg))
+      to_write = dict(**to_write, **summarize_outer_cfg(outer_cfg))  # pyrefly: ignore[bad-argument-type]
 
       if i % 5 == 0:
         elapsed_time = elapsed_time + time.time() - train_start_time
@@ -998,7 +998,7 @@ def local_train(
       to_put_grads = GradientsFromWorker(  # pytype: disable=wrong-arg-types  # jax-ndarray
           metrics=gradient_worker_out.metrics,
           worker_id=0,
-          total_inner_steps=total_inner_steps,
+          total_inner_steps=total_inner_steps,  # pyrefly: ignore[bad-argument-type]
           gen_id="no_gen_id",
           outer_trainer_grads=gradient_worker_out.to_put,
       )
@@ -1021,7 +1021,7 @@ def local_train(
         lopt,
         gradient_estimators,
         unroll_states,
-        worker_weights=worker_weights,
+        worker_weights=worker_weights,  # pyrefly: ignore[bad-argument-type]
         key=next(rng),
         stochastic_resample_frequency=stochastic_resample_frequency,
         sample_estimators_fn=sample_estimators_fn,
@@ -1115,9 +1115,9 @@ def _move_all_gin_config_to_default_scope():
 @gin.configurable
 def run_train(
     train_log_dir: str,
-    lopt: Union[GinRequired, lopt_base.LearnedOptimizer] = gin.REQUIRED,
+    lopt: Union[GinRequired, lopt_base.LearnedOptimizer] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
     outer_learner_fn: Union[GinRequired, Callable[
-        [], gradient_learner.GradientLearner]] = gin.REQUIRED,
+        [], gradient_learner.GradientLearner]] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
     num_estimators: int = 2,
     is_trainer: bool = True,
     is_worker: bool = True,
@@ -1182,7 +1182,7 @@ def run_train(
     if is_trainer and is_worker:
       local_train(
           train_log_dir=train_log_dir,
-          outer_learner=outer_learner_fn(),
+          outer_learner=outer_learner_fn(),  # pyrefly: ignore[not-callable]
           lopt=lopt,
           num_estimators=num_estimators,
           summary_every_n=summary_every_n,
@@ -1222,7 +1222,7 @@ def run_train(
         try:
           train_worker(
               worker_id=worker_id,
-              lopt=lopt,
+              lopt=lopt,  # pyrefly: ignore[bad-argument-type]
               num_estimators=num_estimators,
               summary_every_n=summary_every_n,
               stochastic_resample_frequency=stochastic_resample_frequency,

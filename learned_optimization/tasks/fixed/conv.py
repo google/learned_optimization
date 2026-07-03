@@ -39,7 +39,7 @@ def _cross_entropy_pool_loss(
     num_classes: int = 10):
   """Haiku function for a conv net with pooling and cross entropy loss."""
   if not initializers:
-    initializers = {}
+    initializers = {}  # pyrefly: ignore[bad-assignment]
 
   def _fn(batch):
     net = batch["image"]
@@ -80,7 +80,7 @@ class _ConvTask(base.Task):
 
   def init_with_state(self, key) -> Tuple[Params, ModelState]:
     batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                                   self.datasets.abstract_batch)
+                                   self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     return self._mod.init(key, batch)
 
   def loss(self, params, key, data):
@@ -97,7 +97,7 @@ class _ConvTask(base.Task):
 
   def normalizer(self, loss):
     return jnp.clip(loss, 0,
-                    1.5 * jnp.log(self.datasets.extra_info["num_classes"]))
+                    1.5 * jnp.log(self.datasets.extra_info["num_classes"]))  # pyrefly: ignore[missing-attribute]
 
 
 @gin.configurable

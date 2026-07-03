@@ -54,18 +54,18 @@ class _MLPImageTask(base.Task):
 
   def init(self, key: PRNGKey) -> Any:
     batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                                   self.datasets.abstract_batch)
+                                   self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     return self._mod.init(key, batch["image"])
 
   def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
-    num_classes = self.datasets.extra_info["num_classes"]
+    num_classes = self.datasets.extra_info["num_classes"]  # pyrefly: ignore[missing-attribute]
     logits = self._mod.apply(params, key, data["image"])
     labels = jax.nn.one_hot(data["label"], num_classes)
     vec_loss = base.softmax_cross_entropy(logits=logits, labels=labels)
     return jnp.mean(vec_loss)
 
   def normalizer(self, loss):
-    num_classes = self.datasets.extra_info["num_classes"]
+    num_classes = self.datasets.extra_info["num_classes"]  # pyrefly: ignore[missing-attribute]
     maxval = 1.5 * onp.log(num_classes)
     loss = jnp.clip(loss, 0, maxval)
     return jnp.nan_to_num(loss, nan=maxval, posinf=maxval, neginf=maxval)
@@ -197,7 +197,7 @@ class _MLPImageTaskMSE(_MLPImageTask):
   """Image model with a Mean squared error loss."""
 
   def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:
-    num_classes = self.datasets.extra_info["num_classes"]
+    num_classes = self.datasets.extra_info["num_classes"]  # pyrefly: ignore[missing-attribute]
     logits = self._mod.apply(params, key, data["image"])
     labels = jax.nn.one_hot(data["label"], num_classes)
     return jnp.mean(jnp.square(logits - labels))
@@ -270,13 +270,13 @@ class _MLPImageTaskNorm(base.Task):
 
   def init_with_state(self, key: PRNGKey) -> Any:
     batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                                   self.datasets.abstract_batch)
+                                   self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     params, state = self._mod.init(key, batch["image"])
     return params, state
 
   def loss_with_state(self, params: Params, state: ModelState, key: PRNGKey,
                       data: Any) -> Tuple[jnp.ndarray, ModelState]:
-    num_classes = self.datasets.extra_info["num_classes"]
+    num_classes = self.datasets.extra_info["num_classes"]  # pyrefly: ignore[missing-attribute]
     logits, state = self._mod.apply(params, state, key, data["image"])
     labels = jax.nn.one_hot(data["label"], num_classes)
     vec_loss = base.softmax_cross_entropy(logits=logits, labels=labels)
@@ -289,7 +289,7 @@ class _MLPImageTaskNorm(base.Task):
     return loss, state, {}
 
   def normalizer(self, loss):
-    num_classes = self.datasets.extra_info["num_classes"]
+    num_classes = self.datasets.extra_info["num_classes"]  # pyrefly: ignore[missing-attribute]
     maxval = 1.5 * onp.log(num_classes)
     loss = jnp.clip(loss, 0, maxval)
     return jnp.nan_to_num(loss, nan=maxval, posinf=maxval, neginf=maxval)

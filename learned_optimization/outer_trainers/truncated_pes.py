@@ -130,7 +130,7 @@ def compute_pes_grad(
   pos_loss = jnp.sum(p_ys.loss * p_ys.mask, axis=0) / jnp.sum(p_ys.mask, axis=0)
   neg_loss = jnp.sum(n_ys.loss * n_ys.mask, axis=0) / jnp.sum(n_ys.mask, axis=0)
 
-  return (
+  return (  # pyrefly: ignore[bad-return]
       jnp.mean((pos_loss + neg_loss) / 2.0),
       es_grad,
       new_accumulator,
@@ -182,11 +182,11 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     theta = worker_weights.theta
 
     pos_unroll_state = self.truncated_step.init_step_state(
-        theta, worker_weights.outer_state, key, theta_is_vector=False)
+        theta, worker_weights.outer_state, key, theta_is_vector=False)  # pyrefly: ignore[unexpected-keyword]
     neg_unroll_state = pos_unroll_state
 
     accumulator = jax.tree_util.tree_map(
-        lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),
+        lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),  # pyrefly: ignore[missing-attribute]
         theta)
 
     return PESWorkerState(
@@ -218,7 +218,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     theta = worker_weights.theta
 
     vec_pos, vec_p_theta, vec_n_theta = common.vector_sample_perturbations(
-        theta, next(rng), self.std, self.truncated_step.num_tasks)
+        theta, next(rng), self.std, self.truncated_step.num_tasks)  # pyrefly: ignore[missing-attribute]
 
     p_yses = []
     n_yses = []
@@ -243,7 +243,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
       key = next(rng)
 
       p_state, n_state, p_ys, n_ys, m = common.maybe_stacked_es_unroll(
-          self.truncated_step,
+          self.truncated_step,  # pyrefly: ignore[bad-argument-type]
           self.steps_per_jit,
           self.stack_antithetic_samples,
           vec_p_theta,
@@ -335,7 +335,7 @@ class TruncatedPESPMAP(TruncatedPES):
         functools.partial(
             common.vector_sample_perturbations,
             std=self.std,
-            num_samples=self.truncated_step.num_tasks),
+            num_samples=self.truncated_step.num_tasks),  # pyrefly: ignore[missing-attribute]
         in_axes=(None, 0),
     )
 
@@ -380,7 +380,7 @@ class TruncatedPESPMAP(TruncatedPES):
     neg_unroll_state = pos_unroll_state
 
     accumulator = jax.tree_util.tree_map(
-        lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),
+        lambda x: jnp.zeros([self.truncated_step.num_tasks] + list(x.shape)),  # pyrefly: ignore[missing-attribute]
         theta)
     accumulator = flax_jax_utils.replicate(accumulator)
 

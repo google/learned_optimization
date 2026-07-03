@@ -163,7 +163,7 @@ def flatten_cfg(cfg: CFGObject, features_for: str) -> Mapping[str, Any]:
       for k2, v in a.items():
         to_process.append((k + "/" + k2, v))
     elif isinstance(a, CFGObject):
-      to_process.append((k + "/" + a.obj, a.kwargs))
+      to_process.append((k + "/" + a.obj, a.kwargs))  # pyrefly: ignore[bad-argument-type]
     elif isinstance(a, CFGNamed):
       to_process.append((k + "/" + a.name, a.values))
     elif isinstance(a, DoNotFeaturize):

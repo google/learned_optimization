@@ -419,7 +419,7 @@ class FullES(gradient_learner.GradientEstimator):
     if datas_list is not None:
       raise NotImplementedError()
 
-    num_tasks = self.truncated_step.num_tasks
+    num_tasks = self.truncated_step.num_tasks  # pyrefly: ignore[missing-attribute]
     rng = hk.PRNGSequence(key)
 
     theta = worker_weights.theta
@@ -444,15 +444,15 @@ class FullES(gradient_learner.GradientEstimator):
         vec_p_theta,
         worker_weights.outer_state,
         key,
-        theta_is_vector=True,
-        num_steps_override=length)
+        theta_is_vector=True,  # pyrefly: ignore[unexpected-keyword]
+        num_steps_override=length)  # pyrefly: ignore[unexpected-keyword]
 
     n_state = self.truncated_step.init_step_state(
         vec_n_theta,
         worker_weights.outer_state,
         key,
-        theta_is_vector=True,
-        num_steps_override=length)
+        theta_is_vector=True,  # pyrefly: ignore[unexpected-keyword]
+        num_steps_override=length)  # pyrefly: ignore[unexpected-keyword]
 
     if not hasattr(trunc_state, "length"):
       raise AttributeError("Please specify a truncation schedule whose state"
@@ -470,7 +470,7 @@ class FullES(gradient_learner.GradientEstimator):
         p_state, n_state = tree_utils.strip_weak_type((p_state, n_state))
 
         p_state, n_state, p_ys, n_ys, m = common.maybe_stacked_es_unroll(
-            self.truncated_step,
+            self.truncated_step,  # pyrefly: ignore[bad-argument-type]
             self.steps_per_jit,
             self.stack_antithetic_samples,
             vec_p_theta,
@@ -587,7 +587,7 @@ class PMAPFullES(FullES):
         functools.partial(
             common.vector_sample_perturbations,
             std=self.std,
-            num_samples=self.truncated_step.num_tasks),
+            num_samples=self.truncated_step.num_tasks),  # pyrefly: ignore[missing-attribute]
         in_axes=(None, 0),
     )
 
@@ -596,8 +596,8 @@ class PMAPFullES(FullES):
           theta,
           outer_state,
           key,
-          theta_is_vector=True,
-          num_steps_override=override)
+          theta_is_vector=True,  # pyrefly: ignore[unexpected-keyword]
+          num_steps_override=override)  # pyrefly: ignore[unexpected-keyword]
 
     self.pmap_init_step_state = jax.pmap(init, in_axes=(0, None, 0, None))
 
@@ -613,7 +613,7 @@ class PMAPFullES(FullES):
                                    length):
     key1, key2 = jax.random.split(key)
     p_state, n_state, p_ys, n_ys, m = common.maybe_stacked_es_unroll(
-        self.truncated_step,
+        self.truncated_step,  # pyrefly: ignore[bad-argument-type]
         self.steps_per_jit,
         self.stack_antithetic_samples,
         vec_p_theta,

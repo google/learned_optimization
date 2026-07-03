@@ -168,7 +168,7 @@ class NAdamW(base.Optimizer):
         "use_bias_correction": use_bias_correction
     }
 
-  def init(self, params, model_state=None, num_steps=None):
+  def init(self, params, model_state=None, num_steps=None):  # pyrefly: ignore[bad-override]
     return NAdamWState(
         iteration=jnp.asarray(0, dtype=jnp.int64),
         params=params,
@@ -177,7 +177,7 @@ class NAdamW(base.Optimizer):
         num_steps=jnp.asarray(num_steps, dtype=jnp.int64),
         state=model_state)
 
-  def update(self,
+  def update(self,  # pyrefly: ignore[bad-override]
              opt_state: NAdamWState,
              grads: Params,
              model_state: Optional[ModelState] = None,

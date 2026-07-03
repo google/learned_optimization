@@ -129,7 +129,7 @@ def orth_init(shape, dtype, key, scale=1.0, axis=-1):
 
 def uniform_scale_init(shape, dtype, key, scale=1.0):
   """uniform scale init."""
-  input_size = onp.product(shape[:-1])
+  input_size = onp.product(shape[:-1])  # pyrefly: ignore[missing-attribute]
   max_val = onp.sqrt(3 / input_size) * scale
   return jax.random.uniform(key, shape, dtype, -max_val, max_val)
 
@@ -233,7 +233,7 @@ class SampleInitializer:
   def get_dynamic(cls, cfg):
     """Get the initializer for the given config."""
 
-    class _SwitchedInitializer(hk.initializers.Initializer):
+    class _SwitchedInitializer(hk.initializers.Initializer):  # pyrefly: ignore[invalid-inheritance]
       """A haiku initializer which dynamically switches amoung initializers."""
 
       def __init__(self):

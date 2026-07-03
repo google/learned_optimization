@@ -90,7 +90,7 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
         worker_weights.theta,
         worker_weights.outer_state,
         key,
-        theta_is_vector=False)
+        theta_is_vector=False)  # pyrefly: ignore[unexpected-keyword]
 
   @profile.wrap()
   def get_datas(self):
@@ -145,7 +145,7 @@ class TruncatedGrad(gradient_learner.GradientEstimator):
       ys = jax.tree_util.tree_map(flat_first, tree_utils.tree_zip_jnp(outputs))
 
       assert ys.loss.shape == (self.unroll_length,
-                               self.truncated_step.num_tasks)
+                               self.truncated_step.num_tasks)  # pyrefly: ignore[missing-attribute]
 
       vec_mean_loss = jnp.sum(
           ys.mask * ys.loss, axis=0) / jnp.sum(

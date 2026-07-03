@@ -83,7 +83,7 @@ class ParametricImageMLP(base.TaskFamily):
       def init(self, rng: PRNGKey) -> Params:
         init_net, unused_apply_net = hk.without_apply_rng(
             hk.transform(_forward))
-        image = next(self.datasets.train)["image"]
+        image = next(self.datasets.train)["image"]  # pyrefly: ignore[missing-attribute]
         return init_net(rng, image)
 
       def loss(self, params: Params, rng: PRNGKey, data: Batch) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray

@@ -83,9 +83,9 @@ def summary_decorator(name: str) -> F:
       with summary_scope(name):
         return to_wrap(*args, **kwargs)
 
-    return _fn
+    return _fn  # pyrefly: ignore[bad-return]
 
-  return ff
+  return ff  # pyrefly: ignore[bad-return]
 
 
 count_per_tags = {}
@@ -190,14 +190,14 @@ def aggregate_metric(k: str,
   assert "||" in k, f"bad summary -- {k}"
   agg, _ = k.split("||")
   # summaries don't have to be the same length. lets ensure there all xnp though
-  vs = [xnp.asarray(v) for v in vs]
+  vs = [xnp.asarray(v) for v in vs]  # pyrefly: ignore[bad-assignment]
 
   if agg == AggregationType.mean:
     # size is known at compile time.
     size = onp.sum([onp.prod(v.shape) for v in vs])
     return xnp.sum(xnp.asarray([xnp.sum(v) / size for v in vs]))  # pytype: disable=bad-return-type  # jnp-type
   elif agg == AggregationType.sample:
-    vs = xnp.concatenate([xnp.asarray(v).ravel() for v in vs], axis=0)
+    vs = xnp.concatenate([xnp.asarray(v).ravel() for v in vs], axis=0)  # pyrefly: ignore[bad-assignment]
     if use_jnp:
       assert key is not None
       i = jax.random.randint(key, [], 0, len(vs))
@@ -307,7 +307,7 @@ def with_summary_output_reduced(fn: F, static_argnums=()) -> G:
 
     return outs, metrics
 
-  return _fn
+  return _fn  # pyrefly: ignore[bad-return]
 
 
 def add_with_summary(fn: F, static_argnums=()) -> G:
@@ -351,8 +351,8 @@ def add_with_summary(fn: F, static_argnums=()) -> G:
     params.append(inspect.Parameter(
         "with_summary", inspect.Parameter.KEYWORD_ONLY, default=False))
     sig = sig.replace(parameters=tuple(params))
-  _fn.__signature__ = sig
-  return _fn
+  _fn.__signature__ = sig  # pyrefly: ignore[missing-attribute]
+  return _fn  # pyrefly: ignore[bad-return]
 
 
 def tree_scalar_mean(prefix, values):

@@ -90,7 +90,7 @@ class OptList(base.Optimizer):
   # We write init and update by constructing new instances of NAdamW to allow
   # for vmap-ing over different idx and to prevent jax tracer leaks.
 
-  def init(self,
+  def init(self,  # pyrefly: ignore[bad-override]
            params: Params,
            model_state: Optional[ModelState] = None,
            *,
@@ -98,7 +98,7 @@ class OptList(base.Optimizer):
     return nadamw.NAdamW(**_get_optimizer_config(self.idx)).init(
         params, model_state, num_steps=num_steps)
 
-  def update(self,
+  def update(self,  # pyrefly: ignore[bad-override]
              opt_state: nadamw.NAdamWState,
              grads: Params,
              model_state: Optional[ModelState] = None,

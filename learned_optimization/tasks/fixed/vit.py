@@ -40,7 +40,7 @@ class VisionTransformerTask(base.Task):
 
   def init(self, key: chex.PRNGKey):
     batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                                   self.datasets.abstract_batch)
+                                   self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     return self.flax_module.init({
         "params": key,
         "dropout": key
@@ -51,12 +51,12 @@ class VisionTransformerTask(base.Task):
   def loss(self, params: Any, key: chex.PRNGKey, data: Any):
     logits = self.flax_module.apply(
         params, data["image"], train=True, rngs={"dropout": key})
-    labels_onehot = jax.nn.one_hot(data["label"], logits.shape[1])
-    loss_vec = base.softmax_cross_entropy(logits=logits, labels=labels_onehot)
+    labels_onehot = jax.nn.one_hot(data["label"], logits.shape[1])  # pyrefly: ignore[missing-attribute]
+    loss_vec = base.softmax_cross_entropy(logits=logits, labels=labels_onehot)  # pyrefly: ignore[bad-argument-type]
     return jnp.mean(loss_vec)
 
   def normalizer(self, loss):
-    max_class = onp.log(2 * self.datasets.extra_info["num_classes"])
+    max_class = onp.log(2 * self.datasets.extra_info["num_classes"])  # pyrefly: ignore[missing-attribute]
     loss = jnp.nan_to_num(
         loss, nan=max_class, neginf=max_class, posinf=max_class)
     # shift to [0, 10] then clip.

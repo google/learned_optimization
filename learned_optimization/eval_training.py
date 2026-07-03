@@ -183,7 +183,7 @@ def single_task_training_curves(
               opt,
               opt_state,
               key1,
-              task.datasets.split(s) if use_data else (),
+              task.datasets.split(s) if use_data else (),  # pyrefly: ignore[bad-argument-type, missing-attribute]
               eval_batches if not on_last else last_eval_batches,
               device=device)
           m[f"eval/{s}/loss"] = loss
@@ -197,7 +197,7 @@ def single_task_training_curves(
         eval_xs.append(i)
 
     with profile.Profile("get_batch"):
-      batch = next(task.datasets.train) if use_data else ()
+      batch = next(task.datasets.train) if use_data else ()  # pyrefly: ignore[missing-attribute]
     with profile.Profile("put_batch_and_split"):
       batch = jax.device_put(batch, device=device)
 

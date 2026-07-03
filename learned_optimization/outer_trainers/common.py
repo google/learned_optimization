@@ -88,7 +88,7 @@ def _stack(a, b, axis=0):
     static_argnames=("truncated_step", "with_summary", "unroll_length",
                      "theta_is_vector", "wrap_step_fn"),
 )
-@functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 9))
+@functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 9))  # pyrefly: ignore[bad-specialization]
 def truncated_unroll(
     truncated_step: truncated_step_mod.VectorizedTruncatedStep,
     unroll_length: int,

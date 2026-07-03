@@ -61,7 +61,7 @@ class ParametricLMTransformer(base.TaskFamily):
     return cfgobject.CFGNamed("ParametricLMTransformer", {})
 
   def task_fn(self, task_params) -> base.Task:
-    max_vocab_size = self.datasets.extra_info["vocab_size"]
+    max_vocab_size = self.datasets.extra_info["vocab_size"]  # pyrefly: ignore[missing-attribute]
     if self.vocab_size is None:
       vocab_size = max_vocab_size
     else:
@@ -103,7 +103,7 @@ class ParametricLMTransformer(base.TaskFamily):
 
       def init(self, key: chex.PRNGKey) -> base.Params:
         batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                                       self.datasets.abstract_batch)
+                                       self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
         return self._net.init(key, batch)
 
       def loss(self, params, key, data):

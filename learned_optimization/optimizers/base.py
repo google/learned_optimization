@@ -130,11 +130,11 @@ class GraftedOptimizer(Optimizer):
     self.magnitude_opt = magnitude_opt
     self.direction_opt = direction_opt
 
-  def init(self, params, model_state=None, num_steps=None, **kwargs):
+  def init(self, params, model_state=None, num_steps=None, **kwargs):  # pyrefly: ignore[bad-override]
     return GraftedOptimizerState(
         iteration=jnp.asarray(0, dtype=jnp.int32),
         params=params,
-        state=model_state,
+        state=model_state,  # pyrefly: ignore[bad-argument-type]
         mag_opt_state=self.magnitude_opt.init(
             params, model_state=model_state, num_steps=num_steps, **kwargs),
         dir_opt_state=self.direction_opt.init(
@@ -165,7 +165,7 @@ class GraftedOptimizer(Optimizer):
     return GraftedOptimizerState(
         iteration=opt_state.iteration + 1,
         params=next_params,
-        state=model_state,
+        state=model_state,  # pyrefly: ignore[bad-argument-type]
         mag_opt_state=next_mag_opt_state,
         dir_opt_state=next_dir_opt_state,
     )

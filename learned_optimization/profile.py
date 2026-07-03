@@ -55,12 +55,12 @@ def wrap():
 
   def _wrapper(fn: T) -> T:
 
-    @functools.wraps(fn)
+    @functools.wraps(fn)  # pyrefly: ignore[bad-argument-type]
     def _fn(*args, **kwargs):
-      with Profile(fn.__name__):
-        return fn(*args, **kwargs)
+      with Profile(fn.__name__):  # pyrefly: ignore[missing-attribute]
+        return fn(*args, **kwargs)  # pyrefly: ignore[not-callable]
 
-    return _fn
+    return _fn  # pyrefly: ignore[bad-return]
 
   return _wrapper
 

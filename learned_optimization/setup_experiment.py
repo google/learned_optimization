@@ -63,7 +63,7 @@ def parse_and_set_gin_config(finalize: bool, skip_unknown: bool):
         assert imp.endswith(".*")
         prefix = imp[0:-2]
         path = importlib.import_module(prefix).__file__
-        for p in glob.glob(os.path.join(os.path.dirname(path), "*.py")):
+        for p in glob.glob(os.path.join(os.path.dirname(path), "*.py")):  # pyrefly: ignore[no-matching-overload]
           p = p.split("/")[-1].replace(".py", "")
           to_import = prefix + "." + p
           logging.info("Gin is importing %s from glob", to_import)

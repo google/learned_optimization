@@ -266,7 +266,7 @@ class GradientLearner:
       min_loss = jnp.min(losses)
 
     fn = _get_theta_update_fn(self._theta_opt)
-    key1, key2 = jax.random.split(key)
+    key1, key2 = jax.random.split(key)  # pyrefly: ignore[bad-argument-type]
     theta_opt_state, theta_update_metrics = fn(
         theta_opt_state,
         grads,
@@ -432,7 +432,7 @@ def gradient_worker_compute(
             "loss": estimator_out.unroll_info.loss[idx, :],
             "task_param": jax.tree_util.tree_map(fn, onp_task_params),
             "iteration": iteration,
-            "outer_iteration": worker_weights.outer_state.outer_iteration,
+            "outer_iteration": worker_weights.outer_state.outer_iteration,  # pyrefly: ignore[missing-attribute]
         })
       else:
         logging.warn("No out specified by learner. "
@@ -593,7 +593,7 @@ class SingleMachineGradientLearner:
     next_theta_state, metrics = self.gradient_learner.update(
         state.gradient_learner_state, [worker_compute_out.to_put],
         key=key2,
-        with_metrics=with_metrics)
+        with_metrics=with_metrics)  # pyrefly: ignore[bad-argument-type]
 
     metrics = summary.aggregate_metric_list(
         [worker_compute_out.metrics, metrics])

@@ -76,4 +76,4 @@ def opt_to_optax_opt(
 
     return step, next_state
 
-  return optax.GradientTransformationExtraArgs(init_fn, update_fn)
+  return optax.GradientTransformationExtraArgs(init_fn, update_fn)  # pyrefly: ignore[bad-argument-type]

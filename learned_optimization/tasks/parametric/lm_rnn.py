@@ -72,7 +72,7 @@ class ParametricLMRNN(base.TaskFamily):
     })
 
   def task_fn(self, task_params) -> base.Task:
-    max_vocab_size = self.datasets.extra_info["vocab_size"]
+    max_vocab_size = self.datasets.extra_info["vocab_size"]  # pyrefly: ignore[missing-attribute]
     if self.vocab_size is None:
       vocab_size = max_vocab_size
     else:
@@ -120,7 +120,7 @@ class ParametricLMRNN(base.TaskFamily):
         init_net, unused_apply_net = hk.without_apply_rng(
             hk.transform(_forward))
         batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                                       self.datasets.abstract_batch)
+                                       self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
         seq = batch["obs"]
         return init_net(rng, seq)
 

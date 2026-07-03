@@ -57,9 +57,9 @@ class OptaxOptimizer(base.Optimizer):
            key: Optional[chex.PRNGKey] = None):
     return OptaxState(  # pytype: disable=wrong-arg-types  # jax-ndarray
         params=params,
-        optax_opt_state=self.opt.init(params),
-        state=model_state,
-        iteration=0,
+        optax_opt_state=self.opt.init(params),  # pyrefly: ignore[bad-argument-type]
+        state=model_state,  # pyrefly: ignore[bad-argument-type]
+        iteration=0,  # pyrefly: ignore[bad-argument-type]
     )
 
   @functools.partial(jax.jit, static_argnums=(0,))
@@ -74,9 +74,9 @@ class OptaxOptimizer(base.Optimizer):
     update, new_opt_state = self.opt.update(grad, opt_state.optax_opt_state,
                                             opt_state.params)
     return OptaxState(
-        state=model_state,
-        params=optax.apply_updates(opt_state.params, update),
-        optax_opt_state=new_opt_state,
+        state=model_state,  # pyrefly: ignore[bad-argument-type]
+        params=optax.apply_updates(opt_state.params, update),  # pyrefly: ignore[bad-argument-type]
+        optax_opt_state=new_opt_state,  # pyrefly: ignore[bad-argument-type]
         iteration=opt_state.iteration + 1,
     )
 
@@ -143,8 +143,8 @@ class Adam(OptaxOptimizer):
 def piecewise_linear(times: Sequence[float],
                      vals: Sequence[float]) -> Callable[[float], float]:
   """Returns a function which interpolates piecewise values."""
-  times = jnp.asarray(times)
-  vals = jnp.asarray(vals)
+  times = jnp.asarray(times)  # pyrefly: ignore[bad-assignment]
+  vals = jnp.asarray(vals)  # pyrefly: ignore[bad-assignment]
 
   def fn(x):
     if len(times) <= 1:

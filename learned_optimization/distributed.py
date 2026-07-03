@@ -127,7 +127,7 @@ class AsyncLearner(Generic[T, W]):
       self._server.Start()
 
   def _is_step_valid(self, step: int) -> bool:
-    step = onp.asarray(step)
+    step = onp.asarray(step)  # pyrefly: ignore[bad-assignment]
     return (self._current_iteration >= step and  # pytype: disable=bad-return-type  # typed-numpy
             (self._current_iteration - step) <= self._staleness)
 
@@ -224,7 +224,7 @@ class AsyncLearner(Generic[T, W]):
     """
     with self._lock:
       self._weights = weights
-      self._current_iteration = onp.asarray(current_iteration)
+      self._current_iteration = onp.asarray(current_iteration)  # pyrefly: ignore[bad-assignment]
 
       before = len(self._outer_gradients)
 
@@ -350,7 +350,7 @@ class SyncLearner(Generic[T, W]):
       self._lock.acquire(blocking=True)
       assert worker_id < self._num_workers
       if step == self._current_iteration:
-        self._outer_gradients[worker_id] = (step, value)
+        self._outer_gradients[worker_id] = (step, value)  # pyrefly: ignore[unsupported-operation]
       self._lock.release()
       self._cv.notify_all()
 
@@ -425,7 +425,7 @@ class SyncLearner(Generic[T, W]):
     del clear_buffer
     with self._lock, self._cv:
       self._weights = weights
-      self._current_iteration = onp.asarray(current_iteration)
+      self._current_iteration = onp.asarray(current_iteration)  # pyrefly: ignore[bad-assignment]
       self._outer_gradients = {k: None for k in self._outer_gradients.keys()}
       self._cv.notify_all()
 

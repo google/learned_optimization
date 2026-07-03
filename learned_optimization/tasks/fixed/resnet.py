@@ -51,7 +51,7 @@ class _ResnetTask(base.Task):
         'initial_conv_kernel_size', 'initial_conv_stride', 'max_pool',
         'resnet_v2'
     ]
-    num_classes = self.datasets.extra_info['num_classes']
+    num_classes = self.datasets.extra_info['num_classes']  # pyrefly: ignore[missing-attribute]
     mod = resnet.ResNet(
         num_classes=num_classes, **{k: self._cfg[k] for k in args})
     logits = mod(batch['image'], is_training=True)
@@ -61,7 +61,7 @@ class _ResnetTask(base.Task):
 
   def init_with_state(self, key: chex.PRNGKey) -> base.Params:
     batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                                   self.datasets.abstract_batch)
+                                   self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     return self._net.init(key, batch)
 
   def loss_with_state(self, params, state, key, data):

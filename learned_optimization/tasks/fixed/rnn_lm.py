@@ -78,14 +78,14 @@ class TeacherForcedRNNLM(base.Task):
 
   def init(self, key: PRNGKey) -> base.Params:
     batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                                   self.datasets.abstract_batch)
+                                   self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     return self._mod.init(key, batch["obs"])
 
   def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
     obs = data["obs"]
     target = data["target"]
 
-    max_vocab_size = self.datasets.extra_info["vocab_size"]
+    max_vocab_size = self.datasets.extra_info["vocab_size"]  # pyrefly: ignore[missing-attribute]
     vocab_size = self._vocab_size
     if vocab_size < max_vocab_size:
       # if the target vocab is smaller, we use a mod to keep all

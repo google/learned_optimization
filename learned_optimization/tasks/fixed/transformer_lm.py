@@ -42,7 +42,7 @@ class _TransformerTask(base.Task):
     return self._name
 
   def _hk_forward(self, batch):
-    vocab_size = self.datasets.extra_info['vocab_size']
+    vocab_size = self.datasets.extra_info['vocab_size']  # pyrefly: ignore[missing-attribute]
     mod = transformer.Transformer(
         num_heads=self._cfg['num_heads'],
         num_layers=self._cfg['num_layers'],
@@ -57,7 +57,7 @@ class _TransformerTask(base.Task):
 
   def init(self, key: chex.PRNGKey) -> base.Params:
     batch = jax.tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype),
-                                   self.datasets.abstract_batch)
+                                   self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     return self._net.init(key, batch)
 
   def loss(self, params, key, data):

@@ -137,7 +137,7 @@ class ScheduledTruncationSchedule(TruncationSchedule):
       shift = jnp.asarray(jax.random.normal(key) * self.std, dtype=jnp.int32)
       length = jnp.maximum(length + shift, self.min_length)
 
-    length = summary.summary("length", length)
+    length = summary.summary("length", length)  # pyrefly: ignore[bad-argument-type]
     return ConstantTruncationState(length=jnp.asarray(length, dtype=jnp.int32))
 
   def next_state(
@@ -147,4 +147,4 @@ class ScheduledTruncationSchedule(TruncationSchedule):
     is_done = step >= state.length
     state = lax.cond(is_done, lambda ss: self.init(*ss), lambda ss: state,
                      (key, outer_state))
-    return state, is_done
+    return state, is_done  # pyrefly: ignore[bad-return]

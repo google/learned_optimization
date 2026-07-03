@@ -142,7 +142,7 @@ class TruncatedES(gradient_learner.GradientEstimator):
         worker_weights.theta,
         worker_weights.outer_state,
         key,
-        theta_is_vector=False)
+        theta_is_vector=False)  # pyrefly: ignore[unexpected-keyword]
 
   @profile.wrap()
   def get_datas(self):
@@ -195,7 +195,7 @@ class TruncatedES(gradient_learner.GradientEstimator):
       key = next(rng)
 
       p_state, n_state, p_ys, n_ys, m = common.maybe_stacked_es_unroll(
-          self.truncated_step,
+          self.truncated_step,  # pyrefly: ignore[bad-argument-type]
           self.steps_per_jit,
           self.stack_antithetic_samples,
           vec_p_theta,

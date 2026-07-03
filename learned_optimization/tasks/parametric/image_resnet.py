@@ -60,7 +60,7 @@ class ParametricImageResNet(base.TaskFamily):
     })
 
   def task_fn(self, task_params) -> base.Task:
-    num_classes = self.datasets.extra_info["num_classes"]
+    num_classes = self.datasets.extra_info["num_classes"]  # pyrefly: ignore[missing-attribute]
     datasets = self.datasets
 
     def _forward(inp):
@@ -86,7 +86,7 @@ class ParametricImageResNet(base.TaskFamily):
 
       def init_with_state(self, key: PRNGKey) -> Tuple[Params, ModelState]:
         init_net, unused_apply_net = hk.transform_with_state(_forward)
-        image = next(self.datasets.train)["image"]
+        image = next(self.datasets.train)["image"]  # pyrefly: ignore[missing-attribute]
         params, state = init_net(key, image)
         return params, state
 

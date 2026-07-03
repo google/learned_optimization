@@ -62,7 +62,7 @@ class GradientAccumulator(base.Optimizer):
   def get_state(self, state):
     return state.model_state
 
-  def init(self, p, model_state=None, num_steps=None, **kwargs):
+  def init(self, p, model_state=None, num_steps=None, **kwargs):  # pyrefly: ignore[bad-override]
     if num_steps is not None:
       rescale_num_steps = num_steps // self.num_average
     else:
@@ -76,7 +76,7 @@ class GradientAccumulator(base.Optimizer):
         grad_accum,
         loss_accum,
         inner_opt_state,
-        model_state=model_state,
+        model_state=model_state,  # pyrefly: ignore[bad-argument-type]
         iteration=jnp.asarray(0, dtype=jnp.int64))
 
   def update(self,
@@ -116,5 +116,5 @@ class GradientAccumulator(base.Optimizer):
         new_grad_accum,
         new_loss_accum,
         new_inner_opt_state,
-        model_state=model_state,
+        model_state=model_state,  # pyrefly: ignore[bad-argument-type]
         iteration=opt_state.iteration + 1)

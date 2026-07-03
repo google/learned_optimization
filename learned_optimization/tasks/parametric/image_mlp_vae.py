@@ -123,7 +123,7 @@ class ParametricImageMLPVAE(base.TaskFamily):
         self.datasets = datasets
 
       def init(self, key: PRNGKey) -> Params:
-        image = next(self.datasets.train)["image"]
+        image = next(self.datasets.train)["image"]  # pyrefly: ignore[missing-attribute]
         return hk.transform(_forward).init(key, image)
 
       def loss(self, params: Params, key: PRNGKey, data: Batch) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
@@ -138,7 +138,7 @@ class ParametricImageMLPVAE(base.TaskFamily):
         # loss is from a mix of p(x|z) and kl.
         # p(x|z) is the biggest component so let's ignore kl.
         # This is the sum over pixels, so we normalize by dividing by # pixels.
-        n_elements = onp.prod(next(datasets.train)["image"].shape[1:])
+        n_elements = onp.prod(next(datasets.train)["image"].shape[1:])  # pyrefly: ignore[missing-attribute]
         out = jax.lax.cond(task_params["per_dim_loss"], lambda x: x,
                            lambda x: x / n_elements, loss)
         out = jnp.nan_to_num(out, nan=10, neginf=10, posinf=10)

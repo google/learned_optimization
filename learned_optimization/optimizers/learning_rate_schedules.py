@@ -191,4 +191,4 @@ class ExponentialDecay(ScalarSchedule):
   def __call__(self,
                global_step: chex.Array,
                max_steps: Optional[chex.Array] = None) -> chex.Array:
-    return self.base_lr * (1 - self.decay_amount)**global_step
+    return self.base_lr * (1 - self.decay_amount)**global_step  # pyrefly: ignore[bad-return]

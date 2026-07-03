@@ -85,10 +85,10 @@ class SimpleLOptTruncatedStep(truncated_step.TruncatedStep):
       unroll_state = opt.update(unroll_state, grad, loss=loss)
       out = truncated_step.TruncatedUnrollOut(  # pytype: disable=wrong-arg-types  # jax-ndarray
           loss=loss,
-          is_done=False,
+          is_done=False,  # pyrefly: ignore[bad-argument-type]
           task_param=None,
           iteration=unroll_state.iteration,
-          mask=True,
+          mask=True,  # pyrefly: ignore[bad-argument-type]
       )
       return unroll_state, out
 
@@ -96,11 +96,11 @@ class SimpleLOptTruncatedStep(truncated_step.TruncatedStep):
       params = self.task.init(key)
       unroll_state = self.lopt.opt_fn(theta).init(params)
       out = truncated_step.TruncatedUnrollOut(  # pytype: disable=wrong-arg-types  # jax-ndarray
-          loss=0.0,
-          is_done=True,
+          loss=0.0,  # pyrefly: ignore[bad-argument-type]
+          is_done=True,  # pyrefly: ignore[bad-argument-type]
           task_param=None,
           iteration=unroll_state.iteration,
-          mask=False,
+          mask=False,  # pyrefly: ignore[bad-argument-type]
       )
       return unroll_state, out
 
@@ -201,7 +201,7 @@ def _init_truncation_state(
       inner_step=jnp.asarray(0, dtype=jnp.int32),
       truncation_state=trunc_state,
       task_param=task_param,
-      is_done=False,
+      is_done=False,  # pyrefly: ignore[bad-argument-type]
   )
 
 

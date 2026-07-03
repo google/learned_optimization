@@ -36,13 +36,13 @@ class ExtendTimeWrapper(opt_base.Optimizer):
     self._opt = opt
     self._warp_fn = warp_fn
 
-  def init(self, params, model_state=None, *, num_steps):
+  def init(self, params, model_state=None, *, num_steps):  # pyrefly: ignore[bad-override]
     num_steps = jnp.asarray(self._warp_fn(num_steps), jnp.int32)
 
     inner_opt_state = self._opt.init(params, model_state, num_steps=num_steps)
     return ExtendTimeState(jnp.asarray(0, jnp.int32), inner_opt_state)
 
-  def update(self, opt_state, grad, loss=None, **kwargs):
+  def update(self, opt_state, grad, loss=None, **kwargs):  # pyrefly: ignore[bad-override]
     inner_state = opt_state.inner_opt_state
     inner_state = inner_state.replace(
         iteration=self._warp_fn(opt_state.iteration))
@@ -77,7 +77,7 @@ class WeightDecayWrapper(opt_base.Optimizer):
   def get_state(self, opt_state):
     return self.opt.get_state(opt_state)
 
-  def init(self, params, model_state=None, **kwargs):
+  def init(self, params, model_state=None, **kwargs):  # pyrefly: ignore[bad-override]
     return self.opt.init(params, model_state=model_state, **kwargs)
 
   def update(self, opt_state, grads, model_state=None, loss=None, **kwargs):
@@ -85,7 +85,7 @@ class WeightDecayWrapper(opt_base.Optimizer):
 
     if self.add_to_loss:
       l2 = [jnp.sum(p**2) for p in jax.tree_util.tree_leaves(ps)]
-      loss = loss + sum([x * self.weight_decay for x in l2])
+      loss = loss + sum([x * self.weight_decay for x in l2])  # pyrefly: ignore[unsupported-operation]
 
     grad_l2 = jax.tree_util.tree_map(lambda p: self.weight_decay * p, ps)
     grads = jax.tree_util.tree_map(lambda g, g_l2: g + g_l2, grads, grad_l2)

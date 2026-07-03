@@ -160,7 +160,7 @@ def periodically_save_checkpoint(
   elif step_interval is not None:
     do_save = (current_iteration % step_interval == 0)
 
-  if do_save:
+  if do_save:  # pyrefly: ignore[unbound-name]
     # if a checkpoint exists already, delete it.
 
     # get the last step
@@ -184,7 +184,7 @@ def periodically_save_checkpoint(
 
         path = save_checkpoint(train_log_dir, prefix, value, step, keep=keep)
         paths[prefix] = path
-        _last_checkpoint_time[prefix] = time.time()
+        _last_checkpoint_time[prefix] = time.time()  # pyrefly: ignore[unsupported-operation]
 
       paths = hk.data_structures.to_immutable_dict(paths)
       return paths

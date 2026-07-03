@@ -297,7 +297,7 @@ class TruncGradEstTask(base.Task):
     raise ValueError("Use loss_with_state instead!")
 
   def loss_with_state_and_aux(self, params, model_state, key, datas):
-    l, s = self.loss_with_state(params, model_state, key, datas)
+    l, s = self.loss_with_state(params, model_state, key, datas)  # pyrefly: ignore[bad-argument-type]
     return l, s, {}
 
 

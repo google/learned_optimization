@@ -142,12 +142,12 @@ def map_named(function: Callable[[str, Any], Any],
     Struct with the same pytree.
   """
   if isinstance(val, Mapping):
-    return type(val)(
-        **{k: map_named(function, v, key + "/" + k) for k, v in val.items()})
+    return type(val)(  # pyrefly: ignore[bad-instantiation]
+        **{k: map_named(function, v, key + "/" + k) for k, v in val.items()})  # pyrefly: ignore[unsupported-operation]
   elif isinstance(val, tuple) or isinstance(val, list):
     return type(val)(
         *
-        [map_named(function, v, key + "/" + str(i)) for i, v in enumerate(val)])
+        [map_named(function, v, key + "/" + str(i)) for i, v in enumerate(val)])  # pyrefly: ignore[unsupported-operation]
   # check if it's a flax dataclass
   elif hasattr(val, "__dataclass_fields__"):
     classname = repr(val).split("(")[0]
@@ -156,7 +156,7 @@ def map_named(function: Callable[[str, Any], Any],
         for k, v in val.__dataclass_fields__.items()
     })
   else:
-    return function(key, val)
+    return function(key, val)  # pyrefly: ignore[bad-argument-type]
 
 
 def strip_weak_type(pytree):
