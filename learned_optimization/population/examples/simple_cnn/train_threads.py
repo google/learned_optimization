@@ -78,21 +78,21 @@ def train_one(worker_id):
       for _ in range(5):
         batch = next(te_iterator)
         key, key1 = jax.random.split(key)
-        l = common.loss(params, key1, batch)
+        l = common.loss(params, key1, batch)  # pyrefly: ignore[unbound-name]
         ls.append(l)
       mean_l = onp.mean(ls)
 
       # save to disk
-      model_state = (params, opt_state)
+      model_state = (params, opt_state)  # pyrefly: ignore[unbound-name]
       state_path = os.path.join(train_log_dir, f"{step}__{gen_id}.model")
       common.save_state(state_path, model_state)
       population.set_eval(worker_id, gen_id, step, state_path, mean_l)
       print(f"{worker_id} ]] step={step}, loss={l} path={state_path}")
       summary_writer.scalar("loss", l, step=step)
       summary_writer.scalar(
-          "learning_rate", meta_params["learning_rate"], step=step)
+          "learning_rate", meta_params["learning_rate"], step=step)  # pyrefly: ignore[unsupported-operation]
       summary_writer.scalar(
-          "log_learning_rate", onp.log(meta_params["learning_rate"]), step=step)
+          "log_learning_rate", onp.log(meta_params["learning_rate"]), step=step)  # pyrefly: ignore[unsupported-operation]
       summary_writer.flush()
 
     params, opt_state, l = common.update(params, key, opt_state, batch,

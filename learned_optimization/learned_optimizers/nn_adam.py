@@ -272,7 +272,7 @@ class NNAdam(lopt_base.LearnedOptimizer):
         return NNAdamState(
             params=params,
             rolling_features=rolling.init(params),
-            iteration=jnp.asarray(0, dtype=jnp.int32),
+            iteration=jnp.asarray(0, dtype=jnp.int32),  # pyrefly: ignore[bad-argument-type]
             state=model_state,
             lstm_hidden_state=lstm_hidden_state,
             per_layer_lr=jax.tree_util.tree_map(

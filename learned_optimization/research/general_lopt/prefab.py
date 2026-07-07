@@ -94,7 +94,7 @@ class LearnedOptimizer(opt_base.Optimizer):
   def set_params(self, opt_state, params):
     return self.opt.set_params(opt_state, params)
 
-  def name(self):
+  def name(self):  # pyrefly: ignore[bad-override]
     return "LearnedOptimizer"
 
 

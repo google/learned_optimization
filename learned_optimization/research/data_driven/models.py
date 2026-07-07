@@ -284,9 +284,9 @@ class VisionTransformer(Model):
 
 
 class LayerState(NamedTuple):
-  lstm_state: hk.LSTMState = None
-  fwd_msg: jnp.ndarray = None
-  bwd_msg: jnp.ndarray = None
+  lstm_state: hk.LSTMState = None  # pyrefly: ignore[bad-assignment]
+  fwd_msg: jnp.ndarray = None  # pyrefly: ignore[bad-assignment]
+  bwd_msg: jnp.ndarray = None  # pyrefly: ignore[bad-assignment]
 
 
 @gin.configurable()
@@ -362,7 +362,7 @@ class VSMLLayer(hk.Module):
       out, lstm_state = self._tick(lstm_state, fwd_msg, bwd_msg, aux)
 
     # Update forward messages
-    out_fwd_msg = self._fwd_messenger(out).mean(axis=0)
+    out_fwd_msg = self._fwd_messenger(out).mean(axis=0)  # pyrefly: ignore[unbound-name]
     # Update backward messages
     out_bwd_msg = self._bwd_messenger(out).mean(axis=1)
 
@@ -414,7 +414,7 @@ class BiSequential(hk.Module):
         layer = self.layers[i]
         _, new_states[i + 1] = layer(state, prev_s.fwd_msg, next_s.bwd_msg, aux)
 
-    return out, new_states[1:-1]
+    return out, new_states[1:-1]  # pyrefly: ignore[unbound-name]
 
 
 @gin.configurable()
@@ -591,7 +591,7 @@ class SGD(Model):
     self._use_maml = use_maml
 
     self._grad_func = jax.grad(self._loss, has_aux=True)
-    self._network = hk.without_apply_rng(hk.transform(self._network))
+    self._network = hk.without_apply_rng(hk.transform(self._network))  # pyrefly: ignore[bad-assignment]
     self._opt = getattr(optax, optimizer)(learning_rate)
 
   def create_model(self, key: chex.PRNGKey) -> chex.ArrayTree:
@@ -618,7 +618,7 @@ class SGD(Model):
     return x
 
   def _loss(self, params, x, labels):
-    logits = self._network.apply(params, x)
+    logits = self._network.apply(params, x)  # pyrefly: ignore[missing-attribute]
     loss = optax.softmax_cross_entropy(logits, labels)
     return loss, logits
 
@@ -636,10 +636,10 @@ class SGD(Model):
     dummy_inp = inputs[0]
     if self._use_maml:
       key = hk.next_rng_key() if hk.running_init() else None
-      params = hk.lift(self._network.init, name='maml_lift')(key, dummy_inp)
+      params = hk.lift(self._network.init, name='maml_lift')(key, dummy_inp)  # pyrefly: ignore[missing-attribute]
     else:
       key = hk.next_rng_key()
-      params = self._network.init(key, dummy_inp)
+      params = self._network.init(key, dummy_inp)  # pyrefly: ignore[missing-attribute]
     opt_state = self._opt.init(params)
 
     def scan_tick(carry, x):

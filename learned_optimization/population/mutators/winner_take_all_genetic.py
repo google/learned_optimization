@@ -97,7 +97,7 @@ class WinnerTakeAllGenetic(population.Mutate):
     # We assume that the values here are all floating loss values.
     # grab the highest performing checkpoint data
     best_idx = onp.argmin(values)
-    genid = current_workers[best_idx].generation_id
+    genid = current_workers[best_idx].generation_id  # pyrefly: ignore[bad-index]
 
     # sort by time or step. These should always be the same
     if self._steps_per_exploit:

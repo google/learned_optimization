@@ -81,7 +81,7 @@ def train_one(worker_id: int):
       for _ in range(20):
         batch = next(te_iterator)
         key, key1 = jax.random.split(key)
-        l = common.loss(params, key1, batch, meta_params, False)
+        l = common.loss(params, key1, batch, meta_params, False)  # pyrefly: ignore[unbound-name]
         te_ls.append(l)
 
         batch = next(tr_iterator)
@@ -92,7 +92,7 @@ def train_one(worker_id: int):
       tr_mean_l = onp.mean(tr_ls)
 
       # save to disk
-      model_state = (params, opt_state)
+      model_state = (params, opt_state)  # pyrefly: ignore[unbound-name]
       state_path = os.path.join(train_log_dir, f"{step}__{gen_id}.model")
       common.save_state(state_path, model_state)
 

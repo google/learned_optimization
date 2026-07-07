@@ -83,11 +83,11 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
         worker_weights.theta,
         worker_weights.outer_state,
         key,
-        theta_is_vector=False)
+        theta_is_vector=False)  # pyrefly: ignore[unexpected-keyword]
 
     # we use sample_perturbations instead of vector_sample_perturbations
     # as we don't need the positively/negatively perturbed thetas
-    keys = jax.random.split(key, self.truncated_step.num_tasks)
+    keys = jax.random.split(key, self.truncated_step.num_tasks)  # pyrefly: ignore[missing-attribute]
     epsilons = sample_multiple_perturbations(worker_weights.theta, keys,
                                              self.std)
 
@@ -120,7 +120,7 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
     total_count = 0.
 
     for i in range(self.unroll_length):
-      data = self.truncated_step.get_batch()
+      data = self.truncated_step.get_batch()  # pyrefly: ignore[missing-argument]
       curr_key = next(rng)
 
       state, loss_sum_step, g_sum_step, count =\
@@ -148,7 +148,7 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
     #     is_done=p_ys.is_done)
 
     output = gradient_learner.GradientEstimatorOut(
-        mean_loss=mean_loss, grad=g, unroll_state=state, unroll_info=None)
+        mean_loss=mean_loss, grad=g, unroll_state=state, unroll_info=None)  # pyrefly: ignore[bad-argument-type]
 
     return output, {}
 
@@ -183,7 +183,7 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
         key=key1,
         data=data,
         outer_state=outer_state,
-        theta_is_vector=True)
+        theta_is_vector=True)  # pyrefly: ignore[unexpected-keyword]
     neg_unroll_states, neg_outs = \
       self.truncated_step.unroll_step(
         theta=neg_perturbed_thetas,
@@ -193,7 +193,7 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
         # and also ensures we get the same loss evaluation (if it takes randomness)
         data=data, # also use the same data
         outer_state=outer_state,
-        theta_is_vector=True)
+        theta_is_vector=True)  # pyrefly: ignore[unexpected-keyword]
 
     # keep track of sum of losses for logging
     # pos_outs.loss is an array of losses (one for each trajectory/particle)
@@ -218,13 +218,13 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
     count = jnp.sum(pos_outs.mask)
 
     # for the particle that resets, we sample a new epsilon
-    keys = jax.random.split(key2, self.truncated_step.num_tasks)
+    keys = jax.random.split(key2, self.truncated_step.num_tasks)  # pyrefly: ignore[missing-attribute]
     new_epsilons = sample_multiple_perturbations(theta, keys, self.std)
 
     # replace epsilon of the trajectory that has finished with a new epsilon
     def update_eps(eps, new_eps):
       reshape_isdone = jnp.reshape(pos_outs.is_done,
-                                   [self.truncated_step.num_tasks] + [1] *
+                                   [self.truncated_step.num_tasks] + [1] *  # pyrefly: ignore[missing-attribute]
                                    (len(eps.shape) - 1))
       return eps * (1 - reshape_isdone) + new_eps * (reshape_isdone)
 

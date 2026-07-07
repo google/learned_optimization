@@ -443,7 +443,7 @@ def write_results_thread_main(
         ]
 
       for fn in values_to_metrics_fns:
-        metric = fn(task_group, values, tasks)
+        metric = fn(task_group, values, tasks)  # pyrefly: ignore[not-callable]
         for k, v in metric.items():
           if k in metrics:
             raise ValueError(f"Duplicate metric key found! [[{k}]]")
@@ -472,14 +472,14 @@ def write_results_thread_main(
             maybe_finished,
             metrics[log_to_population_tag],
             population_server_name=population_server_name,
-            population_worker_id=population_worker_id)
+            population_worker_id=population_worker_id)  # pyrefly: ignore[bad-argument-type]
 
 
 
 @gin.configurable
-def eval_chief_config(chief_name: str = gin.REQUIRED,
-                      num_workers: int = gin.REQUIRED,
-                      learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED):
+def eval_chief_config(chief_name: str = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+                      num_workers: int = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+                      learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED):  # pyrefly: ignore[bad-function-definition]
   """Parameters of the evaluation. To be set with gin."""
   if chief_name == gin.REQUIRED or num_workers == gin.REQUIRED:
     raise ValueError("Must set chief_name and num_workers with gin!")
@@ -579,7 +579,7 @@ def main(_):
   logging.info("Waiting on %s", train_log_dir)
 
   i = 0
-  while not filesystem.exists(train_log_dir):
+  while not filesystem.exists(train_log_dir):  # pyrefly: ignore[bad-argument-type]
     time.sleep(1)
     i += 1
     if i % 20 == 0:

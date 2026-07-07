@@ -27,7 +27,7 @@ import yaml
 def main(_) -> None:
   rank = jax.process_index()
   train_log_dir = setup_experiment.setup_experiment(make_dir=(rank == 0))
-  train(train_log_dir)
+  train(train_log_dir)  # pyrefly: ignore[bad-argument-type]
 
 
 def train(training_log_directory: str):
@@ -37,7 +37,7 @@ def train(training_log_directory: str):
     training_log_directory: Directory to store log data to.
   """
 
-  experiment = mnist_projections.ProjectionExperiment(training_log_directory)
+  experiment = mnist_projections.ProjectionExperiment(training_log_directory)  # pyrefly: ignore[missing-argument]
   log_dict = experiment.run()
 
   if jax.process_index() == 0:

@@ -94,7 +94,7 @@ def state_compare_mse_params(prev_src_state: UnrollState,
                      "state_compare_loss", "with_summary", "unroll_length",
                      "outer_param_noise"),
 )
-@functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 4))
+@functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 4))  # pyrefly: ignore[bad-specialization]
 @functools.partial(jax.value_and_grad, has_aux=True, argnums=5)
 def distill_truncated_unroll(
     truncated_step: truncated_step_mod.VectorizedTruncatedStep,
@@ -226,7 +226,7 @@ class TruncatedDistill(gradient_learner.GradientEstimator):
 
     if self.outer_param_noise > 0.0:
       theta = _multi_perturb(worker_weights.theta, key3, self.outer_param_noise,
-                             self.truncated_step.num_tasks)
+                             self.truncated_step.num_tasks)  # pyrefly: ignore[missing-attribute]
       theta_is_vector = True
     else:
       theta = worker_weights.theta
@@ -236,7 +236,7 @@ class TruncatedDistill(gradient_learner.GradientEstimator):
         theta,
         worker_weights.outer_state,
         key1,
-        theta_is_vector=theta_is_vector)
+        theta_is_vector=theta_is_vector)  # pyrefly: ignore[unexpected-keyword]
 
     src_unroll_state = self.src_truncated_step.init_step_state(
         theta,

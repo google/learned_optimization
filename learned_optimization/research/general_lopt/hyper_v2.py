@@ -384,7 +384,7 @@ class HyperV2(lopt_base.LearnedOptimizer):
       rsqrt = lax.rsqrt(rms + 1e-6)
 
     if self.with_rms_norm_g:
-      norm_g = m * rsqrt
+      norm_g = m * rsqrt  # pyrefly: ignore[unbound-name]
       inps.append(norm_g)
 
     if self.with_rsqrt_rms:
@@ -502,8 +502,8 @@ class HyperV2(lopt_base.LearnedOptimizer):
         o = jax.nn.relu(o)
 
     # extract outputs from MLP to construct a step.
-    direction = o[..., 0]
-    magnitude_param = o[..., 1]
+    direction = o[..., 0]  # pyrefly: ignore[bad-index]
+    magnitude_param = o[..., 1]  # pyrefly: ignore[bad-index]
 
     mag_param = jnp.exp(magnitude_param * self.exp_mult)
     param_scale = jnp.sqrt(jnp.mean(jnp.square(p)) + 1e-9)
@@ -691,7 +691,7 @@ class HyperV2(lopt_base.LearnedOptimizer):
 
         return State(
             params=params,
-            state=model_state,
+            state=model_state,  # pyrefly: ignore[bad-argument-type]
             rms_rolling=rms_roll.init(params),
             mom_rolling=mom_roll.init(params),
             fac_rolling=adafac_roll.init(params),
@@ -711,7 +711,7 @@ class HyperV2(lopt_base.LearnedOptimizer):
         if parent.constant_loss:
           loss = 1.0
         assert loss is not None
-        summary.summary("validation_mode", parent.validation_mode)
+        summary.summary("validation_mode", parent.validation_mode)  # pyrefly: ignore[bad-argument-type]
 
         next_loss_buffer = parent.buffer_loss_fns.update(
             opt_state.loss_buffer, loss)
@@ -805,7 +805,7 @@ class HyperV2(lopt_base.LearnedOptimizer):
           return next_p
 
         l, struct = jax.tree_util.tree_flatten(control_params)
-        key, key1 = jax.random.split(key)
+        key, key1 = jax.random.split(key)  # pyrefly: ignore[bad-argument-type]
         keys = struct.unflatten([k for k in jax.random.split(key1, len(l))])
         next_params = jax.tree_util.tree_map(
             apply_one, control_params, keys, lr_mult, opt_state.params, grads,
@@ -815,7 +815,7 @@ class HyperV2(lopt_base.LearnedOptimizer):
 
         ss = State(
             params=next_params,
-            state=model_state,
+            state=model_state,  # pyrefly: ignore[bad-argument-type]
             mom_rolling=next_mom_rolling,
             rms_rolling=next_rms_rolling,
             fac_rolling=next_adafac_rolling,

@@ -276,7 +276,7 @@ def connect_to_server_and_do_tasks(train_log_dir: str):
 def main(_):
   train_log_dir = setup_experiment.setup_experiment(gin_finalize=False)
 
-  connect_to_server_and_do_tasks(train_log_dir)
+  connect_to_server_and_do_tasks(train_log_dir)  # pyrefly: ignore[bad-argument-type]
 
 
 if __name__ == "__main__":

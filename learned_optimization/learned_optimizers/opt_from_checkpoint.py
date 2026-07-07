@@ -151,5 +151,5 @@ def opt_from_checkpoint(
           wrapped = _GinScopeClass(opt, scope)
           # For now, just add the lopt to the returned class.
           # TODO(lmetz) change this api to return a more structured class?
-          wrapped.lopt = lopt
+          wrapped.lopt = lopt  # pyrefly: ignore[missing-attribute]
           return wrapped  # type: ignore

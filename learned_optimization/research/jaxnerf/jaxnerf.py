@@ -109,7 +109,7 @@ class JaxNeRFTask(tasks_base.Task):
 
   def init(self, key):
     key1, key2, key3 = jax.random.split(key, num=3)
-    rays = next(self.datasets.train)["rays"]
+    rays = next(self.datasets.train)["rays"]  # pyrefly: ignore[missing-attribute]
     init_variables = self.model.init(
         key1, rng_0=key2, rng_1=key3, rays=rays, randomized=self.cfg.randomized)
     return init_variables
@@ -171,7 +171,7 @@ def _nerf_loss_fn(model, key, variables, batch, randomized, weight_decay_mult):
 @gin.configurable
 def _create_jaxnerf_config(cfg: ml_collections.ConfigDict, data_dir: str):
   """Create the JaxNeRF config."""
-  base_cfg = ml_collections.ConfigDict(DEFAULT_JAXNERF_CONFIG, type_safe=False)
+  base_cfg = ml_collections.ConfigDict(DEFAULT_JAXNERF_CONFIG, type_safe=False)  # pyrefly: ignore[bad-argument-type]
   base_cfg.update(cfg)
 
   # Set data dir
@@ -212,21 +212,21 @@ DATA_DIR = os.environ.get("JAXNERF_DATA_DIR")
 
 @gin.configurable
 def JAXNeRF_LegoBlenderTask():
-  cfg = _create_jaxnerf_config(LEGO_CONFIG, os.path.join(DATA_DIR, "lego"))
+  cfg = _create_jaxnerf_config(LEGO_CONFIG, os.path.join(DATA_DIR, "lego"))  # pyrefly: ignore[no-matching-overload]
   ds = datasets.load_jaxnerf_datasets(cfg)
   return JaxNeRFTask(cfg, ds)
 
 
 @gin.configurable
 def JAXNeRF_ShipBlenderTask():
-  cfg = _create_jaxnerf_config(LEGO_CONFIG, os.path.join(DATA_DIR, "ship"))
+  cfg = _create_jaxnerf_config(LEGO_CONFIG, os.path.join(DATA_DIR, "ship"))  # pyrefly: ignore[no-matching-overload]
   ds = datasets.load_jaxnerf_datasets(cfg)
   return JaxNeRFTask(cfg, ds)
 
 
 @gin.configurable
 def JAXNeRF_HotdogBlenderTask():
-  cfg = _create_jaxnerf_config(LEGO_CONFIG, os.path.join(DATA_DIR, "hotdog"))
+  cfg = _create_jaxnerf_config(LEGO_CONFIG, os.path.join(DATA_DIR, "hotdog"))  # pyrefly: ignore[no-matching-overload]
   ds = datasets.load_jaxnerf_datasets(cfg)
   return JaxNeRFTask(cfg, ds)
 

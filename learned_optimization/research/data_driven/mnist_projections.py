@@ -421,7 +421,7 @@ class ProjectionExperiment:
         if self.num_tasks > 0:
           test_value, meta_test_value, id_test_value = tree_util.tree_map(
               functools.partial(jnp.mean, axis=0),
-              jnp.split(metric_value, [num_within_tasks, test_tasks.shape[0]]))
+              jnp.split(metric_value, [num_within_tasks, test_tasks.shape[0]]))  # pyrefly: ignore[unbound-name]
         else:
           test_value = meta_test_value = id_test_value = metric_value
         log_dict.update({

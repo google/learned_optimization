@@ -78,7 +78,7 @@ def train(steps=10000):
     for i in range(5):
       if i % 5 == 0:
         l = loss(params)
-        population.set_eval(0, gen_id, step, params, l)
+        population.set_eval(0, gen_id, step, params, l)  # pyrefly: ignore[bad-argument-type]
         print(f"\t {l}, params: {params}, meta_params:{meta_params}")
 
       params = update(params, meta_params)

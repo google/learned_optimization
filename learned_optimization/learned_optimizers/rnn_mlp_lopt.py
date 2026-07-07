@@ -92,7 +92,7 @@ class _LossNormalizer:
 
 
 def _avg_square_mean(tree: Any) -> jnp.ndarray:
-  return sum([jnp.mean(jnp.square(x)) for x in jax.tree_util.tree_leaves(tree)
+  return sum([jnp.mean(jnp.square(x)) for x in jax.tree_util.tree_leaves(tree)  # pyrefly: ignore[bad-return]
              ]) / len(jax.tree_util.tree_leaves(tree))
 
 
@@ -456,7 +456,7 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
         ],
                                axis=1)
 
-      def update(self,
+      def update(self,  # pyrefly: ignore[bad-override]
                  opt_state: RNNMLPLOptState,
                  grads,
                  loss: Optional[jnp.ndarray] = None,
@@ -560,7 +560,7 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
               v,
               ff_inputs,  # pytype: disable=wrong-arg-types  # jax-ndarray
               opt_state.iteration,
-              num_tensors,
+              num_tensors,  # pyrefly: ignore[bad-argument-type]
           )
 
         # Prep the features

@@ -87,7 +87,7 @@ class TaskFamily:
     raise NotImplementedError()
 
   def eval_task_fn(self, cfg: TaskCfg) -> Task:
-    raise self.task_fn(cfg)
+    raise self.task_fn(cfg)  # pyrefly: ignore[bad-raise]
 
   def sample_task(self, key):
     params = self.sample(key)
@@ -128,7 +128,7 @@ def single_task_to_family(task: Task,
     eval_datasets = eval_task.datasets
 
     def sample(self, key: PRNGKey) -> T:
-      return jnp.asarray(0)
+      return jnp.asarray(0)  # pyrefly: ignore[bad-return]
 
     def task_fn(self, _: T) -> Task:
       return task

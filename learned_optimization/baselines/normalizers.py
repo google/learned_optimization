@@ -45,7 +45,7 @@ NormFN = Callable[[jnp.ndarray], jnp.ndarray]
 def ema(data: chex.Array, alpha: float, ignore_nan=False):
   """Exponential moving average."""
   # TODO(lmetz) dedup with notebook_utils!
-  if len(data) == 0:  # pylint: disable=g-explicit-length-test
+  if len(data) == 0:  # pylint: disable=g-explicit-length-test  # pyrefly: ignore[bad-argument-type]
     return data
   data = onp.asarray(data)
   x = onp.zeros_like(data)

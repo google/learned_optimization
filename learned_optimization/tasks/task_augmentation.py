@@ -151,9 +151,9 @@ class ReparamWeightsFamily(base.TaskFamily):
 
       param_scale = jax.tree_util.tree_map(single, abstract_params, keys)
 
-    task = self.task_family.task_fn(sub_config)
+    task = self.task_family.task_fn(sub_config)  # pyrefly: ignore[unbound-name]
 
-    if isinstance(param_scale, LogFeat):
+    if isinstance(param_scale, LogFeat):  # pyrefly: ignore[unbound-name]
       param_scale = param_scale.value
 
     return ReparamWeights(task, param_scale)
@@ -231,9 +231,9 @@ class ReducedBatchsizeTask(base.Task):
       return core.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
 
     abstract_batch = jax.tree_util.tree_map(reduce_abstract_bs,
-                                            self.task.datasets.abstract_batch)
+                                            self.task.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     self.datasets = datasets_base.datasets_map(
-        functools.partial(jax.tree_util.tree_map, reduce_bs), task.datasets,
+        functools.partial(jax.tree_util.tree_map, reduce_bs), task.datasets,  # pyrefly: ignore[bad-argument-type]
         abstract_batch)
 
 
@@ -258,10 +258,10 @@ class ReducedBatchsizeFamily(base.TaskFamily):
       return core.ShapedArray((bs,) + x.shape[1:], dtype=x.dtype)
 
     abstract_batch = jax.tree_util.tree_map(
-        reduce_abstract_bs, self.task_family.datasets.abstract_batch)
+        reduce_abstract_bs, self.task_family.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     self.datasets = datasets_base.datasets_map(
         functools.partial(jax.tree_util.tree_map, reduce_bs),
-        task_family.datasets,
+        task_family.datasets,  # pyrefly: ignore[bad-argument-type]
         abstract_batch=abstract_batch)
 
     self.task_fn = task_family.task_fn
@@ -370,15 +370,15 @@ class ModifyTaskGradient(base.Task):
     self.loss_with_state_and_aux.defvjp(f_fwd, f_bwd)
 
   def loss(self, params, key, data):
-    loss, _, _ = self.loss_with_state_and_aux(params, None, key, data)
+    loss, _, _ = self.loss_with_state_and_aux(params, None, key, data)  # pyrefly: ignore[bad-argument-type]
     return loss
 
   def loss_with_state(self, params, state, key, data):
-    loss, state, _ = self.loss_with_state_and_aux(params, state, key, data)
+    loss, state, _ = self.loss_with_state_and_aux(params, state, key, data)  # pyrefly: ignore[bad-argument-type]
     return loss, state
 
   def loss_with_aux(self, params, key, data):
-    loss, _, aux = self.loss_with_state_and_aux(params, None, key, data)
+    loss, _, aux = self.loss_with_state_and_aux(params, None, key, data)  # pyrefly: ignore[bad-argument-type]
     return loss, aux
 
 

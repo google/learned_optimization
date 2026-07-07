@@ -86,5 +86,5 @@ def add_batch(nest, batch_size: Optional[int]):
 
 
 def split_axis(x: jnp.ndarray, shape=Tuple[int], axis=-1):
-  new_shape = x.shape[:axis] + shape + x.shape[axis:][1:]
+  new_shape = x.shape[:axis] + shape + x.shape[axis:][1:]  # pyrefly: ignore[unsupported-operation]
   return x.reshape(new_shape)

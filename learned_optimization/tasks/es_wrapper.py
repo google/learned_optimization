@@ -116,7 +116,7 @@ def antithetic_es_value_and_grad(
         lambda e: e * (pos_loss - neg_loss) / (2 * std**2), pos)
 
     if has_aux:
-      return (jnp.mean(losses), aux), es_grad
+      return (jnp.mean(losses), aux), es_grad  # pyrefly: ignore[unbound-name]
     else:
       return jnp.mean(losses), es_grad
 
@@ -166,7 +166,7 @@ def multi_antithetic_es_value_and_grad(
     value = jax.tree_util.tree_map(lambda x: jnp.mean(x, axis=0), value)
 
     if has_aux:
-      return (value, aux), grad
+      return (value, aux), grad  # pyrefly: ignore[unbound-name]
     else:
       return value, grad
 
@@ -212,15 +212,15 @@ class ESTask(base.Task):
     self.loss_with_state_and_aux.defvjp(f_fwd, f_bwd)
 
   def loss(self, params, key, data):
-    loss, _, _ = self.loss_with_state_and_aux(params, None, key, data)
+    loss, _, _ = self.loss_with_state_and_aux(params, None, key, data)  # pyrefly: ignore[bad-argument-type]
     return loss
 
   def loss_with_state(self, params, state, key, data):
-    loss, state, _ = self.loss_with_state_and_aux(params, state, key, data)
+    loss, state, _ = self.loss_with_state_and_aux(params, state, key, data)  # pyrefly: ignore[bad-argument-type]
     return loss, state
 
   def loss_with_aux(self, params, key, data):
-    loss, _, aux = self.loss_with_state_and_aux(params, None, key, data)
+    loss, _, aux = self.loss_with_state_and_aux(params, None, key, data)  # pyrefly: ignore[bad-argument-type]
     return loss, aux
 
 

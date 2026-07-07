@@ -156,7 +156,7 @@ def time_for_task_family_vmap_unroll_func(
   else:
     opt_state = jax.jit(
         jax.vmap(
-            lambda pp, ss: opt.init(pp, ss, num_steps=inner_traj_num_steps)))(p,
+            lambda pp, ss: opt.init(pp, ss, num_steps=inner_traj_num_steps)))(p,  # pyrefly: ignore[missing-attribute]
                                                                               s)
 
   def meta_loss(opt_state, task_params, key, datas, theta):
@@ -252,7 +252,7 @@ def timing_for_iterator(it: Iterator[Any],
       break
 
   dtimes = onp.diff(times)
-  return onp.mean(dtimes), onp.std(dtimes) / onp.sqrt(len(dtimes))
+  return onp.mean(dtimes), onp.std(dtimes) / onp.sqrt(len(dtimes))  # pyrefly: ignore[bad-return]
 
 
 def task_family_runtime_stats(

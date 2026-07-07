@@ -140,8 +140,8 @@ def save_model(model: Any, sample_fn_name: str, hardware_name: str,
 
 
 @gin.configurable
-def train_and_save_timing_model(sample_fn_name: str = gin.REQUIRED,
-                                hardware_name: str = gin.REQUIRED,
+def train_and_save_timing_model(sample_fn_name: str = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+                                hardware_name: str = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
                                 min_samples: int = 10000,
                                 num_train_iterations: int = 1000,
                                 test_samples: int = 2000,

@@ -170,8 +170,8 @@ class PopulationController:
       old_state = self.serialized_state()
 
       # also potentially mutate the cache
-      self._active_workers = self.mutate.get_worker_data(
-          self._active_workers, self._cached, worker_id, generation_id, step,
+      self._active_workers = self.mutate.get_worker_data(  # pyrefly: ignore[bad-assignment]
+          self._active_workers, self._cached, worker_id, generation_id, step,  # pyrefly: ignore[bad-argument-type]
           params, meta_params)
 
       new_state = self.serialized_state()
@@ -204,8 +204,8 @@ class PopulationController:
               generation_id=generation_id,
               params=params,
               meta_params=meta_params,
-              parent=(generation_id, step),
-              step=step,
+              parent=(generation_id, step),  # pyrefly: ignore[bad-argument-type]
+              step=step,  # pyrefly: ignore[bad-argument-type]
               value=None,
               time=time.time(),
           )
@@ -254,14 +254,14 @@ class PopulationController:
         # "cast" to a mutable sequence here to make pytype happy.
         mut_active_workers = list(
             self._active_workers)  # type: MutableSequence[ActiveWorker]
-        mut_active_workers[worker_id] = self._active_workers[worker_id].replace(
+        mut_active_workers[worker_id] = self._active_workers[worker_id].replace(  # pyrefly: ignore[missing-attribute]
             step=step)
-        mut_active_workers[worker_id] = mut_active_workers[worker_id].replace(
+        mut_active_workers[worker_id] = mut_active_workers[worker_id].replace(  # pyrefly: ignore[missing-attribute]
             params=params)
         self._active_workers = mut_active_workers
 
       # in light of this new value, run the mutator
-      self._mutate_state, self._active_workers = self.mutate.update(
+      self._mutate_state, self._active_workers = self.mutate.update(  # pyrefly: ignore[bad-assignment]
           self._mutate_state, self._active_workers, self._cached)
 
       self.save_state()

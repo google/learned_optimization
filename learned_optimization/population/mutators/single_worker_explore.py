@@ -195,7 +195,7 @@ class BranchingSingleMachine(population.Mutate):
 
           scores = [center_score, neg_score, pos_score]
           idx = onp.nanargmin(scores)
-          best_checkpoint = [center_steps, neg_steps,
+          best_checkpoint = [center_steps, neg_steps,  # pyrefly: ignore[bad-index]
                              pos_steps][idx].values()[-1]
 
           meta_params = best_checkpoint.meta_params

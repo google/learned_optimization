@@ -64,9 +64,9 @@ def eval_and_save_one_timing(
 @gin.configurable
 def run_many_eval_and_save(
     sample_task_family_cfg_fn: Callable[[PRNGKey],
-                                        cfgobject.CFGObject] = gin.REQUIRED,
-    save_dir: str = gin.REQUIRED,
-    num_to_run: int = gin.REQUIRED):
+                                        cfgobject.CFGObject] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+    save_dir: str = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+    num_to_run: int = gin.REQUIRED):  # pyrefly: ignore[bad-function-definition]
   """Compute and save `num_to_run` runtime statistics."""
 
   dev = jax.devices()[0]

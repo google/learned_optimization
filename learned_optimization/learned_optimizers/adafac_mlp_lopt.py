@@ -404,7 +404,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
             iteration=jnp.asarray(0, dtype=jnp.int32),
             num_steps=jnp.asarray(num_steps))
 
-      def update(
+      def update(  # pyrefly: ignore[bad-override]
           self,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
           opt_state: AdafacMLPLOptState,
           grad: opt_base.Gradient,

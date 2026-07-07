@@ -55,7 +55,7 @@ class CausalSelfAttention(hk.MultiHeadAttention):
 
     seq_len = query.shape[1]
     causal_mask = np.tril(np.ones((1, 1, seq_len, seq_len)))
-    mask = mask * causal_mask if mask is not None else causal_mask
+    mask = mask * causal_mask if mask is not None else causal_mask  # pyrefly: ignore[bad-assignment]
 
     return super().__call__(query, key, value, mask)
 

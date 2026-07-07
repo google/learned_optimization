@@ -114,27 +114,27 @@ class LazyDataset(Datasets):
     self._fn = functools.lru_cache(None)(dataset_fn)
 
   @property
-  def train(self):
+  def train(self):  # pyrefly: ignore[bad-override]
     return self._fn().train
 
   @property
-  def inner_valid(self):
+  def inner_valid(self):  # pyrefly: ignore[bad-override]
     return self._fn().inner_valid
 
   @property
-  def outer_valid(self):
+  def outer_valid(self):  # pyrefly: ignore[bad-override]
     return self._fn().outer_valid
 
   @property
-  def test(self):
+  def test(self):  # pyrefly: ignore[bad-override]
     return self._fn().test
 
   @property
-  def extra_info(self):
+  def extra_info(self):  # pyrefly: ignore[bad-override]
     return self._fn().extra_info
 
   @property
-  def abstract_batch(self):
+  def abstract_batch(self):  # pyrefly: ignore[bad-override]
     return self._fn().abstract_batch
 
 
@@ -460,9 +460,9 @@ def tfrecord_image_classification_datasets(
     filenames = _tfrecord_filenames_from_dataset_name(datasetname, split)
 
     filenames = [tf.convert_to_tensor(filename) for filename in filenames]
-    filenames = tf.data.Dataset.from_tensor_slices(filenames).repeat(
+    filenames = tf.data.Dataset.from_tensor_slices(filenames).repeat(  # pyrefly: ignore[bad-argument-type]
         -1).shuffle(len(filenames) * 2)
-    ds = tf.data.TFRecordDataset(
+    ds = tf.data.TFRecordDataset(  # pyrefly: ignore[bad-instantiation]
         filenames, compression_type="GZIP", num_parallel_reads=4)
 
     features = {

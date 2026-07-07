@@ -152,9 +152,9 @@ class RandomDataset:
   def _generate_tasks(self, key):
     key_tasks, key_mask = jax.random.split(key)
     del key
-    key_tasks = jax.random.split(key_tasks, self._dataset_size)
+    key_tasks = jax.random.split(key_tasks, self._dataset_size)  # pyrefly: ignore[bad-argument-type]
     mask = jax.random.bernoulli(
-        key_mask, p=self._bias_prob, shape=(self._dataset_size,))
+        key_mask, p=self._bias_prob, shape=(self._dataset_size,))  # pyrefly: ignore[bad-argument-type]
     key_tasks = jnp.where(mask[:, None], self._bias_key[None], key_tasks)
     return jax.vmap(self._generate_task)(key_tasks)
 

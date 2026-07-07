@@ -115,7 +115,7 @@ class MLPLOpt(lopt_base.LearnedOptimizer):
             rolling_features=common.vec_rolling_mom(decays).init(params),
             iteration=jnp.asarray(0, dtype=jnp.int32))
 
-      def update(
+      def update(  # pyrefly: ignore[bad-override]
           self,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
           opt_state: MLPLOptState,
           grad: Any,

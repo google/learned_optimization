@@ -209,7 +209,7 @@ class SumOptimizer(opt_base.Optimizer):
     if len(opts) != 2:
       raise ValueError("Only 2 opts are supported for now!")
 
-  def init(self, params, model_state=None, num_steps=None, **kwargs):
+  def init(self, params, model_state=None, num_steps=None, **kwargs):  # pyrefly: ignore[bad-override]
     opt_states = tuple([
         opt.init(params, model_state, num_steps=num_steps, **kwargs)
         for opt in self.opts
@@ -240,7 +240,7 @@ class SumOptimizer(opt_base.Optimizer):
     return SumOptimizerState(
         iteration=opt_state.iteration + 1,
         params=new_params,
-        state=model_state,
+        state=model_state,  # pyrefly: ignore[bad-argument-type]
         inner_opt_states=tuple(new_opt_states),
     )
 
