@@ -27,7 +27,7 @@ try:
   from jax.extend.core import unsafe_am_i_under_a_jit_DO_NOT_USE  # pylint: disable=g-import-not-at-top
 except ImportError:
   # JAX v0.9.2 or older
-  from jax.core import unsafe_am_i_under_a_jit_DO_NOT_USE  # pylint: disable=g-import-not-at-top
+  from jax.core import unsafe_am_i_under_a_jit_DO_NOT_USE  # pylint: disable=g-import-not-at-top # pytype: disable=import-error
 
 
 def maybe_static_cond(pred, true_fn, false_fn, val):
