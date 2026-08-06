@@ -231,13 +231,13 @@ class NNAdam(lopt_base.LearnedOptimizer):
             self.rnn_to_controls.init(key3,
                                       jnp.zeros([0, self.lstm_hidden_size])),
         "per_layer_lr":
-            _scaled_lr.forward(self.initial_learning_rate),
+            _scaled_lr.forward(self.initial_learning_rate),  # pyrefly: ignore[bad-argument-type]
         "per_layer_beta1":
-            _scaled_one_minus_log.forward(self.initial_beta1),
+            _scaled_one_minus_log.forward(self.initial_beta1),  # pyrefly: ignore[bad-argument-type]
         "per_layer_beta2":
-            _scaled_one_minus_log.forward(self.initial_beta2),
+            _scaled_one_minus_log.forward(self.initial_beta2),  # pyrefly: ignore[bad-argument-type]
         "per_layer_epsilon":
-            _scaled_epsilon.forward(self.initial_epsilon),
+            _scaled_epsilon.forward(self.initial_epsilon),  # pyrefly: ignore[bad-argument-type]
     })
 
   def opt_fn(self,

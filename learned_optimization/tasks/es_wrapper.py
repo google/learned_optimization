@@ -52,7 +52,7 @@ def _vector_sample_perturbations(
     pos = _sample_perturbations(theta, key, std=std)
     p_theta = jax.tree_util.tree_map(lambda t, a: t + a, theta, pos)
     n_theta = jax.tree_util.tree_map(lambda t, a: t - a, theta, pos)
-    return pos, p_theta, n_theta
+    return pos, p_theta, n_theta  # pyrefly: ignore[bad-return]
 
   keys = jax.random.split(key, num_samples)
   vec_pos, vec_p_theta, vec_n_theta = jax.vmap(_fn)(keys)
