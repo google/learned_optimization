@@ -332,7 +332,7 @@ def metrics_fn_for_speedup_normalized(
       raise ValueError(f"Task name: {task_name} doesn't have a normalizer!")
 
     v = onp.mean(v, axis=0)
-    nv = norm_map[task_name](v)
+    nv = norm_map[task_name](v)  # pyrefly: ignore[bad-argument-type]
     # assume that the seeds have same inner step.
     max_steps = x[0, -1]
     nv = nv / max_steps
