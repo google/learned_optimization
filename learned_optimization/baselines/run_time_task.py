@@ -30,8 +30,9 @@ from learned_optimization.time_filter import timings
 
 
 @gin.configurable
-def run_many_eval_and_save(task: tasks_base.Task = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
-                           save_dir: str = gin.REQUIRED):  # pyrefly: ignore[bad-function-definition]
+def run_many_eval_and_save(
+    task: tasks_base.Task = gin.REQUIRED, save_dir: str = gin.REQUIRED
+):
   """Compute and save `num_to_run` runtime statistics."""
 
   dev = jax.devices()[0]

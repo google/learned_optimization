@@ -98,8 +98,9 @@ def maybe_archive_hparam_set(task_name: str, hparam_set_name: str) -> bool:
 
 
 @gin.configurable
-def wait_until_ready_then_archive_task(task_name: str = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
-                                       hparam_set_name: str = gin.REQUIRED):  # pyrefly: ignore[bad-function-definition]
+def wait_until_ready_then_archive_task(
+    task_name: str = gin.REQUIRED, hparam_set_name: str = gin.REQUIRED
+):
   """Continually try to create and save an archive of hparam set + task_name.
 
   This function is designed to be run while the baselines are being computed
