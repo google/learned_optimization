@@ -57,9 +57,9 @@ def _get_gin_name(gin_arg_name: str, fallback: str) -> str:
 @profile.wrap()
 @gin.configurable
 def inner_train_task(
-    task: tasks_base.Task = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
-    opt: opt_base.Optimizer = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
-    num_steps: int = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+    task: tasks_base.Task = gin.REQUIRED,
+    opt: opt_base.Optimizer = gin.REQUIRED,
+    num_steps: int = gin.REQUIRED,
     eval_every: int = 10,
     eval_batches: int = 5,
     last_eval_batches: int = 10,
