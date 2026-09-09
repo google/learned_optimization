@@ -463,8 +463,8 @@ def gradient_worker_compute(
             metrics[f"mean||{cfg_name}/grad_norm"] = norm
         metrics[f"mean||{family_name}/mean_loss"] = estimator_out.mean_loss
         metrics[f"mean||{cfg_name}/mean_loss"] = estimator_out.mean_loss
-        metrics[f"sample||{family_name}/time"] = time.time() - stime
-        metrics[f"sample||{cfg_name}/time"] = time.time() - stime
+        metrics[f"sample||{family_name}/time"] = time.time() - stime  # pyrefly: ignore[unsupported-operation]
+        metrics[f"sample||{cfg_name}/time"] = time.time() - stime  # pyrefly: ignore[unsupported-operation]
 
       metrics_list.append(metrics)
 

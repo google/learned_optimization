@@ -160,18 +160,18 @@ def main(_):
     beta2 = 1 - onp.exp(oml_beta2 + onp.random.normal() * 0.03)
 
     return {  # pytype: disable=bad-return-type  # jax-ndarray
-        "learning_rate": onp.exp(loglr + offset),
-        "beta1": beta1,
-        "beta2": beta2,
-        "hue": onp.clip(onp.random.normal() * 0.03 + meta_params["hue"], 0, 1),
-        "contrast_high": contrast_high,
-        "contrast_low": contrast_low,
-        "saturation_high": saturation_high,
-        "saturation_low": saturation_low,
-        "smooth_labels": onp.clip(
+        "learning_rate": onp.exp(loglr + offset),  # pyrefly: ignore[bad-assignment]
+        "beta1": beta1,  # pyrefly: ignore[bad-assignment]
+        "beta2": beta2,  # pyrefly: ignore[bad-assignment]
+        "hue": onp.clip(onp.random.normal() * 0.03 + meta_params["hue"], 0, 1),  # pyrefly: ignore[bad-assignment]
+        "contrast_high": contrast_high,  # pyrefly: ignore[bad-assignment]
+        "contrast_low": contrast_low,  # pyrefly: ignore[bad-assignment]
+        "saturation_high": saturation_high,  # pyrefly: ignore[bad-assignment]
+        "saturation_low": saturation_low,  # pyrefly: ignore[bad-assignment]
+        "smooth_labels": onp.clip(  # pyrefly: ignore[bad-assignment]
             onp.random.normal() * 0.03 + meta_params["smooth_labels"], 0, 1
         ),
-        "batch_size": int(
+        "batch_size": int(  # pyrefly: ignore[bad-assignment]
             meta_params["batch_size"] * (1 + onp.random.normal() * 0.1)
         ),
     }
