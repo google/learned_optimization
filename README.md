@@ -55,6 +55,7 @@ Wrote a paper or blog post that uses *learned\_optimization*? Add it to the list
 
 * Vicol, Paul, Luke Metz, and Jascha Sohl-Dickstein. ["Unbiased gradient estimation in unrolled computation graphs with persistent evolution strategies."](https://arxiv.org/abs/2112.13835) International Conference on Machine Learning (Best paper award). PMLR, 2021.
 * Metz, Luke*, C. Daniel Freeman*, Samuel S. Schoenholz, and Tal Kachman. ["Gradients are Not All You Need."](https://arxiv.org/abs/2111.05803) arXiv preprint arXiv:2111.05803 (2021).
+* Klioui, Sifal. ["Towards a Bitter Lesson of Optimization: When Neural Networks Write Their Own Update Rules."](https://sifal.social/posts/Towards-a-Bitter-Lesson-of-Optimization-When-Neural-Networks-Write-Their-Own-Update-Rules/) Blog post, April 2026.
 
 ## Development / Running tests
 We locate test files next to the related source as opposed to in a separate `tests/` folder.
