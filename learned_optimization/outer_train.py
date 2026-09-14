@@ -75,16 +75,18 @@ def iter_group_amount(it, n):
 @gin.configurable
 def build_gradient_estimators(
     *,
-    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
-    sample_task_family_fn: Callable[[PRNGKey],
-                                    tasks_base.TaskFamily] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,
+    sample_task_family_fn: Callable[
+        [PRNGKey], tasks_base.TaskFamily
+    ] = gin.REQUIRED,
     gradient_estimator_fn: Callable[
         [truncated_step_mod.VectorizedTruncatedStep],
-        gradient_learner.GradientLearner] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+        gradient_learner.GradientLearner,
+    ] = gin.REQUIRED,
     truncated_step_fn: Callable[
         [tasks_base.TaskFamily, lopt_base.LearnedOptimizer],
-        truncated_step_mod.VectorizedTruncatedStep] = lopt_truncated_step  # pyrefly: ignore[bad-function-definition]
-    .VectorizedLOptTruncatedStep,
+        truncated_step_mod.VectorizedTruncatedStep,
+    ] = lopt_truncated_step.VectorizedLOptTruncatedStep,  # pyrefly: ignore[bad-function-definition]
     key: PRNGKey,
     num_gradient_estimators: int,
     worker_id: int,
@@ -129,15 +131,16 @@ ListListTaskFamilyFn = Sequence[Sequence[Callable[[], tasks_base.TaskFamily]]]
 @gin.configurable
 def build_gradient_estimators_fixed(
     *,
-    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
-    list_of_task_family_per_machine: ListListTaskFamilyFn = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,
+    list_of_task_family_per_machine: ListListTaskFamilyFn = gin.REQUIRED,
     gradient_estimator_fn: Callable[
         [truncated_step_mod.VectorizedTruncatedStep],
-        gradient_learner.GradientLearner] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+        gradient_learner.GradientLearner,
+    ] = gin.REQUIRED,
     truncated_step_fn: Callable[
         [tasks_base.TaskFamily, lopt_base.LearnedOptimizer],
-        truncated_step_mod.VectorizedTruncatedStep] = lopt_truncated_step  # pyrefly: ignore[bad-function-definition]
-    .VectorizedLOptTruncatedStep,
+        truncated_step_mod.VectorizedTruncatedStep,
+    ] = lopt_truncated_step.VectorizedLOptTruncatedStep,  # pyrefly: ignore[bad-function-definition]
     key: PRNGKey,
     num_gradient_estimators: int,
     worker_id: int,
@@ -1115,16 +1118,17 @@ def _move_all_gin_config_to_default_scope():
 @gin.configurable
 def run_train(
     train_log_dir: str,
-    lopt: Union[GinRequired, lopt_base.LearnedOptimizer] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
-    outer_learner_fn: Union[GinRequired, Callable[
-        [], gradient_learner.GradientLearner]] = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
+    lopt: Union[GinRequired, lopt_base.LearnedOptimizer] = gin.REQUIRED,
+    outer_learner_fn: Union[
+        GinRequired, Callable[[], gradient_learner.GradientLearner]
+    ] = gin.REQUIRED,
     num_estimators: int = 2,
     is_trainer: bool = True,
     is_worker: bool = True,
     worker_id: int = 0,
     summary_every_n: int = 10,
     num_steps: int = 10000,
-    num_seconds: float = 0.,
+    num_seconds: float = 0.0,
     trainer_batch_size: int = 1,
     staleness: int = 1,
     stochastic_resample_frequency: int = 200,
