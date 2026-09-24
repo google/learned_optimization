@@ -477,9 +477,11 @@ def write_results_thread_main(
 
 
 @gin.configurable
-def eval_chief_config(chief_name: str = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
-                      num_workers: int = gin.REQUIRED,  # pyrefly: ignore[bad-function-definition]
-                      learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED):  # pyrefly: ignore[bad-function-definition]
+def eval_chief_config(
+    chief_name: str = gin.REQUIRED,
+    num_workers: int = gin.REQUIRED,
+    learned_opt: lopt_base.LearnedOptimizer = gin.REQUIRED,
+):
   """Parameters of the evaluation. To be set with gin."""
   if chief_name == gin.REQUIRED or num_workers == gin.REQUIRED:
     raise ValueError("Must set chief_name and num_workers with gin!")
