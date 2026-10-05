@@ -90,7 +90,7 @@ class ReparamWeights(base.Task):
     params = jax.tree_util.tree_map(lambda x, scale: x * scale, params, scales)
     return self.task.loss_with_state_and_aux(params, state, key, data)
 
-  def loss(self, params: Params, key: PRNGKey, data: Batch) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
+  def loss(self, params: Params, key: PRNGKey, data: Batch) -> jnp.ndarray:  # pyrefly: ignore[bad-override]
     loss, _, _ = self.loss_with_state_and_aux(params, None, key, data)
     return loss
 
@@ -509,9 +509,9 @@ class AsyncDelayedGradients(base.Task):
 
   def init_with_state(self, key):
     params, state = self.task.init_with_state(key)
-    buffer = self.buffer.init()  # pytype: disable=attribute-error  # jax-api-types
+    buffer = self.buffer.init()
     for _ in range(self.delay_steps):
-      buffer = self.buffer.add(buffer, params)  # pytype: disable=attribute-error  # jax-api-types
+      buffer = self.buffer.add(buffer, params)
     return params, (buffer, state)
 
   def loss(self, params, key, data):
@@ -526,10 +526,10 @@ class AsyncDelayedGradients(base.Task):
 
   def loss_with_state_and_aux(self, params, state, key, data):
     buffer, state = state
-    last_entry = self.buffer.gather_from_present(buffer, -self.delay_steps + 1)  # pytype: disable=attribute-error  # jax-api-types
+    last_entry = self.buffer.gather_from_present(buffer, -self.delay_steps + 1)
     loss, next_state, aux = self.task.loss_with_state_and_aux(
         last_entry, state, key, data)
-    buffer = self.buffer.add(buffer, params)  # pytype: disable=attribute-error  # jax-api-types
+    buffer = self.buffer.add(buffer, params)
     return loss, (buffer, next_state), aux
 
 

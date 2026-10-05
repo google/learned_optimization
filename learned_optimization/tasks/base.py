@@ -44,13 +44,13 @@ class Task:
                       data: Batch) -> Tuple[jnp.ndarray, ModelState]:
     if state is not None:
       raise ValueError("Define a custom loss_with_state when using a state!")
-    return self.loss(params, key, data), None  # pytype: disable=bad-return-type  # jax-ndarray
+    return self.loss(params, key, data), None  # pyrefly: ignore[bad-return]
 
   def loss_and_aux(
       self, params: Params, key: PRNGKey,
       data: Batch) -> Tuple[jnp.ndarray, Mapping[str, jnp.ndarray]]:
     loss = self.loss(params, key, data)
-    return loss, {}  # pytype: disable=bad-return-type  # jax-ndarray
+    return loss, {}  # pyrefly: ignore[bad-return]
 
   def loss_with_state_and_aux(
       self, params: Params, state: ModelState, key: PRNGKey,

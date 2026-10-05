@@ -55,7 +55,7 @@ class OptaxOptimizer(base.Optimizer):
            model_state: Optional[ModelState] = None,
            num_steps: Optional[int] = None,
            key: Optional[chex.PRNGKey] = None):
-    return OptaxState(  # pytype: disable=wrong-arg-types  # jax-ndarray
+    return OptaxState(
         params=params,
         optax_opt_state=self.opt.init(params),  # pyrefly: ignore[bad-argument-type]
         state=model_state,  # pyrefly: ignore[bad-argument-type]
@@ -188,7 +188,7 @@ class PiecewiseLinearAdam(OptaxOptimizer):
         optax.scale_by_adam(
             b1=beta1, b2=beta2, eps=epsilon, eps_root=epsilon_root
         ),
-        optax.scale_by_schedule(piecewise_linear(times, vals=lrs)),  # pytype: disable=wrong-arg-types  # jax-arraylike
+        optax.scale_by_schedule(piecewise_linear(times, vals=lrs)),  # pyrefly: ignore[bad-argument-type]
         optax.scale(-1),
     )
     super().__init__(opt)
@@ -395,7 +395,7 @@ class SM3(OptaxOptimizer):
     should_reshape = jax.tree_util.tree_map(lambda x: len(x.shape) == 0, params)  # pylint: disable=g-explicit-length-test
     params = jax.tree_util.tree_map(_expand_scalar, params, should_reshape)
     out = super().init(params, model_state, num_steps, key)
-    return SM3OptState(  # pytype: disable=wrong-arg-types  # jax-ndarray
+    return SM3OptState(
         params=out.params,
         state=out.state,
         optax_opt_state=out.optax_opt_state,

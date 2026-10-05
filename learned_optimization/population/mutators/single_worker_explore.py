@@ -105,7 +105,7 @@ class BranchingSingleMachine(population.Mutate):
       state["branch_checkpoint"] = steps[0]
       state["center"] = steps[0].generation_id
 
-    last_checkpoint = steps.values()[-1]  # pytype: disable=unsupported-operands
+    last_checkpoint = steps.values()[-1]  # pyrefly: ignore[bad-index]
 
     if state["phase"] == "exploit":
       # switch to center.

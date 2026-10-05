@@ -159,7 +159,7 @@ def main(_):
     oml_beta2 = onp.log(1 - meta_params["beta2"])
     beta2 = 1 - onp.exp(oml_beta2 + onp.random.normal() * 0.03)
 
-    return {  # pytype: disable=bad-return-type  # jax-ndarray
+    return {
         "learning_rate": onp.exp(loglr + offset),  # pyrefly: ignore[bad-assignment]
         "beta1": beta1,  # pyrefly: ignore[bad-assignment]
         "beta2": beta2,  # pyrefly: ignore[bad-assignment]
@@ -196,7 +196,7 @@ def main(_):
   }
 
   initial_population = [initial_meta for _ in range(num_workers)]
-  initial_population = [mutate_fn(m) for m in initial_population]  # pytype: disable=wrong-arg-types  # jax-ndarray
+  initial_population = [mutate_fn(m) for m in initial_population]  # pyrefly: ignore[bad-argument-type]
   population = population_mod.PopulationController(initial_population, mutator)
   server = population_mod.start_courier_server("population", population)  # pylint: disable=unused-variable
 

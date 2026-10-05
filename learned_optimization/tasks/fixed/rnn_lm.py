@@ -81,7 +81,7 @@ class TeacherForcedRNNLM(base.Task):
                                    self.datasets.abstract_batch)  # pyrefly: ignore[missing-attribute]
     return self._mod.init(key, batch["obs"])
 
-  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
+  def loss(self, params: Params, key: PRNGKey, data: Any) -> jnp.ndarray:  # pyrefly: ignore[bad-override]
     obs = data["obs"]
     target = data["target"]
 
@@ -138,7 +138,7 @@ cfgs = [
 def _partial(rnn_fn, embedding_dim, vocab_size, datasets):
 
   def tmp_fn():
-    return TeacherForcedRNNLM(  # pytype: disable=wrong-arg-types
+    return TeacherForcedRNNLM(
         rnn_fn,
         embedding_dim=embedding_dim,
         vocab_size=vocab_size,

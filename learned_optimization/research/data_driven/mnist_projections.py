@@ -311,7 +311,7 @@ class ProjectionExperiment:
             p=self._project_prob).astype(subset.dtype)
         subset *= mask
 
-      key = jax.vmap(jax.random.fold_in, (None, 0))(rng_tasks_init, subset)  # pytype: disable=wrong-arg-types  # jax-types
+      key = jax.vmap(jax.random.fold_in, (None, 0))(rng_tasks_init, subset)
       key_inp, key_out, key_mask = jax.vmap(
           functools.partial(jax.random.split, num=3), out_axes=1)(
               key)

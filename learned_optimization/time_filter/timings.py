@@ -252,7 +252,7 @@ def timing_for_iterator(it: Iterator[Any],
       break
 
   dtimes = onp.diff(times)
-  return onp.mean(dtimes), onp.std(dtimes) / onp.sqrt(len(dtimes))  # pyrefly: ignore[bad-return]
+  return onp.mean(dtimes), onp.std(dtimes) / onp.sqrt(len(dtimes))
 
 
 def task_family_runtime_stats(
@@ -326,4 +326,4 @@ def task_family_runtime_stats(
 
   if clear_buffers:
     _jax_clear_device_buffers()
-  return ret  # pytype: disable=bad-return-type
+  return ret

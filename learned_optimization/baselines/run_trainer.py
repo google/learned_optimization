@@ -119,7 +119,8 @@ def inner_train_task(
       eval_batches=eval_batches,
       last_eval_batches=last_eval_batches,
       eval_task=eval_task,
-      device=device)  # type: MutableMapping[str, Any] # pytype: disable=annotation-type-mismatch
+      device=device,
+  )  # type: MutableMapping[str, Any]
 
   results["gin_operative_config"] = gin.operative_config_str()
 

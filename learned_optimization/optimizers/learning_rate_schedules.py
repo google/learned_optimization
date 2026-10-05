@@ -77,7 +77,7 @@ class CosineLearningRateSchedule(ScalarSchedule):
     self.constant_fraction = constant_fraction
     self.warmup_fraction = warmup_fraction
 
-  def __call__(self, global_step, max_steps) -> chex.Array:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+  def __call__(self, global_step, max_steps) -> chex.Array:
     def fload32(x):
       """Convert input to float32."""
       return jnp.asarray(x, dtype=onp.float32)
@@ -191,4 +191,4 @@ class ExponentialDecay(ScalarSchedule):
   def __call__(self,
                global_step: chex.Array,
                max_steps: Optional[chex.Array] = None) -> chex.Array:
-    return self.base_lr * (1 - self.decay_amount)**global_step  # pyrefly: ignore[bad-return]
+    return self.base_lr * (1 - self.decay_amount) ** global_step

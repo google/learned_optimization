@@ -123,7 +123,7 @@ class JaxNeRFTask(tasks_base.Task):
   def loss_with_state_and_aux(self, params, state, key, data):
     return self.loss(params, key, data), state, {}
 
-  def loss(self, params, key, data) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
+  def loss(self, params, key, data) -> jnp.ndarray:  # pyrefly: ignore[bad-override]
     loss_val, _ = _nerf_loss_fn(self.model, key, params, data,
                                 self.cfg.randomized, self.cfg.weight_decay_mult)
     return jnp.mean(loss_val)
@@ -162,7 +162,7 @@ def _nerf_loss_fn(model, key, variables, batch, randomized, weight_decay_mult):
       tree_sum_fn(lambda z: jnp.sum(z**2)) /
       tree_sum_fn(lambda z: jnp.prod(jnp.array(z.shape))))
 
-  stats = utils.Stats(  # pytype: disable=wrong-arg-types  # jax-types
+  stats = utils.Stats(
       loss=loss, psnr=psnr, loss_c=loss_c, psnr_c=psnr_c, weight_l2=weight_l2
   )
   return loss + loss_c + weight_decay_mult * weight_l2, stats

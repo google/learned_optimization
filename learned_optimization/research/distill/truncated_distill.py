@@ -90,11 +90,16 @@ def state_compare_mse_params(prev_src_state: UnrollState,
 
 @functools.partial(
     jax.jit,
-    static_argnames=("truncated_step", "src_truncated_step",
-                     "state_compare_loss", "with_summary", "unroll_length",
-                     "outer_param_noise"),
+    static_argnames=(
+        "truncated_step",
+        "src_truncated_step",
+        "state_compare_loss",
+        "with_summary",
+        "unroll_length",
+        "outer_param_noise",
+    ),
 )
-@functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 4))  # pyrefly: ignore[bad-specialization]
+@functools.partial(summary.add_with_summary, static_argnums=(0, 1, 2, 3, 4))
 @functools.partial(jax.value_and_grad, has_aux=True, argnums=5)
 def distill_truncated_unroll(
     truncated_step: truncated_step_mod.VectorizedTruncatedStep,

@@ -97,7 +97,7 @@ class TruncatedESSharedNoise(gradient_learner.GradientEstimator):
         epsilons=epsilons)
 
   @profile.wrap()
-  def compute_gradient_estimate(  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+  def compute_gradient_estimate(
       self,
       worker_weights,
       key: PRNGKey,

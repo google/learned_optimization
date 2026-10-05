@@ -121,7 +121,7 @@ def RMSPropMomLR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=inval
   reps = 5
   cfgs = _lr_cfgs(task_name, "RMSProp", 10000)
   for c in cfgs:
-    c["RMSProp.momentum"] = 0.9  # pytype: disable=unsupported-operands
+    c["RMSProp.momentum"] = 0.9  # pyrefly: ignore[unsupported-operation]
   paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
   return list(cfgs) * reps, paths
 
@@ -403,7 +403,7 @@ def SM3beta2_999_LR_10000_R5(task_name: str) -> HParamSet:  # pylint: disable=in
   reps = 5
   cfgs = _lr_cfgs(task_name, "SM3", 10000, opt_name_override="SM3beta2_999")
   for c in cfgs:
-    c["SM3.b2"] = 0.999  # pytype: disable=unsupported-operands
+    c["SM3.b2"] = 0.999  # pyrefly: ignore[unsupported-operation]
   paths = [(_save_dir_from_cfg(c), reps) for c in cfgs]
   return list(cfgs) * reps, paths
 

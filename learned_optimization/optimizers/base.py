@@ -140,7 +140,7 @@ class GraftedOptimizer(Optimizer):
         dir_opt_state=self.direction_opt.init(
             params, model_state=model_state, num_steps=num_steps, **kwargs))
 
-  def update(self, opt_state, grad, model_state=None, **kwargs):  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+  def update(self, opt_state, grad, model_state=None, **kwargs):  # pyrefly: ignore[bad-override]
     base_params = opt_state.params
 
     next_mag_opt_state = self.magnitude_opt.update(
@@ -175,28 +175,32 @@ class GraftedOptimizer(Optimizer):
 
 
 def SGD(*args, **kwargs):  # pylint: disable=invalid-name
-  from learned_optimization.optimizers import optax_opts  # pytype: disable=import-error # pylint: disable=g-import-not-at-top
+  from learned_optimization.optimizers import optax_opts  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-module-attribute]
+
   warnings.warn("SGD module has been moved to optax_opts!"
                 " Calling here from base is deprecated!")
   return optax_opts.SGD(*args, **kwargs)
 
 
 def SGDM(*args, **kwargs):  # pylint: disable=invalid-name
-  from learned_optimization.optimizers import optax_opts  # pytype: disable=import-error  # pylint: disable=g-import-not-at-top
+  from learned_optimization.optimizers import optax_opts  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-module-attribute]
+
   warnings.warn("SGDM module has been moved to optax_opts!"
                 " Calling here from base is deprecated!")
   return optax_opts.SGDM(*args, **kwargs)
 
 
 def RMSProp(*args, **kwargs):  # pylint: disable=invalid-name
-  from learned_optimization.optimizers import optax_opts  # pytype: disable=import-error  # pylint: disable=g-import-not-at-top
+  from learned_optimization.optimizers import optax_opts  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-module-attribute]
+
   warnings.warn("RMSProp module has been moved to optax_opts!"
                 " Calling here from base is deprecated!")
   return optax_opts.RMSProp(*args, **kwargs)
 
 
 def Adam(*args, **kwargs):  # pylint: disable=invalid-name
-  from learned_optimization.optimizers import optax_opts  # pytype: disable=import-error  # pylint: disable=g-import-not-at-top
+  from learned_optimization.optimizers import optax_opts  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-module-attribute]
+
   warnings.warn("Adammodule has been moved to optax_opts!"
                 " Calling here from base is deprecated!")
   return optax_opts.Adam(*args, **kwargs)

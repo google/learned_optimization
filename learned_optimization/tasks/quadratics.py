@@ -184,7 +184,7 @@ class FixedDimQuadraticFamilyData(base.TaskFamily):
       """Generated Task."""
       datasets = ds
 
-      def loss(self, params: Any, key: PRNGKey, data: Any) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
+      def loss(self, params: Any, key: PRNGKey, data: Any) -> jnp.ndarray:  # pyrefly: ignore[bad-override]
         return jnp.sum(jnp.square(task_params - params)) + data
 
       def loss_and_aux(

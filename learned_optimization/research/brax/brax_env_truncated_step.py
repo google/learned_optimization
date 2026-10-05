@@ -152,7 +152,7 @@ class BraxEnvTruncatedStep(truncated_step.TruncatedStep):
       action = self.policy.apply(theta, key, unroll_state.env_state.obs)
       next_env_state = self.env.step(unroll_state.env_state, action)
 
-      out = truncated_step.TruncatedUnrollOut(  # pytype: disable=wrong-arg-types  # jax-ndarray
+      out = truncated_step.TruncatedUnrollOut(
           loss=-next_env_state.reward,  # pyrefly: ignore[bad-argument-type]
           is_done=False,  # pyrefly: ignore[bad-argument-type]
           task_param=None,
@@ -165,7 +165,7 @@ class BraxEnvTruncatedStep(truncated_step.TruncatedStep):
       ), out
 
     def reset(unroll_state):
-      out = truncated_step.TruncatedUnrollOut(  # pytype: disable=wrong-arg-types  # jax-ndarray
+      out = truncated_step.TruncatedUnrollOut(
           loss=0.0, is_done=True, task_param=None, iteration=0, mask=False  # pyrefly: ignore[bad-argument-type]
       )
       unroll_state = BraxEnvState(
