@@ -243,6 +243,6 @@ def partition_unflatten(unflattener: PartitionUnflatten,
   to_fill = [None for _ in keys]
   for name, part in zip(names, part_values):
     for n, p in zip(name, part):
-      to_fill[unmap[n]] = p
+      to_fill[unmap[n]] = p  # pyrefly: ignore[unsupported-operation]
 
   return jax.tree_util.tree_unflatten(struct, to_fill)
