@@ -62,7 +62,7 @@ class CircularBuffer(Generic[T]):
                 jnp.ones([self.size], dtype=jnp.int64) * -self.size))
 
   @functools.partial(jax.jit, static_argnums=(0,))
-  def add(self, state: CircularBufferState, value: T) -> CircularBufferState:  # pytype: disable=invalid-annotation
+  def add(self, state: CircularBufferState, value: T) -> CircularBufferState:
     """Construct the initial state of the circular buffer with default value."""
     idx = state.idx % self.size
 
@@ -81,7 +81,7 @@ class CircularBuffer(Generic[T]):
     return jnp.roll(vals, -offset, axis=0)
 
   @functools.partial(jax.jit, static_argnums=(0,))
-  def stack_with_idx(self, state: CircularBufferState) -> Tuple[T, jnp.ndarray]:  # pytype: disable=invalid-annotation
+  def stack_with_idx(self, state: CircularBufferState) -> Tuple[T, jnp.ndarray]:
     """Return raw values with integer array containing index.
 
     Args:
@@ -97,7 +97,7 @@ class CircularBuffer(Generic[T]):
     return state.values[0], jnp.where(state.values[1] == -1, -1, candidate)
 
   @functools.partial(jax.jit, static_argnums=(0,))
-  def stack_reorder(self, state: CircularBufferState) -> Tuple[T, jnp.ndarray]:  # pytype: disable=invalid-annotation
+  def stack_reorder(self, state: CircularBufferState) -> Tuple[T, jnp.ndarray]:
     """Reorder the values, and return with a mask."""
     candidate = jnp.clip((state.values[1] - state.idx + self.size), -1,
                          self.size)
@@ -107,7 +107,8 @@ class CircularBuffer(Generic[T]):
 
   @functools.partial(jax.jit, static_argnums=(0,))
   def gather_from_present(
-      self, state: CircularBufferState, idxs: jnp.ndarray) -> T:  # pytype: disable=invalid-annotation
+      self, state: CircularBufferState, idxs: jnp.ndarray
+  ) -> T:
     """Get the values from for each idx in the past."""
     offset = (idxs % self.size)
     idx = (state.idx + offset) % self.size

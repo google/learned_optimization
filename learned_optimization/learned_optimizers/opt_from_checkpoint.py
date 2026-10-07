@@ -66,15 +66,15 @@ class _GinScopeClass:
   @functools.lru_cache(None)
   def __getattr__(self, *args):
     if self.has_locked:
-      ret = self.ginned.__getattribute__(*args)  # pytype: disable=attribute-error
+      ret = self.ginned.__getattribute__(*args)
     else:
       if not self.has_locked:
-        ret = self.ginned.__getattribute__(*args)  # pytype: disable=attribute-error
+        ret = self.ginned.__getattribute__(*args)
       else:
         self.has_locked = True
         with gin.config_scope(None):
           with gin.config_scope(self.scope):
-            ret = self.ginned.__getattribute__(*args)  # pytype: disable=attribute-error
+            ret = self.ginned.__getattribute__(*args)
         self.has_locked = False
     if callable(ret):
       ret = self.__wrap(ret, self.scope)

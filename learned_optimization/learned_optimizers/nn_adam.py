@@ -222,22 +222,17 @@ class NNAdam(lopt_base.LearnedOptimizer):
         lambda: self.lstm_fn().initial_state(1))[1](None, key1)
 
     return flax.core.FrozenDict({
-        "lstm_init_state":
-            lstm_inital_state,
-        "rnn_params":
-            self.rnn_init(key2, jnp.zeros([1, self.rnn_input_features]),
-                          lstm_inital_state),
-        "rnn_to_controls_params":
-            self.rnn_to_controls.init(key3,
-                                      jnp.zeros([0, self.lstm_hidden_size])),
-        "per_layer_lr":
-            _scaled_lr.forward(self.initial_learning_rate),  # pyrefly: ignore[bad-argument-type]
-        "per_layer_beta1":
-            _scaled_one_minus_log.forward(self.initial_beta1),  # pyrefly: ignore[bad-argument-type]
-        "per_layer_beta2":
-            _scaled_one_minus_log.forward(self.initial_beta2),  # pyrefly: ignore[bad-argument-type]
-        "per_layer_epsilon":
-            _scaled_epsilon.forward(self.initial_epsilon),  # pyrefly: ignore[bad-argument-type]
+        "lstm_init_state": lstm_inital_state,
+        "rnn_params": self.rnn_init(
+            key2, jnp.zeros([1, self.rnn_input_features]), lstm_inital_state
+        ),
+        "rnn_to_controls_params": self.rnn_to_controls.init(
+            key3, jnp.zeros([0, self.lstm_hidden_size])
+        ),
+        "per_layer_lr": _scaled_lr.forward(self.initial_learning_rate),
+        "per_layer_beta1": _scaled_one_minus_log.forward(self.initial_beta1),
+        "per_layer_beta2": _scaled_one_minus_log.forward(self.initial_beta2),
+        "per_layer_epsilon": _scaled_epsilon.forward(self.initial_epsilon),
     })
 
   def opt_fn(self,
@@ -287,7 +282,7 @@ class NNAdam(lopt_base.LearnedOptimizer):
             per_layer_epsilon=jax.tree_util.tree_map(
                 lambda x: theta["per_layer_epsilon"], params
             ),
-        )  # pytype: disable=wrong-arg-types
+        )
 
       def lstm_features_for_tensor(self, p: jnp.ndarray, g: jnp.ndarray,
                                    m: jnp.ndarray, rms: jnp.ndarray,

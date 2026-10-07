@@ -216,20 +216,20 @@ def featurize_value(val: Any) -> jnp.ndarray:
   # preprocess some of the tags heuristically.
   empty = jnp.zeros((8,))
   if isinstance(val, str):
-    return empty, jnp.asarray(hash_trick(val))  # pytype: disable=bad-return-type  # jax-ndarray
+    return empty, jnp.asarray(hash_trick(val))  # pyrefly: ignore[bad-return]
   if isinstance(val, Sequence):
-    return pad(val), 0  # pytype: disable=bad-return-type  # jax-ndarray
+    return pad(val), 0  # pyrefly: ignore[bad-argument-type, bad-return]
   if isinstance(val, (int, onp.int32, onp.int64)):
-    return empty, jnp.asarray(val)  # pytype: disable=bad-return-type  # jax-ndarray
+    return empty, jnp.asarray(val)  # pyrefly: ignore[bad-return]
   if isinstance(val, (bool, onp.bool_)):
     return pad(onp.asarray(val, dtype=onp.float32)), jnp.asarray(  # type: ignore  # jax-ndarray
         val, dtype=onp.int32)
   if isinstance(val, (float, onp.float32)):
-    return pad(val), 0  # pytype: disable=bad-return-type  # jax-ndarray
+    return pad(val), 0  # pyrefly: ignore[bad-argument-type, bad-return]
   if isinstance(val, jnp.ndarray):
-    return pad(val), 0  # pytype: disable=bad-return-type  # jax-ndarray
+    return pad(val), 0  # pyrefly: ignore[bad-return]
   if isinstance(val, onp.ndarray):
-    return pad(val), 0  # pytype: disable=bad-return-type  # jax-ndarray
+    return pad(val), 0  # pyrefly: ignore[bad-argument-type, bad-return]
 
   raise NotImplementedError(val, type(val))
 
@@ -241,7 +241,7 @@ def featurize_cfg_path(path: str) -> jnp.ndarray:
       continue
     idxs.append(hash_trick(s))
   unpadded = onp.asarray(idxs)
-  return pad(unpadded)  # pytype: disable=wrong-arg-types  # jax-ndarray
+  return pad(unpadded)  # pyrefly: ignore[bad-argument-type]
 
 
 def featurize(

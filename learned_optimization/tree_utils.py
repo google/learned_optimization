@@ -142,8 +142,9 @@ def map_named(function: Callable[[str, Any], Any],
     Struct with the same pytree.
   """
   if isinstance(val, Mapping):
-    return type(val)(  # pyrefly: ignore[bad-instantiation]
-        **{k: map_named(function, v, key + "/" + k) for k, v in val.items()})  # pyrefly: ignore[unsupported-operation]
+    return type(val)(
+        **{k: map_named(function, v, key + "/" + k) for k, v in val.items()}  # pyrefly: ignore[unsupported-operation]
+    )
   elif isinstance(val, tuple) or isinstance(val, list):
     return type(val)(
         *
@@ -205,7 +206,7 @@ def partition(functions: Sequence[FilterFN],
     del v
     return k
 
-  keys = jax.tree_util.tree_leaves(map_named(get_name, "", values))  # pytype: disable=wrong-arg-types  # numpy-scalars
+  keys = jax.tree_util.tree_leaves(map_named(get_name, "", values))  # pyrefly: ignore[bad-argument-type]
   keys = [str(i) for i, v in enumerate(vals)]
   if not strict:
     functions = list(functions) + [lambda k, v: True]

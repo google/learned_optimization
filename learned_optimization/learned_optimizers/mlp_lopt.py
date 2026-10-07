@@ -116,7 +116,7 @@ class MLPLOpt(lopt_base.LearnedOptimizer):
             iteration=jnp.asarray(0, dtype=jnp.int32))
 
       def update(  # pyrefly: ignore[bad-override]
-          self,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+          self,
           opt_state: MLPLOptState,
           grad: Any,
           loss: float,

@@ -214,7 +214,7 @@ class SumOptimizer(opt_base.Optimizer):
         opt.init(params, model_state, num_steps=num_steps, **kwargs)
         for opt in self.opts
     ])
-    return SumOptimizerState(0, params, model_state, opt_states)  # pytype: disable=wrong-arg-types  # jax-ndarray
+    return SumOptimizerState(0, params, model_state, opt_states)  # pyrefly: ignore[bad-argument-type]
 
   def get_params(self, state):
     return self.opts[0].get_params(state.inner_opt_states[0])
@@ -222,7 +222,7 @@ class SumOptimizer(opt_base.Optimizer):
   def get_state(self, state):
     return self.opts[0].get_state(state.inner_opt_states[0])
 
-  def update(self, opt_state, grad, model_state=None, **kwargs):  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+  def update(self, opt_state, grad, model_state=None, **kwargs):  # pyrefly: ignore[bad-override]
     # apply to both opts
     new_opt_states = [
         opt.update(os, grad, model_state=model_state, **kwargs)

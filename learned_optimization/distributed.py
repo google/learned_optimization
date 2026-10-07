@@ -128,8 +128,10 @@ class AsyncLearner(Generic[T, W]):
 
   def _is_step_valid(self, step: int) -> bool:
     step = onp.asarray(step)  # pyrefly: ignore[bad-assignment]
-    return (self._current_iteration >= step and  # pytype: disable=bad-return-type  # typed-numpy
-            (self._current_iteration - step) <= self._staleness)
+    return (
+        self._current_iteration >= step
+        and (self._current_iteration - step) <= self._staleness
+    )
 
   def put_grads(self, worker_id: Any, step: int, value: T):
     """Put computed gradients into learner."""

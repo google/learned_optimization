@@ -558,7 +558,7 @@ class RNNMLPLOpt(lopt_base.LearnedOptimizer):
               rms,
               g,
               v,
-              ff_inputs,  # pytype: disable=wrong-arg-types  # jax-ndarray
+              ff_inputs,
               opt_state.iteration,
               num_tensors,  # pyrefly: ignore[bad-argument-type]
           )

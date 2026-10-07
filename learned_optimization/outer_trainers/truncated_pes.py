@@ -136,7 +136,7 @@ def compute_pes_grad(
       new_accumulator,
       p_ys,
       delta_losses,
-  )  # pytype: disable=bad-return-type
+  )
 
 
 @gin.configurable
@@ -202,7 +202,7 @@ class TruncatedPES(gradient_learner.GradientEstimator):
     ]
 
   @profile.wrap()
-  def compute_gradient_estimate(  # pytype: disable=signature-mismatch  # overriding-parameter-type-checks
+  def compute_gradient_estimate(
       self,
       worker_weights: gradient_learner.WorkerWeights,
       key: PRNGKey,

@@ -148,7 +148,7 @@ class FullGrad(gradient_learner.GradientEstimator):
                         key: PRNGKey) -> UnrollState:
     return UnrollState()
 
-  def compute_gradient_estimate(  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+  def compute_gradient_estimate(  # pyrefly: ignore[bad-override]
       self,
       worker_weights,
       key,

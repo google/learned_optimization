@@ -90,15 +90,20 @@ class ParametricImageResNet(base.TaskFamily):
         params, state = init_net(key, image)
         return params, state
 
-      def loss_with_state(self, params: Params, state: ModelState, key: PRNGKey,  # pytype: disable=signature-mismatch  # jax-ndarray
-                          data: Batch) -> jnp.ndarray:
+      def loss_with_state(  # pyrefly: ignore[bad-override]
+          self,
+          params: Params,
+          state: ModelState,
+          key: PRNGKey,
+          data: Batch,
+      ) -> jnp.ndarray:
         net = hk.transform_with_state(_forward)
 
         image = data["image"]
         logits, state = net.apply(params, state, key, image)
         labels = jax.nn.one_hot(data["label"], num_classes)
         vec_loss = base.softmax_cross_entropy(logits=logits, labels=labels)
-        return jnp.mean(vec_loss), state  # pytype: disable=bad-return-type  # jax-ndarray
+        return jnp.mean(vec_loss), state  # pyrefly: ignore[bad-return]
 
       def loss_with_state_and_aux(
           self, params: Params, state: ModelState, key: PRNGKey, data: Batch

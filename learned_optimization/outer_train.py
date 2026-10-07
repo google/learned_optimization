@@ -238,7 +238,7 @@ def metrics_and_info_from_gradients(
   max_stale = current_step - onp.min(steps)
   metrics["max_staleness"] = max_stale
 
-  return metrics, worker_ids, applied_inner_steps  # pytype: disable=bad-return-type
+  return metrics, worker_ids, applied_inner_steps  # pyrefly: ignore[bad-return]
 
 
 def maybe_resample_gradient_estimators(
@@ -406,7 +406,7 @@ def train_worker(
     total_inner_steps = onp.asarray(0, dtype=onp.int64)
 
     with profile.Profile("grads_to_onp"):
-      to_put_grads = GradientsFromWorker(  # pytype: disable=wrong-arg-types  # jax-ndarray
+      to_put_grads = GradientsFromWorker(
           metrics=gradient_worker_out.metrics,
           worker_id=worker_id,  # pyrefly: ignore[bad-argument-type]
           total_inner_steps=total_inner_steps,  # pyrefly: ignore[bad-argument-type]
@@ -998,7 +998,7 @@ def local_train(
     metrics = gradient_worker_out.metrics
 
     with profile.Profile("grads_to_onp"):
-      to_put_grads = GradientsFromWorker(  # pytype: disable=wrong-arg-types  # jax-ndarray
+      to_put_grads = GradientsFromWorker(
           metrics=gradient_worker_out.metrics,
           worker_id=0,
           total_inner_steps=total_inner_steps,  # pyrefly: ignore[bad-argument-type]
@@ -1043,7 +1043,7 @@ def local_train(
 
     delta_time = time.time() - learner_time
     learner_time = time.time()
-    to_write = summarize_learner(  # pytype: disable=wrong-arg-types  # typed-numpy
+    to_write = summarize_learner(
         step=step,
         metrics=metrics,
         worker_ids=worker_ids,

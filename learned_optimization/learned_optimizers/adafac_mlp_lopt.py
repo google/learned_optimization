@@ -241,7 +241,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
       net = inp_stack
       for wi, (w, b) in enumerate(zip(weights, biases)):
         o_tmp = net @ w
-        net = o_tmp + jnp.broadcast_to(b, list(net.shape[0:-1]) + [w.shape[-1]])  # pytype: disable=attribute-error
+        net = o_tmp + jnp.broadcast_to(b, list(net.shape[0:-1]) + [w.shape[-1]])
 
         if wi != len(weights) - 1:
           net = jax.nn.relu(net)
@@ -270,7 +270,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
             if type(w) == list:  # pylint: disable=unidiomatic-typecheck
               outs.append(v * w[vi][oi])
             else:
-              outs.append(v * w[vi, oi])  # pytype: disable=unsupported-operands
+              outs.append(v * w[vi, oi])
 
           if wi == 0:
             training_step_feature = global_feat["training_step_feature"]
@@ -279,7 +279,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
               if type(w) == list:  # pylint: disable=unidiomatic-typecheck
                 outs.append(training_step_feature[i] * w[vi][oi])
               else:
-                outs.append(training_step_feature[i] * w[vi, oi])  # pytype: disable=unsupported-operands
+                outs.append(training_step_feature[i] * w[vi, oi])
 
           grids.append(outs)
 
@@ -405,7 +405,7 @@ class AdafacMLPLOpt(lopt_base.LearnedOptimizer):
             num_steps=jnp.asarray(num_steps))
 
       def update(  # pyrefly: ignore[bad-override]
-          self,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+          self,
           opt_state: AdafacMLPLOptState,
           grad: opt_base.Gradient,
           loss: jnp.ndarray,

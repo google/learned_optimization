@@ -53,7 +53,7 @@ class ConstantTruncationSchedule(TruncationSchedule):
     self._total_length = total_length
 
   def init(self, key: PRNGKey, outer_state: Any) -> ConstantTruncationState:
-    return ConstantTruncationState(length=self._total_length)  # pytype: disable=wrong-arg-types  # jax-ndarray
+    return ConstantTruncationState(length=self._total_length)  # pyrefly: ignore[bad-argument-type]
 
   def next_state(
       self, state: ConstantTruncationState, step: int, key: PRNGKey,

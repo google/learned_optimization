@@ -178,7 +178,7 @@ def aggregate_metric_list(
     keys = [None] * len(all_metrics)
   for ki, (k, vs) in enumerate(all_metrics.items()):
     metrics[k] = aggregate_metric(k, vs, use_jnp=use_jnp, key=keys[ki])
-  return metrics  # pytype: disable=bad-return-type  # jax-ndarray
+  return metrics
 
 
 def aggregate_metric(k: str,
@@ -195,7 +195,7 @@ def aggregate_metric(k: str,
   if agg == AggregationType.mean:
     # size is known at compile time.
     size = onp.sum([onp.prod(v.shape) for v in vs])
-    return xnp.sum(xnp.asarray([xnp.sum(v) / size for v in vs]))  # pytype: disable=bad-return-type  # jnp-type
+    return xnp.sum(xnp.asarray([xnp.sum(v) / size for v in vs]))  # pyrefly: ignore[bad-return]
   elif agg == AggregationType.sample:
     vs = xnp.concatenate([xnp.asarray(v).ravel() for v in vs], axis=0)  # pyrefly: ignore[bad-assignment]
     if use_jnp:
@@ -204,13 +204,13 @@ def aggregate_metric(k: str,
     else:
       i = onp.random.randint(0, len(vs), dtype=xnp.int32)
 
-    return vs[i]  # pytype: disable=bad-return-type  # jnp-type
+    return vs[i]  # pyrefly: ignore[bad-index]
   elif agg == AggregationType.collect:
     # This might be multi dim if vmap is used, so ravel first.
-    return xnp.concatenate([xnp.asarray(v).ravel() for v in vs], axis=0)  # pytype: disable=bad-return-type  # jnp-type
+    return xnp.concatenate([xnp.asarray(v).ravel() for v in vs], axis=0)  # pyrefly: ignore[bad-return]
   elif agg == AggregationType.tensor:
     assert len(vs) == 1
-    return vs[0]  # pytype: disable=bad-return-type  # jnp-type
+    return vs[0]  # pyrefly: ignore[bad-return]
   elif agg == AggregationType.none:
     if len(vs) != 1:
       raise ValueError("when using no aggregation one must ensure only scalar "
@@ -220,7 +220,7 @@ def aggregate_metric(k: str,
     if val.size != 1:
       raise ValueError("Value with none aggregation type was not a scalar?"
                        f" Found {val}")
-    return xnp.reshape(val, ())  # pytype: disable=bad-return-type  # jnp-type
+    return xnp.reshape(val, ())  # pyrefly: ignore[bad-return]
   else:
     raise ValueError(f"Unsupported Aggregation type {agg}")
 

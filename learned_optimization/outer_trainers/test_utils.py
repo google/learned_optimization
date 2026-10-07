@@ -22,7 +22,7 @@ def trainer_smoketest(trainer):
   key = jax.random.PRNGKey(0)
   theta = trainer.truncated_step.outer_init(key)
   worker_weights = gradient_learner.WorkerWeights(
-      theta, None, gradient_learner.OuterState(1)  # pytype: disable=wrong-arg-types  # jax-ndarray
+      theta, None, gradient_learner.OuterState(1)  # pyrefly: ignore[bad-argument-type]
   )
   state = trainer.init_worker_state(worker_weights, key=key)
   out, metrics = trainer.compute_gradient_estimate(

@@ -83,7 +83,7 @@ class SimpleLOptTruncatedStep(truncated_step.TruncatedStep):
       params = opt.get_params(unroll_state)
       loss, grad = jax.value_and_grad(self.task.loss)(params, key, data)
       unroll_state = opt.update(unroll_state, grad, loss=loss)
-      out = truncated_step.TruncatedUnrollOut(  # pytype: disable=wrong-arg-types  # jax-ndarray
+      out = truncated_step.TruncatedUnrollOut(
           loss=loss,
           is_done=False,  # pyrefly: ignore[bad-argument-type]
           task_param=None,
@@ -95,7 +95,7 @@ class SimpleLOptTruncatedStep(truncated_step.TruncatedStep):
     def reset(unroll_state):
       params = self.task.init(key)
       unroll_state = self.lopt.opt_fn(theta).init(params)
-      out = truncated_step.TruncatedUnrollOut(  # pytype: disable=wrong-arg-types  # jax-ndarray
+      out = truncated_step.TruncatedUnrollOut(
           loss=0.0,  # pyrefly: ignore[bad-argument-type]
           is_done=True,  # pyrefly: ignore[bad-argument-type]
           task_param=None,
@@ -111,7 +111,7 @@ class SimpleLOptTruncatedStep(truncated_step.TruncatedStep):
                       key: chex.PRNGKey, data: OuterBatch,
                       outer_state: OuterState) -> jnp.ndarray:
     params = self.lopt.opt_fn(theta).get_params(unroll_state)
-    return self.task.loss(params, key, data)  # pytype: disable=bad-return-type  # jax-ndarray
+    return self.task.loss(params, key, data)  # pyrefly: ignore[bad-return]
 
   def get_batch(self, steps: Optional[int] = None) -> InnerBatch:
     return training.vec_get_batch(self.task, steps, split="train")
@@ -196,7 +196,7 @@ def _init_truncation_state(
       theta, is_training=True).init(
           inner_param, inner_state, num_steps=num_steps, key=key4)
 
-  return TruncatedUnrollState(  # pytype: disable=wrong-arg-types  # jax-ndarray
+  return TruncatedUnrollState(
       inner_opt_state=opt_state,
       inner_step=jnp.asarray(0, dtype=jnp.int32),
       truncation_state=trunc_state,
@@ -220,7 +220,7 @@ def progress_or_reset_inner_opt_state(
     meta_loss_with_aux_key: Optional[str] = None,
 ) -> Tuple[T, G, int, jnp.ndarray]:
   """Train a single step, or reset the current inner problem."""
-  # summary.summary("num_steps", num_steps, aggregation="sample")  # pytype: disable=wrong-arg-types  # jax-ndarray
+  # summary.summary("num_steps", num_steps, aggregation="sample")
 
   def true_fn(key):
     """Reset the state of the inner-problem."""
@@ -234,7 +234,7 @@ def progress_or_reset_inner_opt_state(
     p, s = task_family.task_fn(task_param).init_with_state(key2)
 
     next_inner_opt_state = opt.init(p, s, num_steps=num_steps, key=key3)
-    # summary.summary("opt_init_num_steps", num_steps)  # pytype: disable=wrong-arg-types  # jax-ndarray
+    # summary.summary("opt_init_num_steps", num_steps)
 
     return next_inner_opt_state, task_param, jnp.asarray(0), jnp.asarray(0.)
 
@@ -280,8 +280,9 @@ def progress_or_reset_inner_opt_state(
     return next_inner_opt_state, task_param, next_inner_step, jnp.asarray(
         meta_loss, dtype=jnp.float32)
 
-  next_inner_opt_state, task_param, next_inner_step, meta_loss = cond_fn(  # pytype: disable=wrong-arg-types  # jax-types
-      jnp.logical_not(is_done), false_fn, true_fn, key)
+  next_inner_opt_state, task_param, next_inner_step, meta_loss = cond_fn(
+      jnp.logical_not(is_done), false_fn, true_fn, key  # pyrefly: ignore[bad-argument-type]
+  )
 
   return next_inner_opt_state, task_param, next_inner_step, meta_loss
 
@@ -298,7 +299,7 @@ def vectorized_loss_and_aux(task_family: tasks_base.TaskFamily,
   opt = learned_opt.opt_fn(theta, is_training=True)
   p, s = opt.get_params_state(inner_opt_state)
   l, _, aux = task.loss_with_state_and_aux(p, s, key, data)
-  return l, aux  # pytype: disable=bad-return-type  # jax-ndarray
+  return l, aux  # pyrefly: ignore[bad-return]
 
 
 def _truncated_unroll_one_step(
@@ -322,15 +323,15 @@ def _truncated_unroll_one_step(
     num_steps = state.truncation_state.length
 
   next_inner_opt_state, task_param, next_inner_step, l = (
-      progress_or_reset_inner_opt_state(  # pytype: disable=wrong-arg-types  # jax-ndarray
+      progress_or_reset_inner_opt_state(
           task_family=task_family,
           opt=learned_opt.opt_fn(theta),
           num_steps=num_steps,
           key=key1,
           inner_opt_state=state.inner_opt_state,
           task_param=state.task_param,
-          inner_step=state.inner_step,
-          is_done=state.is_done,
+          inner_step=state.inner_step,  # pyrefly: ignore[bad-argument-type]
+          is_done=state.is_done,  # pyrefly: ignore[bad-argument-type]
           data=data,
           meta_loss_with_aux_key=meta_loss_with_aux_key,
       )
@@ -343,19 +344,19 @@ def _truncated_unroll_one_step(
   # opt = learned_opt.opt_fn(theta, is_training=sTrue)
   # summary.summarize_inner_params(opt.get_params(next_inner_opt_state))
 
-  output_state = TruncatedUnrollState(  # pytype: disable=wrong-arg-types  # jax-ndarray
+  output_state = TruncatedUnrollState(
       inner_opt_state=next_inner_opt_state,
-      inner_step=next_inner_step,
+      inner_step=next_inner_step,  # pyrefly: ignore[bad-argument-type]
       truncation_state=next_truncation_state,
       task_param=task_param,
-      is_done=is_done,
+      is_done=is_done,  # pyrefly: ignore[bad-argument-type]
   )
 
-  out = truncated_step.TruncatedUnrollOut(  # pytype: disable=wrong-arg-types  # jax-ndarray
-      is_done=is_done,
+  out = truncated_step.TruncatedUnrollOut(
+      is_done=is_done,  # pyrefly: ignore[bad-argument-type]
       loss=l,
-      mask=(next_inner_step != 0),
-      iteration=next_inner_step,
+      mask=(next_inner_step != 0),  # pyrefly: ignore[bad-argument-type]
+      iteration=next_inner_step,  # pyrefly: ignore[bad-argument-type]
       task_param=state.task_param,
   )
 
