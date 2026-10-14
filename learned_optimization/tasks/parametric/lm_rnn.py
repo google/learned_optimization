@@ -85,7 +85,7 @@ class ParametricLMRNN(base.TaskFamily):
           task_params.values["initializer"])
 
       embed = hk.Embed(vocab_size, self.embed_size, w_init=w_init)(inp)
-      rnn_core = self.rnn_core_fn(self.rnn_size)  # pytype: disable=wrong-arg-count  # trace-all-classes
+      rnn_core = self.rnn_core_fn(self.rnn_size)  # pyrefly: ignore[bad-argument-count]
 
       # Make learnable initial states.
       template_state = rnn_core.initial_state(1)
@@ -124,7 +124,7 @@ class ParametricLMRNN(base.TaskFamily):
         seq = batch["obs"]
         return init_net(rng, seq)
 
-      def loss(self, params: Params, rng: PRNGKey, data: Batch) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
+      def loss(self, params: Params, rng: PRNGKey, data: Batch) -> jnp.ndarray:
         net = hk.without_apply_rng(hk.transform(_forward))
         obs = data["obs"]
         target = data["target"]

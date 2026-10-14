@@ -126,7 +126,7 @@ class ParametricImageMLPVAE(base.TaskFamily):
         image = next(self.datasets.train)["image"]  # pyrefly: ignore[missing-attribute]
         return hk.transform(_forward).init(key, image)
 
-      def loss(self, params: Params, key: PRNGKey, data: Batch) -> jnp.ndarray:  # pytype: disable=signature-mismatch  # jax-ndarray
+      def loss(self, params: Params, key: PRNGKey, data: Batch) -> jnp.ndarray:  # pyrefly: ignore[bad-override]
         image = data["image"]
         center_fn = lambda img: 2 * (img - 0.5)
         image = jax.lax.cond(task_params["center_data"], center_fn, lambda x: x,
