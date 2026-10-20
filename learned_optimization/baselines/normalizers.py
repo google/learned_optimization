@@ -53,10 +53,10 @@ def ema(data: chex.Array, alpha: float, ignore_nan=False):
   m_alpha = alpha
   # TODO(lmetz) profile if this is needed / saves much time.
   if ignore_nan:
-    for i, a in enumerate((1 - alpha) * data[1:]):
+    for i, a in enumerate((1 - alpha) * data[1:]):  # pyrefly: ignore[not-iterable, unsupported-operation]
       x[i + 1] = x[i] if onp.isnan(a) else x[i] * m_alpha + a
   else:
-    for i, a in enumerate((1 - alpha) * data[1:]):
+    for i, a in enumerate((1 - alpha) * data[1:]):  # pyrefly: ignore[not-iterable, unsupported-operation]
       x[i + 1] = x[i] * m_alpha + a
 
   return x
