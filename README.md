@@ -6,7 +6,7 @@
 *learned\_optimization* is a research codebase for training, designing, evaluating, and applying learned
 optimizers, and for meta-training of dynamical systems more broadly. It implements hand-designed and learned optimizers, tasks to meta-train and meta-test them, and outer-training algorithms such as ES, PES, and truncated backprop through time.
 
-To get started see our [documentation](https://learned-optimization.readthedocs.io/en/latest/).
+There is a third-party (alpha) [PyTorch wrapper for VeLO](https://github.com/janEbert/PyTorch-VeLO) (the current SOTA learned optimizer in this repository) by Jan Ebert.
 
 ## Quick Start Colab Notebooks
 Our [documentation](https://learned-optimization.readthedocs.io/en/latest/) can also be run as colab notebooks! We recommend running these notebooks with a free accelerator (TPU or GPU) in colab (go to `Runtime` -> `Change runtime type`).
